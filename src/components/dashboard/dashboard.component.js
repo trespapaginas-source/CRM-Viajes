@@ -216,8 +216,7 @@ export const DashboardComponent = {
             const margenReal = p.totalRecaudado - p.costos;
 
             container.innerHTML += `
-                <div class="bg-white/70 backdrop-blur-xl border border-white/80 p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-500 flex flex-col relative overflow-hidden group">
-                    <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl z-0 pointer-events-none"></div>
+                <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col relative overflow-hidden group">
                     <div class="relative z-10 flex-1 flex flex-col">
                         <h4 class="font-black text-slate-900 text-xl leading-tight truncate pr-2 font-heading">${UI.sanitize(p.nombre)}</h4>
                         <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-6 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
@@ -236,7 +235,7 @@ export const DashboardComponent = {
                             </div>
                             <div class="text-right">
                                 <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Margen a Hoy</p>
-                                <p class="text-base font-black tracking-tight ${margenReal >= 0 ? 'text-emerald-600' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
+                                <p class="text-base font-black tracking-tight ${margenReal >= 0 ? 'text-slate-900' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
                             </div>
                         </div>
                         <div class="mt-auto">
@@ -244,22 +243,22 @@ export const DashboardComponent = {
                                 <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progreso de Recaudo</span>
                                 <span class="text-[10px] font-black text-slate-800">${pct}%</span>
                             </div>
-                            <div class="w-full bg-slate-100/80 h-1.5 rounded-full overflow-hidden mb-6">
-                                <div class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
+                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-6">
+                                <div class="bg-primary-500 h-full rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
                             </div>
                         </div>
-                        <div class="grid grid-cols-3 gap-2 border-t border-slate-200/50 pt-4 mt-auto">
-                            <div class="flex items-center justify-center bg-white rounded-xl py-2 px-1 border border-slate-100 shadow-sm">
+                        <div class="grid grid-cols-3 gap-2 border-t border-slate-100 pt-4 mt-auto">
+                            <div class="flex items-center justify-center bg-slate-50 rounded-xl py-2 px-1 border border-slate-100/50">
                                 <i class="ph ph-users text-slate-400 mr-1.5 text-sm"></i>
                                 <span class="text-[10px] font-black text-slate-700">${p.pax} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Pax</span></span>
                             </div>
-                            <div class="flex items-center justify-center bg-emerald-50/80 rounded-xl py-2 px-1 border border-emerald-100/50 shadow-sm">
-                                <i class="ph ph-check-circle text-emerald-500 mr-1.5 text-sm"></i>
-                                <span class="text-[10px] font-black text-emerald-700">${p.pagados} <span class="font-bold text-[9px] text-emerald-600/70 uppercase ml-0.5">Al día</span></span>
+                            <div class="flex items-center justify-center bg-slate-50 rounded-xl py-2 px-1 border border-slate-100/50">
+                                <i class="ph ph-check-circle text-slate-400 mr-1.5 text-sm"></i>
+                                <span class="text-[10px] font-black text-slate-700">${p.pagados} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Al día</span></span>
                             </div>
-                            <div class="flex items-center justify-center bg-rose-50/80 rounded-xl py-2 px-1 border border-rose-100/50 shadow-sm">
-                                <i class="ph ph-warning-circle text-rose-400 mr-1.5 text-sm"></i>
-                                <span class="text-[10px] font-black text-rose-700">${p.deben} <span class="font-bold text-[9px] text-rose-600/70 uppercase ml-0.5">Deben</span></span>
+                            <div class="flex items-center justify-center bg-slate-50 rounded-xl py-2 px-1 border border-slate-100/50">
+                                <i class="ph ph-warning-circle text-slate-400 mr-1.5 text-sm"></i>
+                                <span class="text-[10px] font-black text-slate-700">${p.deben} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Deben</span></span>
                             </div>
                         </div>
                     </div>
@@ -270,8 +269,8 @@ export const DashboardComponent = {
         const emptySlots = 3 - top3Plans.length;
         for (let i = 0; i < emptySlots; i++) {
             container.innerHTML += `
-                <div class="border border-dashed border-slate-300 bg-white/40 backdrop-blur-sm rounded-[2rem] flex flex-col items-center justify-center text-slate-400 opacity-80 min-h-[300px] p-6 transition-all hover:bg-white/60">
-                    <div class="w-12 h-12 bg-white/80 rounded-2xl flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white mb-3">
+                <div class="border border-dashed border-slate-200 bg-transparent rounded-[20px] flex flex-col items-center justify-center text-slate-400 min-h-[300px] p-6 transition-colors hover:bg-slate-50/50">
+                    <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 mb-3">
                         <i class="ph ph-map-trifold text-2xl text-slate-300"></i>
                     </div>
                     <p class="text-[11px] font-black uppercase tracking-widest text-center text-slate-500">Espacio Disponible</p>

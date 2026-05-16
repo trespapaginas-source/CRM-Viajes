@@ -285,60 +285,66 @@
             </header>
 
 
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 relative scroll-smooth bg-slate-50/50 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-100/40 via-white to-orange-50/30" id="main-scroll-area">
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 relative scroll-smooth bg-slate-50/50" id="main-scroll-area">
 
                 <section id="view-dashboard" class="view-section active fade-in max-w-7xl mx-auto">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-                        <div class="bg-white/60 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(14,165,233,0.12)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
-                            <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl z-0 pointer-events-none"></div>
-                            
-                            <div class="flex items-center gap-3 mb-4 relative z-10">
-                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-slate-800 group-hover:to-slate-900 group-hover:text-white transition-all duration-500 shadow-sm border border-white shrink-0 transform group-hover:scale-105">
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
                                     <i class="ph ph-currency-dollar text-xl"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Ingresos</span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ingresos</span>
                             </div>
-                            
-                            <div class="relative z-10">
+                            <div>
                                 <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-ingresos">$0</h3>
                                 <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Facturación Bruta</p>
                             </div>
                         </div>
 
-                        <div class="bg-white/60 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(14,165,233,0.12)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
-                            <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl z-0 pointer-events-none"></div>
-                            
-                            <div class="flex items-center gap-3 mb-4 relative z-10">
-                                <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-slate-800 group-hover:to-slate-900 group-hover:text-white transition-all duration-500 shadow-sm border border-white shrink-0 transform group-hover:scale-105">
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
                                     <i class="ph ph-receipt text-xl"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Costos</span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Costos</span>
                             </div>
-                            
-                            <div class="relative z-10">
+                            <div>
                                 <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-costos">$0</h3>
                                 <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Operación Total</p>
                             </div>
                         </div>
 
-                        <div class="bg-white/60 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(14,165,233,0.15)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
-                            <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-sky-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl z-0 pointer-events-none"></div>
-                            
+                        <div class="bg-slate-900 rounded-[20px] p-6 shadow-md border border-slate-800 flex flex-col justify-between min-h-[140px] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden">
+                            <div class="absolute inset-0 bg-gradient-to-br from-primary-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                             <div class="flex justify-between items-center mb-4 relative z-10">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-50 to-sky-100 text-sky-600 flex items-center justify-center group-hover:bg-gradient-to-br group-hover:from-sky-500 group-hover:to-sky-600 group-hover:text-white transition-all duration-500 shadow-sm border border-white shrink-0 transform group-hover:scale-105">
-                                        <i class="ph ph-chart-line-up text-xl"></i>
+                                    <div class="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center border border-slate-700 shrink-0">
+                                        <i class="ph ph-chart-line-up text-xl text-primary-400"></i>
                                     </div>
-                                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Utilidad</span>
+                                    <span class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Utilidad</span>
                                 </div>
-                                <span class="text-[10px] font-black text-sky-600 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100 shadow-sm transition-colors group-hover:bg-sky-100 group-hover:border-sky-200" id="kpi-margen-pct">0% MG</span>
+                                <span class="text-[10px] font-black text-primary-400 bg-primary-500/10 px-2.5 py-1 rounded-lg border border-primary-500/20" id="kpi-margen-pct">0% MG</span>
                             </div>
-                            
                             <div class="relative z-10">
-                                <h3 class="text-3xl font-black text-sky-600 tracking-tighter" id="kpi-margen">$0</h3>
+                                <h3 class="text-3xl font-black text-white tracking-tighter" id="kpi-margen">$0</h3>
                                 <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Beneficio Neto</p>
                             </div>
                         </div>
+
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-users-three text-xl"></i>
+                                </div>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ventas</span>
+                            </div>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-clientes">0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Pasajeros Activos</p>
+                            </div>
+                        </div>
+                    </div>
 
                         <div class="bg-white/60 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(14,165,233,0.12)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
                             <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl z-0 pointer-events-none"></div>
@@ -359,59 +365,55 @@
 
                     <!-- FILA 2: KPIs Estratégicos CEO -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 fade-in" style="animation-delay: 0.05s;">
-                        <div class="bg-white/50 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-emerald-100/30 flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(16,185,129,0.15)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
-                            <div class="absolute -right-10 -top-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 z-0 pointer-events-none"></div>
-                            <div class="flex items-center gap-3 mb-4 relative z-10">
-                                <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500 shadow-sm border border-emerald-100/50 shrink-0 transform group-hover:scale-105">
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
                                     <i class="ph ph-wallet text-xl"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">Recaudado</span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Recaudado</span>
                             </div>
-                            <div class="relative z-10">
-                                <h3 class="text-3xl font-black text-emerald-700 tracking-tighter" id="kpi-recaudado">$0</h3>
-                                <p class="text-[10px] text-emerald-600/70 mt-1 font-bold uppercase tracking-wider">Total Cobrado</p>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-recaudado">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Total Cobrado</p>
                             </div>
                         </div>
 
-                        <div class="bg-white/50 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-amber-100/30 flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(245,158,11,0.15)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
-                            <div class="absolute -right-10 -top-10 w-32 h-32 bg-amber-400/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 z-0 pointer-events-none"></div>
-                            <div class="flex items-center gap-3 mb-4 relative z-10">
-                                <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white transition-all duration-500 shadow-sm border border-amber-100/50 shrink-0 transform group-hover:scale-105">
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
                                     <i class="ph ph-clock-countdown text-xl"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em]">Cartera</span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cartera</span>
                             </div>
-                            <div class="relative z-10">
-                                <h3 class="text-3xl font-black text-amber-700 tracking-tighter" id="kpi-cartera">$0</h3>
-                                <p class="text-[10px] text-amber-600/70 mt-1 font-bold uppercase tracking-wider">Cuentas por Cobrar</p>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-cartera">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Cuentas por Cobrar</p>
                             </div>
                         </div>
 
-                        <div class="bg-white/50 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-blue-100/30 flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(59,130,246,0.15)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
-                            <div class="absolute -right-10 -top-10 w-32 h-32 bg-blue-400/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 z-0 pointer-events-none"></div>
-                            <div class="flex items-center gap-3 mb-4 relative z-10">
-                                <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all duration-500 shadow-sm border border-blue-100/50 shrink-0 transform group-hover:scale-105">
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
                                     <i class="ph ph-airplane-takeoff text-xl"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Próximas</span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Próximas</span>
                             </div>
-                            <div class="relative z-10">
-                                <h3 class="text-3xl font-black text-blue-700 tracking-tighter" id="kpi-proximas">0</h3>
-                                <p class="text-[10px] text-blue-600/70 mt-1 font-bold uppercase tracking-wider">Salidas en 7 Días</p>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-proximas">0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Salidas en 7 Días</p>
                             </div>
                         </div>
 
-                        <div class="bg-white/50 backdrop-blur-2xl rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-rose-100/30 flex flex-col justify-between min-h-[140px] hover:shadow-[0_8px_30px_rgb(244,63,94,0.15)] hover:-translate-y-1 transition-all duration-500 group relative overflow-hidden">
-                            <div class="absolute -right-10 -top-10 w-32 h-32 bg-rose-400/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 z-0 pointer-events-none"></div>
-                            <div class="flex items-center gap-3 mb-4 relative z-10">
-                                <div class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-all duration-500 shadow-sm border border-rose-100/50 shrink-0 transform group-hover:scale-105">
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-rose-600 group-hover:text-white transition-colors duration-300 shrink-0">
                                     <i class="ph ph-x-circle text-xl"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em]">Cancelación</span>
+                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cancelación</span>
                             </div>
-                            <div class="relative z-10">
-                                <h3 class="text-3xl font-black text-rose-600 tracking-tighter" id="kpi-cancelacion">0%</h3>
-                                <p class="text-[10px] text-rose-600/70 mt-1 font-bold uppercase tracking-wider">Tasa de Desistimiento</p>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-cancelacion">0%</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Tasa de Desistimiento</p>
                             </div>
                         </div>
                     </div>
@@ -430,16 +432,14 @@
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 fade-in" style="animation-delay: 0.2s;">
-                        <div class="bg-white/70 backdrop-blur-xl rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/80 lg:col-span-2 relative overflow-hidden group">
-                            <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl z-0 pointer-events-none"></div>
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 lg:col-span-2 relative overflow-hidden group">
                             <div class="mb-6 relative z-10">
                                 <h3 class="font-black text-slate-800 text-lg tracking-tight font-heading">Ventas vs Recaudo</h3>
                                 <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Top planes con mayor tracción financiera</p>
                             </div>
                             <div class="relative h-64 w-full z-10"><canvas id="revenueChart"></canvas></div>
                         </div>
-                        <div class="bg-white/70 backdrop-blur-xl rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/80 relative overflow-hidden group">
-                            <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl z-0 pointer-events-none"></div>
+                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 relative overflow-hidden group">
                             <div class="mb-6 relative z-10">
                                 <h3 class="font-black text-slate-800 text-lg tracking-tight font-heading">Distribución</h3>
                                 <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Share de mercado interno</p>
