@@ -216,48 +216,51 @@ export const DashboardComponent = {
             const margenReal = p.totalRecaudado - p.costos;
 
             container.innerHTML += `
-                <div class="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col">
-                    <h4 class="font-black text-slate-900 text-lg leading-tight truncate pr-2">${UI.sanitize(p.nombre)}</h4>
-                    <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-6 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
-                    <div class="grid grid-cols-2 gap-y-5 gap-x-4 mb-6">
-                        <div>
-                            <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Total Vendido</p>
-                            <p class="text-base font-black text-slate-900 tracking-tight">${formatCOP(p.totalVendido)}</p>
+                <div class="bg-white/70 backdrop-blur-xl border border-white/80 p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-500 flex flex-col relative overflow-hidden group">
+                    <div class="absolute -inset-4 bg-gradient-to-tr from-transparent via-transparent to-primary-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl z-0 pointer-events-none"></div>
+                    <div class="relative z-10 flex-1 flex flex-col">
+                        <h4 class="font-black text-slate-900 text-xl leading-tight truncate pr-2 font-heading">${UI.sanitize(p.nombre)}</h4>
+                        <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-6 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
+                        <div class="grid grid-cols-2 gap-y-5 gap-x-4 mb-6">
+                            <div>
+                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Total Vendido</p>
+                                <p class="text-base font-black text-slate-900 tracking-tight">${formatCOP(p.totalVendido)}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Costos Base</p>
+                                <p class="text-base font-bold text-slate-500 tracking-tight">${formatCOP(p.costos)}</p>
+                            </div>
+                            <div>
+                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Recaudado</p>
+                                <p class="text-base font-black text-slate-900 tracking-tight">${formatCOP(p.totalRecaudado)}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Margen a Hoy</p>
+                                <p class="text-base font-black tracking-tight ${margenReal >= 0 ? 'text-emerald-600' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
+                            </div>
                         </div>
-                        <div class="text-right">
-                            <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Costos Base</p>
-                            <p class="text-base font-bold text-slate-500 tracking-tight">${formatCOP(p.costos)}</p>
+                        <div class="mt-auto">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progreso de Recaudo</span>
+                                <span class="text-[10px] font-black text-slate-800">${pct}%</span>
+                            </div>
+                            <div class="w-full bg-slate-100/80 h-1.5 rounded-full overflow-hidden mb-6">
+                                <div class="bg-gradient-to-r from-primary-400 to-primary-600 h-full rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
+                            </div>
                         </div>
-                        <div>
-                            <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Recaudado</p>
-                            <p class="text-base font-black text-slate-900 tracking-tight">${formatCOP(p.totalRecaudado)}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Margen a Hoy</p>
-                            <p class="text-base font-black tracking-tight ${margenReal >= 0 ? 'text-emerald-600' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
-                        </div>
-                    </div>
-                    <div class="mt-auto">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progreso de Recaudo</span>
-                            <span class="text-[10px] font-black text-slate-800">${pct}%</span>
-                        </div>
-                        <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-6">
-                            <div class="bg-slate-900 h-full rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2 border-t border-slate-100/80 pt-4">
-                        <div class="flex items-center justify-center bg-slate-50 rounded-xl py-2 px-1">
-                            <i class="ph ph-users text-slate-400 mr-1.5 text-sm"></i>
-                            <span class="text-[10px] font-black text-slate-700">${p.pax} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Pax</span></span>
-                        </div>
-                        <div class="flex items-center justify-center bg-emerald-50/50 rounded-xl py-2 px-1">
-                            <i class="ph ph-check-circle text-emerald-500 mr-1.5 text-sm"></i>
-                            <span class="text-[10px] font-black text-emerald-700">${p.pagados} <span class="font-bold text-[9px] text-emerald-600/70 uppercase ml-0.5">Al día</span></span>
-                        </div>
-                        <div class="flex items-center justify-center bg-rose-50/50 rounded-xl py-2 px-1">
-                            <i class="ph ph-warning-circle text-rose-400 mr-1.5 text-sm"></i>
-                            <span class="text-[10px] font-black text-rose-700">${p.deben} <span class="font-bold text-[9px] text-rose-600/70 uppercase ml-0.5">Deben</span></span>
+                        <div class="grid grid-cols-3 gap-2 border-t border-slate-200/50 pt-4 mt-auto">
+                            <div class="flex items-center justify-center bg-white rounded-xl py-2 px-1 border border-slate-100 shadow-sm">
+                                <i class="ph ph-users text-slate-400 mr-1.5 text-sm"></i>
+                                <span class="text-[10px] font-black text-slate-700">${p.pax} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Pax</span></span>
+                            </div>
+                            <div class="flex items-center justify-center bg-emerald-50/80 rounded-xl py-2 px-1 border border-emerald-100/50 shadow-sm">
+                                <i class="ph ph-check-circle text-emerald-500 mr-1.5 text-sm"></i>
+                                <span class="text-[10px] font-black text-emerald-700">${p.pagados} <span class="font-bold text-[9px] text-emerald-600/70 uppercase ml-0.5">Al día</span></span>
+                            </div>
+                            <div class="flex items-center justify-center bg-rose-50/80 rounded-xl py-2 px-1 border border-rose-100/50 shadow-sm">
+                                <i class="ph ph-warning-circle text-rose-400 mr-1.5 text-sm"></i>
+                                <span class="text-[10px] font-black text-rose-700">${p.deben} <span class="font-bold text-[9px] text-rose-600/70 uppercase ml-0.5">Deben</span></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -267,8 +270,8 @@ export const DashboardComponent = {
         const emptySlots = 3 - top3Plans.length;
         for (let i = 0; i < emptySlots; i++) {
             container.innerHTML += `
-                <div class="border border-dashed border-slate-200 bg-slate-50/50 rounded-[2rem] flex flex-col items-center justify-center text-slate-400 opacity-80 min-h-[300px] p-6">
-                    <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
+                <div class="border border-dashed border-slate-300 bg-white/40 backdrop-blur-sm rounded-[2rem] flex flex-col items-center justify-center text-slate-400 opacity-80 min-h-[300px] p-6 transition-all hover:bg-white/60">
+                    <div class="w-12 h-12 bg-white/80 rounded-2xl flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white mb-3">
                         <i class="ph ph-map-trifold text-2xl text-slate-300"></i>
                     </div>
                     <p class="text-[11px] font-black uppercase tracking-widest text-center text-slate-500">Espacio Disponible</p>
@@ -301,8 +304,8 @@ export const DashboardComponent = {
                 data: {
                     labels: labels.length > 0 ? labels : ['Sin datos'],
                     datasets: [
-                        { label: 'Venta Total Negociada', data: dataVendido.length > 0 ? dataVendido : [0], backgroundColor: '#cbd5e1', borderRadius: 6 },
-                        { label: 'Dinero Real Recaudado', data: dataRecaudado.length > 0 ? dataRecaudado : [0], backgroundColor: '#0f172a', borderRadius: 6 }
+                        { label: 'Venta Total Negociada', data: dataVendido.length > 0 ? dataVendido : [0], backgroundColor: '#38BDF8', borderRadius: 6 },
+                        { label: 'Dinero Real Recaudado', data: dataRecaudado.length > 0 ? dataRecaudado : [0], backgroundColor: '#0EA5E9', borderRadius: 6 }
                     ]
                 },
                 options: {
@@ -321,7 +324,7 @@ export const DashboardComponent = {
         const pieCanvas = document.getElementById('packagesChart');
         if (pieCanvas) {
             const ctxDoughnut = pieCanvas.getContext('2d');
-            const bgColors = ['#0f172a', '#334155', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0', '#8b7355', '#d4af37', '#f3e5ab'];
+            const bgColors = ['#0EA5E9', '#38BDF8', '#7DD3FC', '#BAE6FD', '#E0F2FE', '#F0F9FF', '#F97316', '#FB923C', '#FDBA74'];
             this.doughnutChart = new Chart(ctxDoughnut, {
                 type: 'doughnut',
                 data: {
