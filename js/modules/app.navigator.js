@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // js/modules/app.navigator.js — Router SPA + Persistencia
 // Dependencias: DataService (service), UI (utils)
 // Cross-module: 
@@ -18,6 +18,7 @@ import { PlanesComponent } from '../../src/components/planes/planes.component.js
 import { DashboardComponent } from '../../src/components/dashboard/dashboard.component.js';
 import { RentabilidadComponent } from '../../src/components/rentabilidad/rentabilidad.component.js';
 import { InternacionalesComponent } from '../../src/components/internacionales/internacionales.component.js';
+import { DocumentosComponent } from '../../src/components/documentos/documentos.component.js';
 
 export const App = {
     async initData() {
@@ -44,6 +45,7 @@ export const App = {
             RentabilidadComponent.init();
             ContactsComponent.init();
             InternacionalesComponent.init();
+            DocumentosComponent.init();
 
             const savedView = localStorage.getItem('travelers_active_view') || 'dashboard';
             this.navigate(savedView);
@@ -101,7 +103,8 @@ export const App = {
             'configuracion': 'Configuración del Sistema',
             'enlaces': 'Ventas por WhatsApp',
             'rentabilidad': 'Rentabilidad y Salidas',
-            'internacionales': 'Directorio Internacional'
+            'internacionales': 'Directorio Internacional',
+            'documentos': 'Documentos y Soportes'
         };
 
         const headerObj = document.getElementById('header-title');

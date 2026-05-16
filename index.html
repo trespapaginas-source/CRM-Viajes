@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
@@ -159,6 +160,13 @@
                     <i class="ph ph-map-trifold text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity"></i>
                     <span class="font-bold text-sm">Catálogo</span>
                 </a>
+
+                <a href="#" data-target="documentos"
+                    class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group">
+                    <i class="ph ph-file-pdf text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity"></i>
+                    <span class="font-bold text-sm">Cotizaciones</span>
+                </a>
+
 
                 <a href="#" data-target="clientes"
                     class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group">
@@ -1720,6 +1728,173 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- NUEVA SECCIÓN: DOCUMENTOS (COTIZACIONES Y SOPORTES) -->
+                <section id="view-documentos" class="view-section max-w-7xl mx-auto hidden">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+                        <div>
+                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Generador de Soportes</h3>
+                            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Cotizaciones y Recibos de Pago</p>
+                        </div>
+                        <button onclick="DocumentosComponent.openSettings()" class="bg-white border border-slate-200/60 p-3 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-sm transition-all focus:outline-none flex items-center">
+                            <i class="ph ph-gear text-lg mr-2"></i> Configurar Marca
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Formulario de Configuración -->
+                        <div class="bg-white p-6 rounded-[1.5rem] shadow-sm border border-slate-200/50">
+                            <div class="mb-6 pb-4 border-b border-slate-100">
+                                <h4 class="font-black text-slate-800 text-lg">Detalles del Documento</h4>
+                                <p class="text-xs text-slate-400 font-medium">Configura los datos del cliente y valores.</p>
+                            </div>
+
+                            <form id="doc-form" class="space-y-5" onsubmit="event.preventDefault(); DocumentosComponent.generatePDF();">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-widest">Tipo de Documento</label>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="doc_type" value="cotizacion" class="peer sr-only" checked onchange="DocumentosComponent.updateFormUI()">
+                                            <div class="text-center p-3 border border-slate-200 rounded-xl peer-checked:bg-primary-50 peer-checked:border-primary-500 peer-checked:text-primary-700 font-bold transition-all">
+                                                Cotización
+                                            </div>
+                                        </label>
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="doc_type" value="recibo" class="peer sr-only" onchange="DocumentosComponent.updateFormUI()">
+                                            <div class="text-center p-3 border border-slate-200 rounded-xl peer-checked:bg-emerald-50 peer-checked:border-emerald-500 peer-checked:text-emerald-700 font-bold transition-all">
+                                                Recibo de Pago
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">A Nombre De</label>
+                                        <input type="text" id="doc_cliente" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="Ej. Juan Pérez (Grupo)">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Identificación</label>
+                                        <input type="text" id="doc_dni" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="DNI / Pasaporte">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Plan / Concepto</label>
+                                    <input type="text" id="doc_plan" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="Ej. Paquete San Andrés - 4 Días">
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Nº Pasajeros</label>
+                                        <input type="number" id="doc_pax" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all" value="1" min="1">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Fecha Viaje</label>
+                                        <input type="date" id="doc_fecha" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none transition-all">
+                                    </div>
+                                </div>
+
+                                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/60 space-y-4">
+                                    <div>
+                                        <label class="block text-[11px] font-black text-slate-800 mb-1.5 uppercase tracking-widest">Valor Total ($)</label>
+                                        <input type="number" id="doc_valor_total" oninput="DocumentosComponent.calcSaldo()" required class="w-full px-4 py-3 bg-white border border-slate-200/60 rounded-xl text-base font-black text-slate-800 focus:ring-2 focus:ring-slate-900 outline-none transition-all" placeholder="0">
+                                    </div>
+                                    <div id="wrapper_abono" class="hidden">
+                                        <label class="block text-[11px] font-black text-emerald-600 mb-1.5 uppercase tracking-widest">Abono Recibido ($)</label>
+                                        <input type="number" id="doc_abono" oninput="DocumentosComponent.calcSaldo()" class="w-full px-4 py-3 bg-white border border-emerald-200/60 rounded-xl text-base font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500 outline-none transition-all" placeholder="0">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Saldo Pendiente</label>
+                                        <div id="doc_saldo_display" class="w-full px-4 py-3 bg-slate-200/50 border border-slate-200/60 rounded-xl text-sm font-bold text-slate-500">$0</div>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="w-full bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg hover:bg-slate-800 transition-all flex justify-center items-center mt-4 uppercase tracking-[0.15em] text-xs">
+                                    <i class="ph ph-file-pdf mr-2 text-xl"></i> Generar Documento
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Vista Previa Documento -->
+                        <div class="hidden lg:block relative bg-slate-100 rounded-[1.5rem] border border-slate-200 overflow-hidden flex flex-col items-center justify-center min-h-[600px]">
+                            <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'20\' height=\'20\' viewBox=\'0 0 20 20\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'%2394a3b8\' fill-opacity=\'0.1\' fill-rule=\'evenodd\'%3E%3Ccircle cx=\'3\' cy=\'3\' r=\'3\'/%3E%3Cg/%3E%3C/svg%3E')] opacity-50"></div>
+                            <div id="pdf_preview_container" class="relative z-10 w-[400px] h-[565px] bg-white shadow-2xl transform scale-90 origin-center transition-all overflow-hidden border border-slate-200">
+                                <!-- El HTML del PDF se inyecta aquí para previsualizar -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Modal de Configuración de Marca -->
+                <div id="modal-settings-marca" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+                    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity" id="msm-bg" onclick="UI.closeModal('modal-settings-marca', 'msm-bg', 'msm-content')"></div>
+                    <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg transform scale-95 opacity-0 transition-all duration-300 relative z-10 flex flex-col max-h-[90vh] overflow-hidden" id="msm-content">
+                        <div class="p-6 md:p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h3 class="font-black text-slate-800 text-xl tracking-tight">Configuración de Marca</h3>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Identidad para PDFs</p>
+                            </div>
+                            <button onclick="UI.closeModal('modal-settings-marca', 'msm-bg', 'msm-content')" class="text-slate-400 hover:text-slate-900 transition-all p-2 bg-white hover:bg-slate-100 rounded-xl shadow-sm border border-slate-200/60"><i class="ph ph-x text-lg"></i></button>
+                        </div>
+                        <div class="p-6 md:p-8 overflow-y-auto custom-scrollbar space-y-5">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Logo URL (PNG/JPG)</label>
+                                <input type="text" id="setting_logo" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="https://ejemplo.com/logo.png">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Color Primario</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="color" id="setting_color1" value="#008B8B" class="w-10 h-10 rounded cursor-pointer border-0 p-0">
+                                        <span class="text-xs font-bold text-slate-500">Cyan</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Color Secundario</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="color" id="setting_color2" value="#F97316" class="w-10 h-10 rounded cursor-pointer border-0 p-0">
+                                        <span class="text-xs font-bold text-slate-500">Naranja</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Razón Social</label>
+                                <input type="text" id="setting_razon" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Travelers S.A.S">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">NIT</label>
+                                    <input type="text" id="setting_nit" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="900.000.000-1">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">RNT</label>
+                                    <input type="text" id="setting_rnt" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="123456">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Teléfono / Contacto</label>
+                                <input type="text" id="setting_tel" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="+57 300 000 0000">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Dirección</label>
+                                <input type="text" id="setting_dir" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Calle Falsa 123">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Términos y Condiciones (Pie de página)</label>
+                                <textarea id="setting_terms" rows="3" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Condiciones de reserva, reembolsos..."></textarea>
+                            </div>
+                        </div>
+                        <div class="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+                            <button type="button" onclick="DocumentosComponent.saveSettings()" class="bg-slate-900 text-white font-black px-6 py-3.5 rounded-xl shadow-lg hover:bg-slate-800 transition-all uppercase tracking-[0.15em] text-[10px]">Guardar Configuración</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Template HTML Oculto para Generar PDF -->
+                <div id="pdf-template-container" style="display: none;"></div>
+
+
             </div>
         </main>
     </div>
