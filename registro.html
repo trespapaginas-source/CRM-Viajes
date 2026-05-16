@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Check-in de Reserva | Travelers</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #fcfcfd;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(220, 30%, 95%, 1) 0, transparent 50%), 
+                radial-gradient(at 100% 100%, hsla(220, 30%, 90%, 1) 0, transparent 50%);
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3, .font-heading {
+            font-family: 'Outfit', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        input, select, button {
+            min-height: 48px;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+
+<body class="text-slate-900 antialiased p-4 md:p-8 flex items-center justify-center">
+
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="text-center mb-10 fade-in">
+            <div class="w-16 h-16 bg-slate-900 rounded-[1.5rem] mx-auto flex items-center justify-center mb-5 shadow-2xl shadow-slate-900/20">
+                <i class="ph ph-airplane-tilt text-3xl text-white"></i>
+            </div>
+            <h1 class="text-2xl font-black uppercase tracking-[0.2em] text-slate-900 font-heading">Travelers</h1>
+            <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1.5">Registro de Pasajeros</p>
+        </div>
+
+        <div id="app-container"
+            class="bg-white/80 backdrop-blur-2xl rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white p-6 md:p-10 fade-in relative overflow-hidden">
+
+            <div id="state-loading" class="flex flex-col items-center justify-center py-12">
+                <div class="w-12 h-12 border-4 border-slate-100 border-t-slate-900 rounded-full animate-spin mb-5"></div>
+                <p class="text-[11px] font-black uppercase tracking-widest text-slate-400">Validando enlace seguro...</p>
+            </div>
+
+            <div id="state-error" class="hidden flex-col items-center text-center py-8">
+                <div class="w-24 h-24 bg-red-50/50 border border-red-100 rounded-full flex items-center justify-center mb-6">
+                    <i class="ph ph-warning-circle text-5xl text-red-400"></i>
+                </div>
+                <h2 class="text-xl font-black text-slate-800 mb-2 tracking-tight">Enlace no disponible</h2>
+                <p class="text-sm text-slate-500 mb-8 leading-relaxed px-4" id="error-message">Este link ha caducado o ya fue utilizado para completar el registro.</p>
+                <a href="https://wa.me/573000000000"
+                    class="w-full sm:w-auto px-8 bg-slate-900 text-white font-black py-4 rounded-xl shadow-lg shadow-slate-900/20 hover:bg-slate-800 hover:-translate-y-0.5 transition-all flex justify-center items-center uppercase tracking-widest text-[11px]">
+                    <i class="ph ph-whatsapp-logo mr-3 text-xl"></i> Contactar Asesor
+                </a>
+            </div>
+
+            <div id="state-form" class="hidden">
+                <div class="bg-slate-900 p-6 rounded-[1.5rem] mb-6 shadow-xl relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none"></div>
+                    <div class="relative z-10">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Resumen de tu Viaje</p>
+                        <h3 class="text-xl font-black text-white tracking-tight mb-2" id="ui-plan-name">Cargando...</h3>
+                        <p class="text-xs font-bold text-emerald-400 flex items-center mb-5"><i class="ph ph-calendar-blank mr-2 text-lg"></i> <span id="ui-plan-date">...</span></p>
+
+                        <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Abono Validado</p>
+                                <p class="text-lg font-black text-emerald-400 tracking-tighter mt-0.5" id="ui-abono">$0</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Saldo Pendiente</p>
+                                <p class="text-lg font-black text-white tracking-tighter mt-0.5" id="ui-saldo">$0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-8 border border-indigo-100/60 bg-indigo-50/40 p-5 rounded-[1.5rem] shadow-sm backdrop-blur-sm flex items-start">
+                    <i class="ph ph-shield-check text-2xl text-indigo-500 mr-3 mt-0.5 shrink-0"></i>
+                    <p class="text-[11px] text-indigo-900 font-bold leading-relaxed uppercase tracking-widest">Para emitir tus pólizas de asistencia médica y garantizar tu reserva, confirma los siguientes datos.</p>
+                </div>
+
+                <form id="checkin-form" class="space-y-6" onsubmit="submitForm(event)">
+                    <input type="hidden" id="client-id">
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nombres *</label>
+                            <input type="text" id="f-nombre" required
+                                class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Apellidos *</label>
+                            <input type="text" id="f-apellido" required
+                                class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">N° de Documento (Cédula/Pasaporte) *</label>
+                        <input type="tel" id="f-documento" required placeholder="Ej: 104567890"
+                            class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">WhatsApp / Celular *</label>
+                            <input type="tel" id="f-telefono" required
+                                class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Edad *</label>
+                            <input type="number" inputmode="numeric" id="f-edad" required min="1" max="100" placeholder="Ej: 28"
+                                class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Correo Electrónico *</label>
+                        <input type="email" id="f-email" required placeholder="tu@correo.com"
+                            class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Ciudad de Origen *</label>
+                            <input type="text" id="f-ciudad" required placeholder="Ej: Bogotá"
+                                class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">EPS (Seguro Médico) *</label>
+                            <input type="text" id="f-eps" required placeholder="Ej: Sura, Sanitas..."
+                                class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                        </div>
+                    </div>
+
+                    <div class="pt-5 border-t border-slate-100/60">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">¿Alergias o Condiciones Médicas?</label>
+                        <input type="text" id="f-alergias" placeholder="Si no tienes, escribe 'Ninguna'" required
+                            class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Contacto de Emergencia *</label>
+                        <input type="text" id="f-emergencia" required placeholder="Ej: Marta Pérez - 3001234567"
+                            class="w-full border border-slate-200/60 rounded-xl px-4 py-3.5 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                    </div>
+
+                    <div class="pt-6">
+                        <button type="submit" id="btn-submit"
+                            class="w-full bg-slate-900 text-white font-black py-4.5 rounded-xl shadow-lg shadow-slate-900/20 hover:bg-slate-800 hover:-translate-y-0.5 transition-all flex justify-center items-center uppercase tracking-widest text-[11px]">
+                            Completar mi Reserva <i class="ph ph-check-circle ml-3 text-xl"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="state-success" class="hidden flex-col items-center text-center py-10">
+                <div class="w-28 h-28 bg-emerald-50 border border-emerald-100 rounded-full flex items-center justify-center mb-8 relative">
+                    <div class="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-20"></div>
+                    <i class="ph ph-check-circle text-[4rem] text-emerald-500 relative z-10"></i>
+                </div>
+                <h2 class="text-2xl font-black text-slate-800 mb-3 tracking-tight">¡Reserva Asegurada!</h2>
+                <p class="text-[13px] text-slate-500 leading-relaxed mb-8 px-4 font-medium">Hemos recibido tus datos correctamente y tus pólizas han sido solicitadas. Estamos emocionados de tenerte con nosotros en esta aventura.</p>
+
+                <div class="bg-slate-50/50 border border-slate-200/60 w-full p-5 rounded-[1.5rem] mb-8 text-left shadow-inner">
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center"><i class="ph ph-info mr-2 text-lg"></i> Siguiente paso</p>
+                    <p class="text-xs text-slate-700 font-medium leading-relaxed">Un asesor se pondrá en contacto contigo días antes del viaje para enviarte las recomendaciones finales y el punto de encuentro.</p>
+                </div>
+
+                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Ya puedes cerrar esta ventana.</p>
+            </div>
+
+        </div>
+
+        <p class="text-center text-[9px] text-slate-400 mt-8 font-black uppercase tracking-[0.3em] opacity-60">Powered by Travelers CRM</p>
+    </div>
+
+    <script>
+        // Inicialización de Supabase (Mismas credenciales del CRM)
+        const supabaseUrl = 'https://qefuqkplornelbzwqgri.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlZnVxa3Bsb3JuZWxiendxZ3JpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MDkzMTUsImV4cCI6MjA4ODM4NTMxNX0.nqTpWWq0wJXrY-JynUz_oPUEGaMhVbTK1dOBBq3p9rs';
+
+        // PARCHE QA: Le cambiamos el nombre a 'supabaseClient' para evitar el choque (SyntaxError)
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+        // Funciones de UI
+        const formatMoney = (val) => '$ ' + Number(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        const showState = (stateId) => {
+            ['state-loading', 'state-error', 'state-form', 'state-success'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+                document.getElementById(id).classList.remove('flex');
+            });
+            const el = document.getElementById(stateId);
+            el.classList.remove('hidden');
+            if (stateId === 'state-error' || stateId === 'state-success') el.classList.add('flex');
+        };
+
+        // Lógica de validación de Token al cargar la página
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+
+            if (!token) {
+                document.getElementById('error-message').innerText = "El enlace proporcionado no es válido o está incompleto.";
+                return showState('state-error');
+            }
+
+            try {
+                // 1. Buscar cliente por token usando supabaseClient
+                const { data: clientes, error } = await supabaseClient.from('clientes').select('*').eq('link_token', token);
+
+                if (error || !clientes || clientes.length === 0) {
+                    return showState('state-error');
+                }
+
+                const cliente = clientes[0];
+                const ahora = new Date();
+                const expDate = new Date(cliente.link_expiracion);
+
+                // 2. Validar expiración estricta (24 horas)
+                if (ahora > expDate) {
+                    document.getElementById('error-message').innerText = "Por seguridad, este enlace ha caducado (pasaron más de 24 horas). Solicita uno nuevo a tu asesor.";
+                    return showState('state-error');
+                }
+
+                // 3. Buscar nombre del plan de forma independiente
+                let planNombre = 'Plan / Viaje Exclusivo';
+                if (cliente.plan_id) {
+                    const { data: planes } = await supabaseClient.from('planes').select('nombre').eq('id', cliente.plan_id);
+                    if (planes && planes.length > 0) planNombre = planes[0].nombre;
+                }
+
+                // 4. Cargar datos en la UI de forma segura
+                document.getElementById('ui-plan-name').innerText = planNombre;
+                document.getElementById('ui-plan-date').innerText = cliente.fecha_viaje || 'Fecha por definir';
+                document.getElementById('ui-abono').innerText = formatMoney(cliente.abono_acumulado || 0);
+                document.getElementById('ui-saldo').innerText = formatMoney(cliente.saldo_restante || 0);
+
+                // 5. Precargar info del cliente
+                document.getElementById('f-nombre').value = cliente.nombre || '';
+                document.getElementById('f-apellido').value = cliente.apellido || '';
+                document.getElementById('f-telefono').value = cliente.telefono || '';
+
+                // Guardar saldo en memoria para calcular el estado real al guardar
+                window.saldoPendienteReal = cliente.saldo_restante || 0;
+
+                showState('state-form');
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('error-message').innerText = "Hubo un problema conectando con el servidor. Intenta nuevamente.";
+                showState('state-error');
+            }
+        });
+
+        // Enviar Formulario (Completar Check-in con Seguridad y Estado Inteligente)
+        async function submitForm(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit');
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2 text-xl"></i> Procesando Reserva...';
+            btn.disabled = true;
+
+            // Extraemos el token directo de la URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const activeToken = urlParams.get('token');
+
+            if (!activeToken) {
+                alert("Error de seguridad: Token perdido o inválido.");
+                return;
+            }
+
+            // Cálculo Inteligente del Estado
+            const estadoReal = window.saldoPendienteReal <= 0 ? 'confirmado' : 'proceso de pago';
+
+            // Recolectar data
+            const payload = {
+                nombre: document.getElementById('f-nombre').value.trim(),
+                apellido: document.getElementById('f-apellido').value.trim(),
+                documento: document.getElementById('f-documento').value.trim(),
+                telefono: document.getElementById('f-telefono').value.trim(),
+                email: document.getElementById('f-email').value.trim(),
+                ciudad: document.getElementById('f-ciudad').value.trim(),
+                edad: document.getElementById('f-edad').value,
+                eps: document.getElementById('f-eps').value.trim(),
+                alergias: document.getElementById('f-alergias').value.trim(),
+                contacto_emergencia: document.getElementById('f-emergencia').value.trim(),
+
+                // Transición de estado dinámico y quema del enlace
+                estado: estadoReal,
+                link_token: null,
+                link_expiracion: null
+            };
+
+            try {
+                // Actualiza estrictamente la fila usando supabaseClient
+                const { error } = await supabaseClient.from('clientes').update(payload).eq('link_token', activeToken);
+
+                if (error) throw error;
+
+                showState('state-success');
+
+            } catch (err) {
+                console.error(err);
+                alert("Hubo un error guardando tus datos. Verifica tu conexión a internet.");
+                btn.innerHTML = 'Completar mi Reserva <i class="ph ph-check-circle ml-2 text-xl"></i>';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>

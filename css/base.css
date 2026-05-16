@@ -1,0 +1,60 @@
+/* ==========================================
+   css/base.css — Tipografía, Reset, Scrollbar, Transiciones Globales
+   Extraído de style.css líneas 1–74
+   ========================================== */
+
+html,
+body {
+    height: 100%;
+    background-color: #fcfcfd !important;
+    color: #0f172a;
+    overflow: hidden;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6,
+.font-black,
+.font-heading {
+    font-family: 'Outfit', sans-serif !important;
+    letter-spacing: -0.02em;
+}
+
+/* Scrollbar estilo macOS */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+
+/* Transiciones Suaves Globales */
+button, a, input, select {
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button.bg-slate-900:hover,
+button.bg-primary-900:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.2);
+}
+
+/* UX Refinements */
+html { scroll-behavior: smooth; }
+
+td span.uppercase {
+    white-space: nowrap !important;
+    display: inline-block !important;
+    margin-bottom: 2px;
+}
+
+.font-black { font-weight: 700 !important; }
+.tracking-widest { letter-spacing: 0.06em !important; }
+
+.border, .border-b, .border-t, .border-l, .border-r {
+    border-color: rgba(226, 232, 240, 0.6) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+    box-shadow: 0 0 0 2px rgba(226, 232, 240, 1), 0 4px 12px rgba(15, 23, 42, 0.03) !important;
+    border-color: transparent !important;
+}
