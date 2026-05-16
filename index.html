@@ -251,97 +251,85 @@
             </div>
         </aside>
 
-        <main class="flex-1 flex flex-col h-full relative overflow-hidden">
-
-            <header class="h-14 md:h-16 glass-panel flex items-center justify-between px-4 md:px-8 z-10 sticky top-0">
-                <div class="flex items-center">
-                    <button class="md:hidden text-slate-600 mr-3 p-1 hover:text-slate-900 transition-colors"
-                        onclick="UI.toggleSidebar()">
+        <main class="flex-1 flex flex-col min-w-0 min-h-0 bg-white relative z-0 h-full">
+            <header class="h-16 lg:h-20 border-b border-slate-200/50 bg-white/80 backdrop-blur-md flex items-center justify-between px-4 lg:px-8 shrink-0 relative z-10 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <button class="md:hidden text-slate-400 hover:text-slate-900 transition-colors" onclick="UI.toggleSidebar()">
                         <i class="ph ph-list text-2xl"></i>
                     </button>
-                    <div>
-                        <h2 id="header-title" class="text-base md:text-xl font-black text-slate-800 tracking-tight">
-                            Dashboard General</h2>
-                    </div>
+                    <h2 class="text-lg lg:text-xl font-black text-slate-800 tracking-tight" id="header-title">Consola Financiera</h2>
                 </div>
-                <div id="dashboard-filters" class="flex items-center space-x-3">
-                    <div class="hidden md:flex bg-slate-200/50 p-1 rounded-xl shadow-inner border border-slate-200/60">
-                        <button id="pill-hoy" data-action="update-dashboard-range" data-range="hoy"
-                            class="time-pill px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg text-slate-500 hover:text-slate-800 transition-colors">Hoy</button>
-                        <button id="pill-semana" data-action="update-dashboard-range" data-range="semana"
-                            class="time-pill px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg text-slate-500 hover:text-slate-800 transition-colors">7
-                            Días</button>
-                        <button id="pill-mes" data-action="update-dashboard-range" data-range="mes"
-                            class="time-pill px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg bg-white text-slate-900 shadow-sm transition-colors border border-slate-200/50">Mes</button>
-                        <button id="pill-ano" data-action="update-dashboard-range" data-range="ano"
-                            class="time-pill px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg text-slate-500 hover:text-slate-800 transition-colors">Año</button>
+                <div class="flex items-center gap-4">
+                    <div class="hidden md:flex bg-slate-100 rounded-xl p-1 border border-slate-200/50 shadow-sm">
+                        <button class="time-pill px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-colors" id="pill-hoy" data-action="update-dashboard-range" data-range="hoy">Hoy</button>
+                        <button class="time-pill px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-colors" id="pill-semana" data-action="update-dashboard-range" data-range="semana">7 Días</button>
+                        <button class="time-pill px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-white text-slate-900 shadow-sm transition-colors" id="pill-mes" data-action="update-dashboard-range" data-range="mes">Mes</button>
+                        <button class="time-pill px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-colors" id="pill-ano" data-action="update-dashboard-range" data-range="ano">Año</button>
                     </div>
-                    <button onclick="UI.showToast('Exportación PDF en desarrollo', 'info')"
-                        class="bg-white border border-slate-200 p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shadow-sm"
-                        title="Exportar Reporte">
+                    <button class="w-10 h-10 rounded-xl bg-white border border-slate-200/50 text-slate-600 flex items-center justify-center hover:bg-slate-50 hover:text-primary-600 transition-colors shadow-sm">
                         <i class="ph ph-download-simple text-lg"></i>
                     </button>
                 </div>
             </header>
 
 
-            <div class="flex-1 overflow-y-auto p-4 md:p-8 relative scroll-smooth bg-slate-50/50" id="main-scroll-area">
+            <div class="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 lg:p-8 relative scroll-smooth bg-slate-50/50" id="main-scroll-area">
 
                 <section id="view-dashboard" class="view-section active fade-in max-w-7xl mx-auto">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-currency-dollar text-xl"></i>
+                        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[100px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-currency-dollar text-lg"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ingresos</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Ingresos</span>
                             </div>
                             <div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-ingresos">$0</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Facturación Bruta</p>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-ingresos">$0</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Facturación Bruta</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-receipt text-xl"></i>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-receipt text-lg"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Costos</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Costos</span>
                             </div>
                             <div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-costos">$0</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Operación Total</p>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-costos">$0</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Operación Total</p>
                             </div>
                         </div>
 
-                        <div class="bg-slate-900 rounded-[20px] p-6 shadow-md border border-slate-800 flex flex-col justify-between min-h-[140px] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden">
+                        <div class="bg-slate-900 rounded-2xl p-5 shadow-md border border-slate-800 flex flex-col justify-between min-h-[120px] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden">
                             <div class="absolute inset-0 bg-gradient-to-br from-primary-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                            <div class="flex justify-between items-center mb-4 relative z-10">
+                            <div class="flex justify-between items-center mb-3 relative z-10">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center border border-slate-700 shrink-0">
-                                        <i class="ph ph-chart-line-up text-xl text-primary-400"></i>
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center border border-slate-700 shrink-0">
+                                        <i class="ph ph-chart-line-up text-lg text-primary-400"></i>
                                     </div>
-                                    <span class="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Utilidad</span>
+                                    <span class="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Utilidad</span>
                                 </div>
-                                <span class="text-[10px] font-black text-primary-400 bg-primary-500/10 px-2.5 py-1 rounded-lg border border-primary-500/20" id="kpi-margen-pct">0% MG</span>
+                                <span class="text-[9px] font-black text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded border border-primary-500/20" id="kpi-margen-pct">0% MG</span>
                             </div>
                             <div class="relative z-10">
-                                <h3 class="text-3xl font-black text-white tracking-tighter" id="kpi-margen">$0</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Beneficio Neto</p>
+                                <h3 class="text-2xl font-black text-white tracking-tighter" id="kpi-margen">$0</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Beneficio Neto</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-users-three text-xl"></i>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-users-three text-lg"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ventas</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Ventas</span>
                             </div>
                             <div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-clientes">0</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Pasajeros Activos</p>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-clientes">0</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Pasajeros Activos</p>
                             </div>
                         </div>
                     </div>
@@ -365,55 +353,55 @@
 
                     <!-- FILA 2: KPIs Estratégicos CEO -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 fade-in" style="animation-delay: 0.05s;">
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-wallet text-xl"></i>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-wallet text-lg"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Recaudado</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Recaudado</span>
                             </div>
                             <div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-recaudado">$0</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Total Cobrado</p>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-recaudado">$0</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Total Cobrado</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-clock-countdown text-xl"></i>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-clock-countdown text-lg"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cartera</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Cartera</span>
                             </div>
                             <div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-cartera">$0</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Cuentas por Cobrar</p>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-cartera">$0</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Cuentas por Cobrar</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-airplane-takeoff text-xl"></i>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-airplane-takeoff text-lg"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Próximas</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Próximas</span>
                             </div>
                             <div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-proximas">0</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Salidas en 7 Días</p>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-proximas">0</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Salidas en 7 Días</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[140px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-rose-600 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-x-circle text-xl"></i>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-rose-600 group-hover:text-white transition-colors duration-300 shrink-0">
+                                    <i class="ph ph-x-circle text-lg"></i>
                                 </div>
-                                <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cancelación</span>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Cancelación</span>
                             </div>
                             <div>
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tighter" id="kpi-cancelacion">0%</h3>
-                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Tasa de Desistimiento</p>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-cancelacion">0%</h3>
+                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Tasa de Desistimiento</p>
                             </div>
                         </div>
                     </div>
@@ -432,19 +420,19 @@
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 fade-in" style="animation-delay: 0.2s;">
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 lg:col-span-2 relative overflow-hidden group">
-                            <div class="mb-6 relative z-10">
-                                <h3 class="font-black text-slate-800 text-lg tracking-tight font-heading">Ventas vs Recaudo</h3>
-                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Top planes con mayor tracción financiera</p>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 lg:col-span-2 relative overflow-hidden group">
+                            <div class="mb-4 relative z-10">
+                                <h3 class="font-black text-slate-800 text-[15px] tracking-tight font-heading">Ventas vs Recaudo</h3>
+                                <p class="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Top planes financieros</p>
                             </div>
-                            <div class="relative h-64 w-full z-10"><canvas id="revenueChart"></canvas></div>
+                            <div class="relative h-56 w-full z-10"><canvas id="revenueChart"></canvas></div>
                         </div>
-                        <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 relative overflow-hidden group">
-                            <div class="mb-6 relative z-10">
-                                <h3 class="font-black text-slate-800 text-lg tracking-tight font-heading">Distribución</h3>
-                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Share de mercado interno</p>
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 relative overflow-hidden group">
+                            <div class="mb-4 relative z-10">
+                                <h3 class="font-black text-slate-800 text-[15px] tracking-tight font-heading">Distribución</h3>
+                                <p class="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Share de mercado</p>
                             </div>
-                            <div class="relative h-56 w-full flex justify-center z-10"><canvas id="packagesChart"></canvas>
+                            <div class="relative h-52 w-full flex justify-center z-10"><canvas id="packagesChart"></canvas>
                             </div>
                         </div>
                     </div>

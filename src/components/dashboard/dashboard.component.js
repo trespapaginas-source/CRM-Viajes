@@ -216,49 +216,49 @@ export const DashboardComponent = {
             const margenReal = p.totalRecaudado - p.costos;
 
             container.innerHTML += `
-                <div class="bg-white rounded-[20px] p-6 shadow-sm border border-slate-200/60 hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col relative overflow-hidden group">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col relative overflow-hidden group">
                     <div class="relative z-10 flex-1 flex flex-col">
-                        <h4 class="font-black text-slate-900 text-xl leading-tight truncate pr-2 font-heading">${UI.sanitize(p.nombre)}</h4>
-                        <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-6 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
-                        <div class="grid grid-cols-2 gap-y-5 gap-x-4 mb-6">
+                        <h4 class="font-black text-slate-900 text-lg leading-tight truncate pr-2 font-heading">${UI.sanitize(p.nombre)}</h4>
+                        <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-4 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
+                        <div class="grid grid-cols-2 gap-y-4 gap-x-4 mb-5">
                             <div>
-                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Total Vendido</p>
-                                <p class="text-base font-black text-slate-900 tracking-tight">${formatCOP(p.totalVendido)}</p>
+                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Total Vendido</p>
+                                <p class="text-sm font-black text-slate-900 tracking-tight">${formatCOP(p.totalVendido)}</p>
                             </div>
                             <div class="text-right">
-                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Costos Base</p>
-                                <p class="text-base font-bold text-slate-500 tracking-tight">${formatCOP(p.costos)}</p>
+                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Costos Base</p>
+                                <p class="text-sm font-bold text-slate-500 tracking-tight">${formatCOP(p.costos)}</p>
                             </div>
                             <div>
-                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Recaudado</p>
-                                <p class="text-base font-black text-slate-900 tracking-tight">${formatCOP(p.totalRecaudado)}</p>
+                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Recaudado</p>
+                                <p class="text-sm font-black text-slate-900 tracking-tight">${formatCOP(p.totalRecaudado)}</p>
                             </div>
                             <div class="text-right">
-                                <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Margen a Hoy</p>
-                                <p class="text-base font-black tracking-tight ${margenReal >= 0 ? 'text-slate-900' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
+                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Margen a Hoy</p>
+                                <p class="text-sm font-black tracking-tight ${margenReal >= 0 ? 'text-slate-900' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
                             </div>
                         </div>
                         <div class="mt-auto">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Progreso de Recaudo</span>
-                                <span class="text-[10px] font-black text-slate-800">${pct}%</span>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Progreso</span>
+                                <span class="text-[9px] font-black text-slate-800">${pct}%</span>
                             </div>
-                            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-6">
+                            <div class="w-full bg-slate-100 h-1 rounded-full overflow-hidden mb-4">
                                 <div class="bg-primary-500 h-full rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
                             </div>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 border-t border-slate-100 pt-4 mt-auto">
-                            <div class="flex items-center justify-center bg-slate-50 rounded-xl py-2 px-1 border border-slate-100/50">
-                                <i class="ph ph-users text-slate-400 mr-1.5 text-sm"></i>
-                                <span class="text-[10px] font-black text-slate-700">${p.pax} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Pax</span></span>
-                            </div>
-                            <div class="flex items-center justify-center bg-slate-50 rounded-xl py-2 px-1 border border-slate-100/50">
-                                <i class="ph ph-check-circle text-slate-400 mr-1.5 text-sm"></i>
-                                <span class="text-[10px] font-black text-slate-700">${p.pagados} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Al día</span></span>
-                            </div>
-                            <div class="flex items-center justify-center bg-slate-50 rounded-xl py-2 px-1 border border-slate-100/50">
-                                <i class="ph ph-warning-circle text-slate-400 mr-1.5 text-sm"></i>
-                                <span class="text-[10px] font-black text-slate-700">${p.deben} <span class="font-bold text-[9px] text-slate-400 uppercase ml-0.5">Deben</span></span>
+                            <div class="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
+                                <div class="flex items-center justify-center bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100/50">
+                                    <i class="ph ph-users text-slate-400 mr-1.5 text-[10px]"></i>
+                                    <span class="text-[9px] font-black text-slate-700">${p.pax} <span class="font-bold text-[8px] text-slate-400 uppercase ml-0.5">Pax</span></span>
+                                </div>
+                                <div class="flex items-center justify-center bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100/50">
+                                    <i class="ph ph-check-circle text-slate-400 mr-1.5 text-[10px]"></i>
+                                    <span class="text-[9px] font-black text-slate-700">${p.pagados} <span class="font-bold text-[8px] text-slate-400 uppercase ml-0.5">Al día</span></span>
+                                </div>
+                                <div class="flex items-center justify-center bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100/50">
+                                    <i class="ph ph-warning-circle text-slate-400 mr-1.5 text-[10px]"></i>
+                                    <span class="text-[9px] font-black text-slate-700">${p.deben} <span class="font-bold text-[8px] text-slate-400 uppercase ml-0.5">Deben</span></span>
+                                </div>
                             </div>
                         </div>
                     </div>
