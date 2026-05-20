@@ -195,7 +195,7 @@ export const InternacionalesComponent = {
         document.getElementById('int-email').value = cliente.email || '';
         document.getElementById('int-ciudad').value = cliente.ciudad || '';
         document.getElementById('int-vendedor').value = cliente.vendedor || '';
-        document.getElementById('int-estado').value = cliente.estado_reserva || 'En Caja';
+        document.getElementById('int-estado').value = cliente.estado || 'En Caja';
         document.getElementById('int-precio-total').value = cliente.precio_total || '';
         document.getElementById('int-costo-total').value = cliente.costo_total || '';
         document.getElementById('int-notas-financieras').value = cliente.notas_financieras || '';
@@ -320,7 +320,7 @@ export const InternacionalesComponent = {
         const email = document.getElementById('int-email').value;
         const ciudad = document.getElementById('int-ciudad').value;
         const vendedor = document.getElementById('int-vendedor').value;
-        const estado_reserva = document.getElementById('int-estado').value;
+        const estado = document.getElementById('int-estado').value;
         const precio_total = parseFloat(document.getElementById('int-precio-total').value) || 0;
         const costo_total = parseFloat(document.getElementById('int-costo-total').value) || 0;
         const notas_financieras = document.getElementById('int-notas-financieras').value;
@@ -354,7 +354,7 @@ export const InternacionalesComponent = {
             notas_financieras,
             abonos_total: totalPagado,
             saldo_pendiente: Math.max(0, precio_total - totalPagado),
-            estado_reserva: estado_reserva
+            estado: estado
         };
 
         if (id) dataToSave.id = id;

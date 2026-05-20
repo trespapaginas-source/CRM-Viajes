@@ -133,31 +133,31 @@ export const SuppliersComponent = {
             if (p.productos && p.productos.length > 0) {
                 hs = '<div class="mt-2 pt-2 border-t border-slate-100 space-y-1 w-full">';
                 p.productos.forEach(un => {
-                    hs += `<div class="flex justify-between items-center text-[9px] bg-slate-50/50 px-2 py-1 rounded-md border border-slate-100/50"><span class="text-slate-600 truncate mr-2 font-bold flex items-center"><i class="ph ph-tag mr-1 text-slate-400"></i>${un.name}</span><span class="font-black text-slate-800 bg-white px-1.5 py-0.5 rounded shadow-sm">${formatCOP(un.costo)}</span></div>`;
+                    hs += `<div class="flex justify-between items-center text-[9px] bg-slate-50/50 px-2 py-1 rounded-md border border-slate-100/50"><span class="text-slate-600 truncate mr-2 font-bold flex items-center"><i class="ph ph-tag mr-1 text-slate-400"></i>${UI.sanitize(un.name)}</span><span class="font-black text-slate-800 bg-white px-1.5 py-0.5 rounded shadow-sm">${formatCOP(un.costo)}</span></div>`;
                 });
                 hs += '</div>';
             }
 
-            const safeName = p.nombre.replace(/'/g, "\\'");
+            const safeName = (p.nombre || '').replace(/'/g, "\\'");
             c.innerHTML += `
-                <div class="supplier-card bg-white/90 backdrop-blur-md rounded-2xl shadow-sm p-3.5 relative group flex flex-col border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden" data-ciudad="${p.ciudad || ''}" data-categoria="${p.tipo || ''}">
+                <div class="supplier-card bg-white/90 backdrop-blur-md rounded-2xl shadow-sm p-3.5 relative group flex flex-col border border-slate-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden" data-ciudad="${UI.sanitize(p.ciudad || '')}" data-categoria="${UI.sanitize(p.tipo || '')}">
                     <div class="flex items-start gap-3 relative z-10">
                         <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl border shadow-sm shrink-0 ${fall.b}"><i class="ph ${fall.i}"></i></div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start justify-between gap-1">
-                                <h4 class="text-sm font-black text-slate-900 truncate leading-tight pt-0.5">${p.nombre}</h4>
+                                <h4 class="text-sm font-black text-slate-900 truncate leading-tight pt-0.5">${UI.sanitize(p.nombre)}</h4>
                                 <div class="flex space-x-1 shrink-0 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all">
                                     <button class="btn-quick-add-supplier bg-white shadow-sm border border-slate-200 p-1.5 rounded-lg text-green-500 hover:text-white hover:bg-green-500 transition-colors" data-id="${p.id}" title="Servicio Rápido"><i class="ph ph-plus-circle text-xs"></i></button>
                                     <button class="btn-edit-supplier bg-white shadow-sm border border-slate-200 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-primary-500 transition-colors" data-id="${p.id}" title="Editar"><i class="ph ph-pencil-simple text-xs"></i></button>
-                                    <button class="btn-delete-supplier-item btn-delete-protected bg-white shadow-sm border border-slate-200 p-1.5 rounded-lg text-red-400 hover:text-white hover:bg-red-500 transition-colors" data-id="${p.id}" data-name="${safeName}" title="Eliminar"><i class="ph ph-trash text-xs"></i></button>
+                                    <button class="btn-delete-supplier-item btn-delete-protected bg-white shadow-sm border border-slate-200 p-1.5 rounded-lg text-red-400 hover:text-white hover:bg-red-500 transition-colors" data-id="${p.id}" data-name="${UI.sanitize(safeName)}" title="Eliminar"><i class="ph ph-trash text-xs"></i></button>
                                 </div>
                             </div>
-                            <span class="inline-block mt-0.5 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border border-white/60 shadow-sm ${fall.t}">${p.tipo}</span>
+                            <span class="inline-block mt-0.5 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border border-white/60 shadow-sm ${fall.t}">${UI.sanitize(p.tipo)}</span>
                         </div>
                     </div>
                     <div class="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-100 relative z-10">
-                        <p class="text-[9px] font-bold text-slate-500 flex items-center truncate max-w-[50%]"><i class="ph ph-map-pin mr-1 text-primary-500 text-xs shrink-0"></i> <span class="truncate">${p.ciudad || 'Sede Virtual'}</span></p>
-                        <p class="text-[9px] font-bold text-slate-500 flex items-center shrink-0"><i class="ph ph-phone mr-1 text-green-500 text-xs"></i> ${p.telefono}</p>
+                        <p class="text-[9px] font-bold text-slate-500 flex items-center truncate max-w-[50%]"><i class="ph ph-map-pin mr-1 text-primary-500 text-xs shrink-0"></i> <span class="truncate">${UI.sanitize(p.ciudad || 'Sede Virtual')}</span></p>
+                        <p class="text-[9px] font-bold text-slate-500 flex items-center shrink-0"><i class="ph ph-phone mr-1 text-green-500 text-xs"></i> ${UI.sanitize(p.telefono || '')}</p>
                     </div>
                     <div class="relative z-10 w-full">${hs}</div>
                 </div>`;
@@ -243,7 +243,7 @@ export const SuppliersComponent = {
         this.tempProducts.forEach((p, i) => {
             u.innerHTML += `
             <li class="flex justify-between items-center bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md">
-                <div><span class="text-sm font-black text-slate-800">${p.name}</span><br><span class="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-100 shadow-sm">${formatCOP(p.costo)}</span></div>
+                <div><span class="text-sm font-black text-slate-800">${UI.sanitize(p.name)}</span><br><span class="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-100 shadow-sm">${formatCOP(p.costo)}</span></div>
                 <button type="button" class="btn-remove-temp-product text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 p-2 rounded-lg transition-colors border border-slate-100" data-index="${i}"><i class="ph ph-trash text-lg"></i></button>
             </li>`;
         });

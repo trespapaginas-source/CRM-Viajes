@@ -122,7 +122,7 @@ export const DataService = {
                     const isPast = dateViaje < today;
                     
                     const precioTotal = parseFloat(c.precio_total || 0);
-                    const totalAbonado = this.abonos.filter(a => a.cliente_id === c.id && a.estado_pago === 'confirmed').reduce((s, a) => s + (parseFloat(a.monto) || 0), 0);
+                    const totalAbonado = this.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (parseFloat(a.monto) || 0), 0);
                     const porcentaje = precioTotal > 0 ? (totalAbonado / precioTotal) * 100 : (totalAbonado > 0 ? 100 : 0);
                     
                     let targetState = c.estado; // por defecto mantiene el actual

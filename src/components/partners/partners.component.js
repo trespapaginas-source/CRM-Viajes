@@ -294,12 +294,12 @@ export const PartnersComponent = {
                 }
 
                 if (st === 'devolución') {
-                    const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago === 'confirmed').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                    const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                     const devuelto = parseFloat(c.monto_devuelto || 0);
                     ingresoBruto += Math.max(0, totalAbo - devuelto);
                     paxServicio += paxNum;
                 } else if (st === 'en caja') {
-                    const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago === 'confirmed').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                    const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                     ingresoBruto += totalAbo;
                 } else {
                     ingresoBruto += parseFloat(c.precio_total || 0);

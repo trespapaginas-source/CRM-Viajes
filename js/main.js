@@ -25,7 +25,7 @@ import { ConfigModule }       from './modules/config.module.js';
 import { B2BModule }          from './modules/b2b.module.js';
 
 import { SearchModule }          from './modules/search.module.js';
-import { DocumentosComponent } from '../../src/components/documentos/documentos.component.js';
+import { DocumentosComponent } from '../src/components/documentos/documentos.component.js';
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PUENTE GLOBAL — Necesario para onclick="" del HTML

@@ -1,4 +1,4 @@
-﻿import { RentabilidadComponent } from '../../src/components/rentabilidad/rentabilidad.component.js';
+import { RentabilidadComponent } from '../../src/components/rentabilidad/rentabilidad.component.js';
 // js/modules/calendar.module.js — Planificador Visual
 // Extraído de app.js líneas 3193–3387
 import { DataService } from '../services/supabase.service.js';
@@ -120,7 +120,7 @@ export const CalendarModule = {
             const px = parseInt(c.pax || 1);
             paxTotal += px;
             ingresoBruto += parseFloat(c.precio_total || 0);
-            const abonosCli = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago === 'confirmed').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            const abonosCli = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
             recaudado += abonosCli;
         });
 

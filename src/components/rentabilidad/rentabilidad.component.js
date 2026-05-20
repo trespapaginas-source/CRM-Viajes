@@ -165,12 +165,12 @@ export const RentabilidadComponent = {
             grupo.pax_total += parseInt(cli.pax || 1);
 
             if (st === 'devolución') {
-                const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago === 'confirmed').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                 const devuelto = parseFloat(cli.monto_devuelto || 0);
                 grupo.ingreso_bruto += Math.max(0, totalAbo - devuelto);
                 grupo.pax_servicio += parseInt(cli.pax || 1);
             } else if (st === 'en caja') {
-                const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago === 'confirmed').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                 grupo.ingreso_bruto += totalAbo;
                 grupo.ingreso_retenido += totalAbo;
             } else {
@@ -266,7 +266,7 @@ export const RentabilidadComponent = {
             paxTotal += p;
 
             const st = c.estado ? c.estado.toLowerCase() : '';
-            const abonado = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago === 'confirmed').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            const abonado = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
 
             if (st === 'devolución') {
                 const devuelto = parseFloat(c.monto_devuelto || 0);
