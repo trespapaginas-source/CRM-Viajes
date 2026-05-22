@@ -19,7 +19,7 @@ export const PartnersComponent = {
         const defaultSocios = [
             { email: 'trespa.paginas@gmail.com', nombre: 'Leo (Admin)', porcentaje: 18 },
             { email: 'luismendezramirez@hotmail.es', nombre: 'Luis Méndez', porcentaje: 50 },
-            { email: 'vivemarketingdigital@outlook.com', nombre: 'Gean Fontalvo', porcentaje: 32 }
+            { email: 'vivemarketingdigital@outlook.com', nombre: 'Jean Fontalvo', porcentaje: 32 }
         ];
 
         // Migration patch para actualizar los correos de prueba antiguos si quedaron guardados
@@ -30,9 +30,9 @@ export const PartnersComponent = {
                     s.email = 'trespa.paginas@gmail.com';
                 }
                 if (s.email === 'luis@travelers.com') s.email = 'luismendezramirez@hotmail.es';
-                if (s.email === 'jean@travelers.com' || s.nombre === 'Jean') {
+                if (s.email === 'jean@travelers.com' || s.nombre === 'Gean' || s.nombre === 'Jean') {
                     s.email = 'vivemarketingdigital@outlook.com';
-                    if (s.nombre === 'Jean') s.nombre = 'Gean Fontalvo';
+                    if (s.nombre === 'Gean' || s.nombre === 'Jean' || s.nombre === 'Gean Fontalvo') s.nombre = 'Jean Fontalvo';
                 }
             });
         };
