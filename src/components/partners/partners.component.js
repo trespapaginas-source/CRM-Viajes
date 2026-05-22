@@ -17,15 +17,27 @@ export const PartnersComponent = {
         if (this._configLoaded) return;
 
         const defaultSocios = [
-            { email: window.AuthModule?.currentUser?.email || 'admin@travelers.com', nombre: 'Leo (Admin)', porcentaje: 18 },
-            { email: 'luis@travelers.com', nombre: 'Luis Méndez', porcentaje: 50 },
-            { email: 'jean@travelers.com', nombre: 'Jean', porcentaje: 32 }
+            { email: window.AuthModule?.currentUser?.email || 'trespa.paginas@gmail.com', nombre: 'Leo (Admin)', porcentaje: 18 },
+            { email: 'luismendezramirez@hotmail.es', nombre: 'Luis Méndez', porcentaje: 50 },
+            { email: 'vivemarketingdigital@outlook.com', nombre: 'Gean Fontalvo', porcentaje: 32 }
         ];
+
+        // Migration patch para actualizar los correos de prueba antiguos si quedaron guardados
+        const patchSocios = (socios) => {
+            socios.forEach(s => {
+                if (s.email === 'luis@travelers.com') s.email = 'luismendezramirez@hotmail.es';
+                if (s.email === 'jean@travelers.com') {
+                    s.email = 'vivemarketingdigital@outlook.com';
+                    if (s.nombre === 'Jean') s.nombre = 'Gean Fontalvo';
+                }
+            });
+        };
 
         const saved = localStorage.getItem('trv_socios');
         if (saved) {
             const parsed = JSON.parse(saved);
             if (parsed.length > 0 && !(parsed.length === 1 && parsed[0].porcentaje === 100)) {
+                patchSocios(parsed);
                 this.sociosConfig = parsed;
                 this._configLoaded = true;
                 return;
@@ -36,14 +48,15 @@ export const PartnersComponent = {
             const { data, error } = await supabaseClient.from('socios_config').select('*').order('created_at', { ascending: true });
             if (!error && data && data.length > 0) {
                 this.sociosConfig = data.map(s => ({ id: s.id, nombre: s.nombre, email: s.email, porcentaje: Number(s.porcentaje) }));
+                patchSocios(this.sociosConfig);
                 this._configLoaded = true;
                 return;
             }
         } catch (e) {
-            // Tabla no existe aún, continuar al fallback
+            console.warn('Fallback: no se pudo cargar configuración de socios de BD', e);
         }
 
-        this.sociosConfig = defaultSocios;
+        this.sociosConfig = [...defaultSocios];
         this._configLoaded = true;
     },
 
