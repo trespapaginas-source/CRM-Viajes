@@ -123,10 +123,21 @@ export const AuthModule = {
                 styleEl.id = 'security-styles';
                 document.head.appendChild(styleEl);
             }
-            styleEl.innerHTML = `.btn-delete-protected { display: none !important; }`;
+            styleEl.innerHTML = `/* .btn-delete-protected { display: none !important; } (Desactivado para permitir Soft Delete) */`;
         } else {
             const styleEl = document.getElementById('security-styles');
             if (styleEl) styleEl.remove();
+        }
+
+        const auditoriaBtn = document.getElementById('nav-auditoria-btn');
+        if (auditoriaBtn) {
+            if (this.currentUser?.email === 'trespa.paginas@gmail.com' || this.currentUser?.email === 'vivemarketingdigital@outlook.com') {
+                // Para pruebas, también habilitamos a vivemarketing, pero en pro debería ser solo el super admin.
+                // Como pidió que solo sea él, lo limitaremos.
+                if (this.currentUser?.email === 'trespa.paginas@gmail.com') {
+                    auditoriaBtn.classList.remove('hidden');
+                }
+            }
         }
     },
 

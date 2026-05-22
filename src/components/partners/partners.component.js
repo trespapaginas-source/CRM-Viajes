@@ -618,6 +618,7 @@ export const PartnersComponent = {
             const { data, error } = await supabaseClient
                 .from('socios_movimientos')
                 .select('*')
+                .is('deleted_at', null)
                 .order('fecha', { ascending: false });
             if (error) throw error;
             this.movements = data || [];
@@ -674,9 +675,10 @@ export const PartnersComponent = {
             return { success: true };
         } else {
             try {
+                const user = window.AuthModule?.currentUser?.email || 'Desconocido';
                 const { error } = await supabaseClient
                     .from('socios_movimientos')
-                    .delete()
+                    .update({ deleted_at: new Date().toISOString(), deleted_by: user })
                     .eq('id', id);
                 if (error) throw error;
                 await this.loadMovements();
@@ -696,6 +698,7 @@ export const PartnersComponent = {
             const { data, error } = await supabaseClient
                 .from('gastos_corporativos')
                 .select('*')
+                .is('deleted_at', null)
                 .order('fecha', { ascending: false });
             if (error) throw error;
             this.corporateExpenses = data || [];
@@ -752,9 +755,10 @@ export const PartnersComponent = {
             return { success: true };
         } else {
             try {
+                const user = window.AuthModule?.currentUser?.email || 'Desconocido';
                 const { error } = await supabaseClient
                     .from('gastos_corporativos')
-                    .delete()
+                    .update({ deleted_at: new Date().toISOString(), deleted_by: user })
                     .eq('id', id);
                 if (error) throw error;
                 await this.loadCorporateExpenses();
@@ -825,9 +829,7 @@ export const PartnersComponent = {
 
             filtered.forEach(g => {
                 const amountFormat = isAdmin ? formatCOP(g.monto) : '***';
-                const deleteBtn = isAdmin
-                    ? `<button type="button" data-action="pvm-delete-gasto-corp" data-id="${g.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar gasto"><i class="ph ph-trash"></i></button>`
-                    : ``;
+                const deleteBtn = `<button type="button" data-action="pvm-delete-gasto-corp" data-id="${g.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar gasto"><i class="ph ph-trash"></i></button>`;
 
                 const receiptHtml = g.comprobante 
                     ? `<button type="button" data-action="open-lightbox" data-url="${g.comprobante}" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 transition-all" title="Ver comprobante"><i class="ph ph-image text-xs"></i> Ver</button>`
@@ -1025,9 +1027,7 @@ export const PartnersComponent = {
                     ? `<span class="bg-slate-100 text-slate-700 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-slate-200">Corte</span>`
                     : `<span class="bg-indigo-50 text-indigo-700 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-indigo-100">Retiro</span>`;
 
-                const deleteBtn = isAdmin
-                    ? `<button type="button" data-action="pvm-delete-movimiento" data-id="${m.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar movimiento"><i class="ph ph-trash"></i></button>`
-                    : ``;
+                const deleteBtn = `<button type="button" data-action="pvm-delete-movimiento" data-id="${m.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar movimiento"><i class="ph ph-trash"></i></button>`;
 
                 tb.innerHTML += `
                     <tr class="hover:bg-slate-50 transition-colors">

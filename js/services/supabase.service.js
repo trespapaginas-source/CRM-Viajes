@@ -42,13 +42,13 @@ export const DataService = {
         // Se añaden límites (limit) para prevenir cuellos de botella de memoria
         // sin romper las relaciones de datos actuales.
         const [resPlanes, resClientes, resProv, resAbo, resGastos, resSeguimientos, resB2BAli, resB2BServ, resB2BNeg, resHistorial] = await Promise.all([
-            supabaseClient.from('planes').select('*').order('created_at', { ascending: false }).limit(500),
-            supabaseClient.from('clientes').select('*').order('created_at', { ascending: false }).limit(2000),
-            supabaseClient.from('proveedores').select('*').order('created_at', { ascending: false }).limit(1000),
+            supabaseClient.from('planes').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(500),
+            supabaseClient.from('clientes').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(2000),
+            supabaseClient.from('proveedores').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(1000),
             // Nota: Abonos se trae ordenado descendente para obtener los más recientes,
             // y luego se invierte el array para mantener la compatibilidad (ascending: true) del UI.
-            supabaseClient.from('abonos').select('*').order('created_at', { ascending: false }).limit(5000),
-            supabaseClient.from('gastos_salidas').select('*').order('created_at', { ascending: false }).limit(3000),
+            supabaseClient.from('abonos').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(5000),
+            supabaseClient.from('gastos_salidas').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(3000),
             supabaseClient.from('seguimientos').select('*').order('created_at', { ascending: false }).limit(2000),
             supabaseClient.from('b2b_aliados').select('*').order('created_at', { ascending: false }).limit(1000),
             supabaseClient.from('b2b_servicios_catalogo').select('*').order('created_at', { ascending: false }).limit(1000),
@@ -348,7 +348,8 @@ export const DataService = {
 
     async deleteAbono(abonoId, clienteId) {
         try {
-            const { error } = await supabaseClient.from('abonos').delete().eq('id', abonoId);
+            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            const { error } = await supabaseClient.from('abonos').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', abonoId);
             if (error) throw error;
             await this.loadAll();
             await this.recalculateClientBalances(clienteId);
@@ -384,17 +385,20 @@ export const DataService = {
     },
 
     async deletePlan(id) {
-        const { error } = await supabaseClient.from('planes').delete().eq('id', id);
+        const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+        const { error } = await supabaseClient.from('planes').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
     },
     async deleteCliente(id) {
-        const { error } = await supabaseClient.from('clientes').delete().eq('id', id);
+        const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+        const { error } = await supabaseClient.from('clientes').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
     },
     async deleteProveedor(id) {
-        const { error } = await supabaseClient.from('proveedores').delete().eq('id', id);
+        const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+        const { error } = await supabaseClient.from('proveedores').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
     },

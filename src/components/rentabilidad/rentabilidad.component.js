@@ -453,7 +453,8 @@ export const RentabilidadComponent = {
             }
         }
         try {
-            await supabaseClient.from('gastos_salidas').delete().eq('id', id);
+            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            await supabaseClient.from('gastos_salidas').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
             await DataService.loadAll();
             UI.showToast("Gasto eliminado.", "success");
         } catch (e) { UI.showToast("Error eliminando.", "error"); }

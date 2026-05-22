@@ -26,10 +26,11 @@ import { B2BModule }          from './modules/b2b.module.js';
 
 import { SearchModule }          from './modules/search.module.js';
 import { DocumentosComponent } from '../src/components/documentos/documentos.component.js';
+import { AuditoriaComponent }  from '../src/components/auditoria/auditoria.component.js';
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════
 // PUENTE GLOBAL — Necesario para onclick="" del HTML
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════
 
 window.supabaseClient     = supabaseClient;
 window.DataService        = DataService;
@@ -58,12 +59,14 @@ window.B2BModule          = B2BModule;
 
 window.SearchModule       = SearchModule;
 window.DocumentosComponent = DocumentosComponent;
+window.AuditoriaComponent = AuditoriaComponent;
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════
 // ARRANQUE DEL SISTEMA
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ════════════════════════════════════════════════════════════
 AuthModule.init();
 SearchModule.init();
+AuditoriaComponent.init();
 
 // Listener global ESC para cerrar modales laterales
 document.addEventListener('keydown', (e) => {
