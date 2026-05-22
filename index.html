@@ -3540,7 +3540,7 @@
     <div id="partners-vault-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-2 md:p-4">
         <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"
             id="pvm-bg" data-action="close-partners-vault"></div>
-        <div class="bg-white/95 backdrop-blur-2xl border border-white rounded-[1.5rem] shadow-2xl w-full max-w-2xl flex flex-col max-h-[95vh] md:max-h-[85vh] transform scale-95 opacity-0 transition-all duration-300 z-10 overflow-hidden modal-mobile-safe"
+        <div class="bg-white/95 backdrop-blur-2xl border border-white rounded-[1.5rem] shadow-2xl w-full max-w-5xl flex flex-col max-h-[95vh] md:max-h-[85vh] transform scale-95 opacity-0 transition-all duration-300 z-10 overflow-hidden modal-mobile-safe"
             id="pvm-content">
 
             <div
@@ -3556,14 +3556,15 @@
                         class="text-lg md:text-xl font-black text-slate-900 flex items-center tracking-tight whitespace-nowrap">
                         <i class="ph ph-vault text-slate-400 mr-2 text-xl"></i> Bóveda de Socios</h3>
                     <p class="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-0.5 whitespace-nowrap">
-                        Distribución de
-                        Utilidad Neta</p>
+                        Consola Financiera y de Utilidades</p>
                 </div>
                 <div class="flex items-center flex-wrap gap-2 w-full md:w-auto">
                     <select id="pvm-quick-filters" 
                         class="flex-1 md:flex-none bg-slate-50 border border-slate-200/60 rounded-xl px-2 py-2 md:py-1.5 text-[11px] md:text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer shadow-sm">
                         <option value="historico">Todo el histórico</option>
                         <option value="mes_actual">Mes Actual</option>
+                        <option value="mes_anterior">Mes Anterior</option>
+                        <option value="anio_actual">Año Actual</option>
                         <option value="3_meses">Últimos 3 meses</option>
                         <option value="6_meses">Últimos 6 meses</option>
                         <option value="personalizado">Personalizado</option>
@@ -3584,115 +3585,475 @@
                 </div>
             </div>
 
+            <!-- Navigation Sub-tabs -->
+            <div class="px-5 py-2 bg-slate-50 border-b border-slate-200 flex gap-2 shrink-0 overflow-x-auto custom-scrollbar">
+                <button type="button" data-action="pvm-switch-tab" data-tab="desempeno" id="pvm-tab-btn-desempeno" class="px-3 py-1.5 rounded-lg text-xs font-black transition-all whitespace-nowrap bg-slate-900 text-white shadow-sm">
+                    <i class="ph ph-chart-pie mr-1"></i> Resumen Ejecutivo
+                </button>
+                <button type="button" data-action="pvm-switch-tab" data-tab="saldos" id="pvm-tab-btn-saldos" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
+                    <i class="ph ph-hand-coins mr-1"></i> Saldos y Retiros (Bóveda)
+                </button>
+                <button type="button" data-action="pvm-switch-tab" data-tab="rentabilidad-mensual" id="pvm-tab-btn-rentabilidad-mensual" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
+                    <i class="ph ph-calendar mr-1"></i> Análisis Mensual
+                </button>
+                <button type="button" data-action="pvm-switch-tab" data-tab="gastos-corporativos" id="pvm-tab-btn-gastos-corporativos" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
+                    <i class="ph ph-receipt mr-1"></i> Gastos Corporativos
+                </button>
+                <button type="button" data-action="pvm-switch-tab" data-tab="planes-rendimiento" id="pvm-tab-btn-planes-rendimiento" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
+                    <i class="ph ph-presentation-chart mr-1"></i> Rendimiento y Auditoría
+                </button>
+            </div>
+
             <div class="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-6 space-y-5">
 
-                <div class="bg-slate-900 rounded-2xl p-5 relative overflow-hidden shadow-lg">
-                    <div class="absolute -right-6 -top-6 w-28 h-28 bg-white/5 rounded-full blur-xl"></div>
-                    <div class="absolute -left-4 -bottom-4 w-20 h-20 bg-emerald-500/10 rounded-full blur-lg"></div>
-                    <div class="flex items-center justify-between relative z-10">
-                        <div>
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">Utilidad
-                                Neta del Periodo</p>
-                            <h2 class="text-2xl md:text-3xl font-black text-emerald-400 tracking-tight"
-                                id="pvm-utilidad-total">$0</h2>
+                <!-- Panel 1: Resumen Ejecutivo -->
+                <div id="pvm-panel-desempeno" class="space-y-5">
+                    <div class="bg-slate-900 rounded-2xl p-5 relative overflow-hidden shadow-lg grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        <div class="absolute -right-6 -top-6 w-28 h-28 bg-white/5 rounded-full blur-xl"></div>
+                        <div class="absolute -left-4 -bottom-4 w-20 h-20 bg-emerald-500/10 rounded-full blur-lg"></div>
+                        
+                        <div class="md:col-span-8 space-y-4 relative z-10">
+                            <div>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">Caja Neta Devengada (Planes Realizados - Gastos Corporativos)</p>
+                                <h2 class="text-2xl md:text-3xl font-black text-emerald-400 tracking-tight" id="pvm-utilidad-total">$0</h2>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-700/40">
+                                <div>
+                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Utilidad Bruta (Planes)</p>
+                                    <p class="text-xs font-black text-white" id="pvm-bruta-planes">$0</p>
+                                </div>
+                                <div>
+                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Gastos Corporativos</p>
+                                    <p class="text-xs font-black text-rose-400" id="pvm-gastos-corp-total">$0</p>
+                                </div>
+                                <div>
+                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Caja Proyectada (Futuro)</p>
+                                    <p class="text-xs font-black text-indigo-400" id="pvm-proyectada-total">$0</p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="text-right">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">Tu
-                                Participación</p>
-                            <p class="text-xl md:text-2xl font-black text-white tracking-tight" id="pvm-my-share">$0</p>
-                            <p class="text-[9px] font-bold text-primary-400 mt-0.5" id="pvm-my-percent">0%</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3 mt-4 pt-3 border-t border-slate-700/40 relative z-10">
-                        <div class="flex items-center gap-1.5">
-                            <i class="ph ph-airplane-tilt text-slate-500 text-sm"></i>
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest"
-                                id="pvm-tours-count">0 Tours</span>
-                        </div>
-                        <div class="w-px h-3 bg-slate-700"></div>
-                        <div class="flex items-center gap-1.5">
-                            <i class="ph ph-chart-line-up text-slate-500 text-sm"></i>
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest"
-                                id="pvm-ingresos-total">Ingresos: $0</span>
-                        </div>
-                        <div class="w-px h-3 bg-slate-700"></div>
-                        <div class="flex items-center gap-1.5">
-                            <i class="ph ph-receipt text-slate-500 text-sm"></i>
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest"
-                                id="pvm-costos-total">Costos: $0</span>
-                        </div>
-                    </div>
-                </div>
 
-                <div>
-                    <h4
-                        class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
-                        <i class="ph ph-users-three mr-1.5 text-sm"></i> Socios
-                    </h4>
-                    <div class="flex flex-wrap gap-2" id="pvm-socios-cards">
-                    </div>
-                </div>
-
-                <div id="pvm-admin-settings" class="hidden">
-                    <button data-action="toggle-partners-editor"
-                        class="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-200/60 px-4 py-2.5 rounded-xl transition-all shadow-sm mb-2">
-                        <span
-                            class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center"><i
-                                class="ph ph-gear-fine mr-1.5 text-sm"></i> Configurar Socios y Porcentajes</span>
-                        <i class="ph ph-caret-down text-slate-400 text-sm transition-transform"
-                            id="pvm-editor-toggle-icon"></i>
-                    </button>
-                    <div id="pvm-editor-panel" class="hidden space-y-2 mb-3">
-                        <div id="pvm-partners-editor" class="space-y-2"></div>
-                        <div class="flex gap-2">
-                            <button data-action="add-partner-row"
-                                class="flex-1 border border-dashed border-slate-300 text-slate-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-700 transition-all">+
-                                Añadir Socio</button>
-                            <button data-action="save-partners-settings"
-                                class="flex-1 bg-slate-900 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-sm">Guardar
-                                Cambios</button>
+                        <div class="md:col-span-4 text-left md:text-right bg-white/5 p-4 rounded-xl border border-white/10 relative z-10">
+                            <p class="text-[9px] font-black text-slate-300 uppercase tracking-[0.3em] mb-1">Tu Participación Real (Devengado)</p>
+                            <p class="text-xl md:text-2xl font-black text-emerald-300 tracking-tight" id="pvm-my-share">$0</p>
+                            <p class="text-[9px] font-black text-primary-400 mt-0.5" id="pvm-my-percent">0% Share</p>
                         </div>
                     </div>
-                </div>
 
-                <div
-                    class="border border-slate-200/60 bg-white/60 backdrop-blur-xl rounded-xl overflow-hidden shadow-sm">
-                    <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-                        <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center"><i
-                                class="ph ph-list-magnifying-glass mr-1.5 text-base"></i> Desglose de Utilidad por Tour
+                    <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-600">
+                        <i class="ph ph-info text-slate-400 text-base"></i>
+                        <span>
+                            <strong>Nota contable:</strong> Los saldos se calculan con base en la utilidad real devengada (viajes operados hasta la fecha) restando los gastos corporativos globales. Las reservas futuras confirmadas se muestran en la sección proyectada pero no forman parte del saldo disponible.
+                        </span>
+                    </div>
+
+                    <div>
+                        <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
+                            <i class="ph ph-users-three mr-1.5 text-sm"></i> Distribución de Socios (% Participación Fija)
                         </h4>
-                        <span
-                            class="bg-primary-100 text-primary-700 text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest"
-                            id="pvm-breakdown-count">0 Tours</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="pvm-socios-cards">
+                        </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm border-collapse">
-                            <thead
-                                class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap">
-                                <tr>
-                                    <th class="py-2.5 px-4">Plan</th>
-                                    <th class="py-2.5 px-4">Fecha de Salida</th>
-                                    <th class="py-2.5 px-4 text-center">Asistieron</th>
-                                    <th class="py-2.5 px-4 text-center" title="En caja, devolución o reprogramado">Retenidos</th>
-                                    <th class="py-2.5 px-4 text-right">Ingreso</th>
-                                    <th class="py-2.5 px-4 text-right">Costos</th>
-                                    <th class="py-2.5 px-4 text-right">Margen Neto</th>
-                                    <th class="py-2.5 px-4 text-right" title="Rentabilidad = (Margen Neto / Ingreso Bruto) * 100">Rentabilidad</th>
-                                    <th class="py-2.5 px-4 text-right" title="Ganancia por persona = Margen Neto / Pasajeros Totales">Ganancia/Pax</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pvm-breakdown-list" class="divide-y divide-slate-100/50">
-                            </tbody>
-                        </table>
+
+                    <div id="pvm-admin-settings" class="hidden">
+                        <button type="button" data-action="toggle-partners-editor"
+                            class="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-200/60 px-4 py-2.5 rounded-xl transition-all shadow-sm mb-2">
+                            <span
+                                class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center"><i
+                                    class="ph ph-gear-fine mr-1.5 text-sm"></i> Configurar Socios y Porcentajes Generales</span>
+                            <i class="ph ph-caret-down text-slate-400 text-sm transition-transform"
+                                id="pvm-editor-toggle-icon"></i>
+                        </button>
+                        <div id="pvm-editor-panel" class="hidden space-y-2 mb-3">
+                            <div id="pvm-partners-editor" class="space-y-2"></div>
+                            <div class="flex gap-2">
+                                <button type="button" data-action="add-partner-row"
+                                    class="flex-1 border border-dashed border-slate-300 text-slate-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-700 transition-all">+
+                                    Añadir Socio</button>
+                                <button type="button" data-action="save-partners-settings"
+                                    class="flex-1 bg-slate-900 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-sm">Guardar
+                                    Cambios</button>
+                            </div>
+                        </div>
                     </div>
-                    <div id="pvm-breakdown-empty" class="hidden py-8 text-center">
-                        <i class="ph ph-chart-bar text-3xl text-slate-200 mb-2"></i>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin salidas
-                            registradas este mes</p>
+                </div>
+
+                <!-- Panel 2: Saldos y Retiros -->
+                <div id="pvm-panel-saldos" class="space-y-5 hidden">
+                    <div id="pvm-saldos-fallback-banner" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+                        <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="text-xs font-bold text-amber-900">Guardado Local Activo (Fallback)</p>
+                            <p class="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
+                                La tabla <code class="bg-amber-100/80 px-1 py-0.5 rounded text-[9px] font-mono">socios_movimientos</code> no existe en Supabase. Los datos se guardan temporalmente en este navegador. Para hacerlos permanentes en la base de datos, ejecute el script de migración SQL <code class="bg-amber-100/80 px-1 py-0.5 rounded text-[9px] font-mono">setup_socios_movimientos.sql</code> provisto en el proyecto.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
+                            <i class="ph ph-hand-coins mr-1.5 text-sm"></i> Bóveda y Saldos Disponibles (Histórico Devengado Neto)
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="pvm-saldos-grid">
+                            <!-- Rendered dynamically by JS -->
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-200/60 bg-white/60 backdrop-blur-xl rounded-xl overflow-hidden shadow-sm">
+                        <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                            <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center">
+                                <i class="ph ph-clock-counter-clockwise mr-1.5 text-base"></i> Historial de Movimientos de Caja
+                            </h4>
+                            <div class="flex items-center gap-2">
+                                <select id="pvm-history-filter-partner" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 outline-none">
+                                    <option value="todos">Todos los Socios</option>
+                                    <!-- Options added dynamically -->
+                                </select>
+                                <span class="bg-slate-200 text-slate-700 text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest" id="pvm-history-count">0 Movimientos</span>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap">
+                                    <tr>
+                                        <th class="py-2.5 px-4">Fecha</th>
+                                        <th class="py-2.5 px-4">Socio</th>
+                                        <th class="py-2.5 px-4">Tipo</th>
+                                        <th class="py-2.5 px-4 text-right">Monto</th>
+                                        <th class="py-2.5 px-4">Concepto</th>
+                                        <th class="py-2.5 px-4">Registrado Por</th>
+                                        <th class="py-2.5 px-4 text-center">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pvm-history-list" class="divide-y divide-slate-100/50">
+                                    <!-- Rendered dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="pvm-history-empty" class="hidden py-8 text-center">
+                            <i class="ph ph-coins text-3xl text-slate-200 mb-2"></i>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin movimientos registrados</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 3: Rentabilidad Mensual Histórica -->
+                <div id="pvm-panel-rentabilidad-mensual" class="space-y-5 hidden">
+                    <div class="border border-slate-200/60 bg-white/60 backdrop-blur-xl rounded-xl overflow-hidden shadow-sm">
+                        <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100">
+                            <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center">
+                                <i class="ph ph-calendar mr-1.5 text-base"></i> Rentabilidad Mensual y Distribución de Utilidad Neta
+                            </h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse font-sans">
+                                <thead class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap" id="pvm-monthly-thead">
+                                    <!-- Header cols dynamically generated by JS for partners columns -->
+                                </thead>
+                                <tbody id="pvm-monthly-list" class="divide-y divide-slate-100/50">
+                                    <!-- Rendered dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Panel de Detalle Mensual (Se despliega al hacer clic en una fila) -->
+                    <div id="pvm-monthly-detail-panel" class="hidden border border-slate-200/60 bg-slate-50/50 rounded-2xl p-5 space-y-4">
+                        <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                            <div>
+                                <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center">
+                                    <i class="ph ph-info mr-2 text-indigo-500"></i> Desglose Detallado: <span id="pvm-detail-month-title" class="text-indigo-600 ml-1">Mayo 2026</span>
+                                </h4>
+                                <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Operaciones y gastos del periodo</p>
+                            </div>
+                            <button type="button" class="text-slate-400 hover:text-slate-700 bg-white border border-slate-200 p-1.5 rounded-lg text-xs font-bold shadow-sm" onclick="document.getElementById('pvm-monthly-detail-panel').classList.add('hidden')">Cerrar Detalle</button>
+                        </div>
+
+                        <div class="flex flex-col gap-5">
+                            <!-- Lado izquierdo: Planes Realizados -->
+                            <div class="w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div class="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
+                                    <p class="text-[9px] font-black text-slate-600 uppercase tracking-wider">🗺️ Planes Realizados / Causados</p>
+                                </div>
+                                <div class="overflow-x-auto max-h-[300px] overflow-y-auto">
+                                    <table class="w-full text-left text-xs border-collapse">
+                                        <thead class="bg-slate-50 text-[8px] font-black text-slate-400 uppercase border-b border-slate-200 tracking-wider whitespace-nowrap">
+                                            <tr>
+                                                <th class="py-2 px-3">Plan</th>
+                                                <th class="py-2 px-3">Fecha</th>
+                                                <th class="py-2 px-3 text-center">Pax</th>
+                                                <th class="py-2 px-3 text-right">Vendido</th>
+                                                <th class="py-2 px-3 text-right">Costos</th>
+                                                <th class="py-2 px-3 text-right">Margen</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pvm-detail-month-planes" class="divide-y divide-slate-100">
+                                            <!-- Rendered dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Lado derecho: Gastos Corporativos del Mes -->
+                            <div class="w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div class="bg-slate-100/50 px-4 py-2 border-b border-slate-200">
+                                    <p class="text-[9px] font-black text-slate-600 uppercase tracking-wider">💸 Gastos Corporativos Descontados</p>
+                                </div>
+                                <div class="overflow-x-auto max-h-[300px] overflow-y-auto">
+                                    <table class="w-full text-left text-xs border-collapse">
+                                        <thead class="bg-slate-50 text-[8px] font-black text-slate-400 uppercase border-b border-slate-200 tracking-wider whitespace-nowrap">
+                                            <tr>
+                                                <th class="py-2 px-3">Categoría</th>
+                                                <th class="py-2 px-3">Concepto</th>
+                                                <th class="py-2 px-3 text-center">Soporte</th>
+                                                <th class="py-2 px-3 text-right">Monto</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pvm-detail-month-gastos" class="divide-y divide-slate-100">
+                                            <!-- Rendered dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 4: Control de Gastos Corporativos -->
+                <div id="pvm-panel-gastos-corporativos" class="space-y-5 hidden">
+                    <div id="pvm-gastos-fallback-banner" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+                        <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="text-xs font-bold text-amber-900">Guardado Local Activo (Gastos Fallback)</p>
+                            <p class="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
+                                La tabla <code class="bg-amber-100/80 px-1 py-0.5 rounded text-[9px] font-mono">gastos_corporativos</code> no existe en Supabase. Los datos se guardan temporalmente en este navegador.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                        <!-- Formulario de Registro -->
+                        <div class="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm h-fit">
+                            <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider mb-3 flex items-center">
+                                <i class="ph ph-plus-circle mr-1.5 text-base text-slate-500"></i> Registrar Gasto Corporativo
+                            </h4>
+                            <form id="pvm-gasto-corp-form" class="space-y-3">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Categoría</label>
+                                    <select id="pvm-gasto-corp-categoria" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm">
+                                        <option value="Alquiler Oficina">Alquiler Oficina</option>
+                                        <option value="Software / Herramientas">Software / Herramientas</option>
+                                        <option value="Marketing y Publicidad">Marketing y Publicidad</option>
+                                        <option value="Administrativo / Legal">Administrativo / Legal</option>
+                                        <option value="Papelería / Tarjetas">Papelería / Tarjetas</option>
+                                        <option value="Dotación / Camisas">Dotación / Camisas</option>
+                                        <option value="Otros Operativos">Otros Operativos</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Monto (COP)</label>
+                                    <div class="relative">
+                                        <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">$</span>
+                                        <input type="number" id="pvm-gasto-corp-monto" required min="1" step="0.01" class="w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-lg pl-6 pr-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="0.00">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Fecha</label>
+                                    <input type="date" id="pvm-gasto-corp-fecha" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm">
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Concepto / Descripción (Requerido)</label>
+                                    <textarea id="pvm-gasto-corp-concepto" required rows="2" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="Ej: Pago arriendo oficina Mayo 2026..."></textarea>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Captura / Comprobante (Requerido)</label>
+                                    <div class="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-3 bg-slate-50 hover:bg-slate-100/70 transition-all cursor-pointer flex flex-col items-center justify-center gap-1 group" id="pvm-gasto-corp-dropzone">
+                                        <input type="file" id="pvm-gasto-corp-comprobante" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" required>
+                                        <i class="ph ph-camera text-slate-400 text-lg group-hover:text-indigo-500 group-hover:scale-110 transition-all"></i>
+                                        <span id="pvm-gasto-corp-file-name" class="text-[10px] font-black text-slate-500 group-hover:text-slate-800 transition-colors">Adjuntar Comprobante</span>
+                                        <span class="text-[8px] text-slate-400">JPG, PNG o GIF (Máx. 2MB)</span>
+                                    </div>
+                                    <div id="pvm-gasto-corp-preview-container" class="hidden mt-2 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 p-1 flex items-center justify-between">
+                                        <img id="pvm-gasto-corp-preview" src="" class="h-10 w-10 object-cover rounded-md border border-slate-200">
+                                        <span id="pvm-gasto-corp-preview-name" class="text-[10px] font-bold text-slate-600 truncate flex-1 mx-2"></span>
+                                        <button type="button" id="pvm-gasto-corp-preview-remove" class="text-slate-400 hover:text-red-500 p-1"><i class="ph ph-trash text-sm"></i></button>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5">
+                                    <i class="ph ph-floppy-disk text-xs"></i> Guardar Gasto
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Listado de Gastos -->
+                        <div class="lg:col-span-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                                    <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center">
+                                        <i class="ph ph-receipt mr-1.5 text-base"></i> Gastos Corporativos del Periodo
+                                    </h4>
+                                    <span class="bg-rose-100 text-rose-700 text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest" id="pvm-gasto-corp-count">0 Gastos</span>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left text-sm border-collapse">
+                                        <thead class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap">
+                                            <tr>
+                                                <th class="py-2 px-3">Fecha</th>
+                                                <th class="py-2 px-3">Categoría</th>
+                                                <th class="py-2 px-3">Concepto</th>
+                                                <th class="py-2 px-3 text-center">Soporte</th>
+                                                <th class="py-2 px-3 text-right">Monto</th>
+                                                <th class="py-2 px-3">Usuario</th>
+                                                <th class="py-2 px-3 text-center">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pvm-gasto-corp-list" class="divide-y divide-slate-100/50">
+                                            <!-- Rendered dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="pvm-gasto-corp-empty" class="hidden py-8 text-center">
+                                    <i class="ph ph-receipt text-3xl text-slate-200 mb-2"></i>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin gastos corporativos registrados en este periodo</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 5: Rendimiento de Planes y Auditoría -->
+                <div id="pvm-panel-planes-rendimiento" class="space-y-5 hidden">
+                    <div class="border border-slate-200/60 bg-white/60 backdrop-blur-xl rounded-xl overflow-hidden shadow-sm">
+                        <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100">
+                            <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center">
+                                <i class="ph ph-map-pin mr-1.5 text-base"></i> Rendimiento de Utilidad Bruta por Plan
+                            </h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap">
+                                    <tr>
+                                        <th class="py-2.5 px-4">Plan</th>
+                                        <th class="py-2.5 px-4 text-center">Salidas</th>
+                                        <th class="py-2.5 px-4 text-center">Pax Totales</th>
+                                        <th class="py-2.5 px-4 text-right">Ingresos</th>
+                                        <th class="py-2.5 px-4 text-right">Costos</th>
+                                        <th class="py-2.5 px-4 text-right">Utilidad Bruta</th>
+                                        <th class="py-2.5 px-4 text-right">Rentabilidad %</th>
+                                        <th class="py-2.5 px-4 text-right">Ganancia/Pax</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pvm-plan-list" class="divide-y divide-slate-100/50">
+                                    <!-- Rendered dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="border border-slate-200/60 bg-white/60 backdrop-blur-xl rounded-xl overflow-hidden shadow-sm">
+                        <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                            <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center">
+                                <i class="ph ph-list-magnifying-glass mr-1.5 text-base"></i> Auditoría de Utilidades por Salida Turística
+                            </h4>
+                            <span class="bg-primary-100 text-primary-700 text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest" id="pvm-breakdown-count">0 Tours</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm border-collapse">
+                                <thead class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap">
+                                    <tr>
+                                        <th class="py-2.5 px-4">Plan / Destino</th>
+                                        <th class="py-2.5 px-4">Fecha de Salida</th>
+                                        <th class="py-2.5 px-4 text-center">Asistieron</th>
+                                        <th class="py-2.5 px-4 text-center" title="En caja, devolución o reprogramado">Retenidos</th>
+                                        <th class="py-2.5 px-4 text-right">Ingreso</th>
+                                        <th class="py-2.5 px-4 text-right">Costos</th>
+                                        <th class="py-2.5 px-4 text-right">Margen Neto</th>
+                                        <th class="py-2.5 px-4 text-right" title="Rentabilidad = (Margen Neto / Ingreso Bruto) * 100">Rentabilidad</th>
+                                        <th class="py-2.5 px-4 text-right" title="Ganancia por persona = Margen Neto / Pasajeros Totales">Ganancia/Pax</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pvm-breakdown-list" class="divide-y divide-slate-100/50">
+                                    <!-- Rendered dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="pvm-breakdown-empty" class="hidden py-8 text-center">
+                            <i class="ph ph-chart-bar text-3xl text-slate-200 mb-2"></i>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin salidas registradas en este periodo</p>
+                        </div>
                     </div>
                 </div>
 
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE REGISTRO DE RETIRO O CORTE -->
+    <div id="pvm-movimiento-modal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-2 md:p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"
+            id="pvm-mov-bg" data-action="close-pvm-movimiento"></div>
+        <div class="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 z-10 overflow-hidden modal-mobile-safe"
+            id="pvm-mov-content">
+            <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div>
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center" id="pvm-mov-title">
+                        <i class="ph ph-hand-coins mr-2 text-slate-500"></i> Registrar Movimiento
+                    </h3>
+                    <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Control de Caja y Utilidades</p>
+                </div>
+                <button type="button" data-action="close-pvm-movimiento" class="text-slate-400 hover:text-slate-900 p-1.5 rounded-lg transition-all hover:bg-slate-100">
+                    <i class="ph ph-x text-base"></i>
+                </button>
+            </div>
+            <form id="pvm-movimiento-form" class="p-5 space-y-4">
+                <input type="hidden" id="pvm-mov-socio-email">
+                <input type="hidden" id="pvm-mov-tipo">
+                
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Socio</label>
+                    <input type="text" id="pvm-mov-socio-nombre" readonly class="w-full text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 outline-none text-slate-600 cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Tipo de Operación</label>
+                    <input type="text" id="pvm-mov-tipo-texto" readonly class="w-full text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 outline-none text-slate-600 cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Saldo Disponible (Histórico)</label>
+                    <input type="text" id="pvm-mov-saldo-disponible" readonly class="w-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl px-3 py-2 outline-none cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Monto a Operar (COP)</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">$</span>
+                        <input type="number" id="pvm-mov-monto" required min="1" step="0.01" class="w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-xl pl-6 pr-3 py-2 outline-none focus:ring-2 focus:ring-slate-900" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Fecha de Registro</label>
+                    <input type="date" id="pvm-mov-fecha" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900">
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Concepto / Observaciones</label>
+                    <textarea id="pvm-mov-concepto" required rows="2" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900" placeholder="Detalle de la transacción..."></textarea>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" data-action="close-pvm-movimiento" class="flex-1 border border-slate-200 text-slate-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-700 transition-all">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md">Registrar</button>
+                </div>
+            </form>
+        </div>
         </div>
     </div>
 

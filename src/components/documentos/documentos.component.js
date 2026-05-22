@@ -1,6 +1,7 @@
 import { Store } from '../../core/store.js';
 import { DataService } from '../../../js/services/supabase.service.js';
 import { UI } from '../../../js/utils/ui.utils.js';
+import { parseSpanishDate, formatShortDate } from '../../../js/utils/format.utils.js';
 
 const DocumentosComponent = {
     settings: {
@@ -21,19 +22,19 @@ const DocumentosComponent = {
     reservasDisponibles: [],
 
     init: async function () {
-        this.loadSettings();
-        
+        await this.loadSettings();
+
         // Inicializar documento en blanco
         this.resetActiveDoc();
-        
+
         this.loadSavedDocsList();
-        
+
         // Rellenar DOM e inicializar listas y previsualización
         this.fillDOMFromActiveDoc();
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
-        
+
         await this.loadCRMData();
 
         // Suscribirse reactivamente al Store de datos
@@ -43,12 +44,37 @@ const DocumentosComponent = {
         });
     },
 
-    loadSettings: function () {
-        const saved = localStorage.getItem('crm_doc_settings');
-        if (saved) {
-            this.settings = { ...this.settings, ...JSON.parse(saved) };
+    loadSettings: async function () {
+        try {
+            const { data, error } = await DataService.getAgenciaConfig();
+            if (!error && data) {
+                this.settings = {
+                    logo: data.logo || this.settings.logo,
+                    color1: data.color_primario || this.settings.color1,
+                    color2: data.color_secundario || this.settings.color2,
+                    razon: data.razon_social || this.settings.razon,
+                    subtitulo: data.subtitulo || this.settings.subtitulo,
+                    nit: data.nit || this.settings.nit,
+                    rnt: data.rnt || this.settings.rnt,
+                    tel: data.telefono || this.settings.tel,
+                    dir: data.direccion || this.settings.dir,
+                    terms: data.condiciones || this.settings.terms
+                };
+                localStorage.setItem('crm_doc_settings', JSON.stringify(this.settings));
+            } else {
+                const saved = localStorage.getItem('crm_doc_settings');
+                if (saved) {
+                    this.settings = { ...this.settings, ...JSON.parse(saved) };
+                }
+            }
+        } catch (e) {
+            console.warn("Error cargando configuración de marca desde la base de datos:", e);
+            const saved = localStorage.getItem('crm_doc_settings');
+            if (saved) {
+                this.settings = { ...this.settings, ...JSON.parse(saved) };
+            }
         }
-        
+
         const setVal = (id, val) => {
             const el = document.getElementById(id);
             if (el) el.value = val;
@@ -65,12 +91,12 @@ const DocumentosComponent = {
         setVal('setting_terms', this.settings.terms || '');
     },
 
-    saveSettings: function () {
+    saveSettings: async function () {
         const getVal = (id) => {
             const el = document.getElementById(id);
             return el ? el.value : '';
         };
-        this.settings = {
+        const newSettings = {
             logo: getVal('setting_logo'),
             color1: getVal('setting_color1'),
             color2: getVal('setting_color2'),
@@ -82,22 +108,44 @@ const DocumentosComponent = {
             dir: getVal('setting_dir'),
             terms: getVal('setting_terms')
         };
+        this.settings = { ...this.settings, ...newSettings };
         localStorage.setItem('crm_doc_settings', JSON.stringify(this.settings));
-        UI.closeModal('modal-settings-marca', 'msm-bg', 'msm-content');
-        this.renderPreview();
-        UI.showToast('Configuración de marca guardada correctamente.', 'success');
+
+        const btn = document.querySelector('button[onclick="DocumentosComponent.saveSettings()"]');
+        let originalHtml = "";
+        if (btn) {
+            originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Guardando...';
+            btn.disabled = true;
+        }
+
+        try {
+            const { error } = await DataService.saveAgenciaConfig(newSettings);
+            if (error) throw error;
+            UI.showToast('Configuración de marca guardada en base de datos.', 'success');
+        } catch (e) {
+            console.error("Error al guardar en base de datos:", e);
+            UI.showToast('Guardado localmente. Recuerda ejecutar el script de base de datos en Supabase.', 'warning');
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+            UI.closeModal('modal-settings-marca', 'msm-bg', 'msm-content');
+            this.renderPreview();
+        }
     },
 
     openSettings: function () {
         UI.openModal('modal-settings-marca', 'msm-bg', 'msm-content');
     },
 
-    loadSavedDocsList: function() {
+    loadSavedDocsList: function () {
         const select = document.getElementById('saved_docs_select');
         if (!select) return;
         const saved = localStorage.getItem('crm_saved_documentos');
         const docs = saved ? JSON.parse(saved) : [];
-        
+
         select.innerHTML = '<option value="">-- Cargar Borrador --</option>';
         docs.forEach(doc => {
             const option = document.createElement('option');
@@ -110,7 +158,7 @@ const DocumentosComponent = {
         }
     },
 
-    resetActiveDoc: function() {
+    resetActiveDoc: function () {
         this.activeDoc = {
             id: null,
             name: '',
@@ -126,17 +174,17 @@ const DocumentosComponent = {
                 titulo_tours: 'TOURS Y EXPERIENCIAS PROGRAMADAS',
                 titulo_adicionales: 'Servicios Adicionales (Fuera de Plan)',
                 titulo_pagos: 'Canales de Pago Autorizados',
-                
+
                 cliente_nombre: '',
                 cliente_id: '',
                 cliente_tel: '',
                 cliente_email: '',
-                
+
                 destino: '',
                 fechas: '',
                 duracion: '',
                 pasajeros: '',
-                
+
                 servicios_principales: [
                     { categoria: 'Transporte Aéreo', descripcion: 'Vuelos de ida y regreso con equipaje incluido.' },
                     { categoria: 'Alojamiento', descripcion: 'Estadía en hotel seleccionado con desayuno diario.' },
@@ -146,14 +194,14 @@ const DocumentosComponent = {
                     { experiencia: 'Tours y Excursiones', descripcion: 'Entradas y traslados compartidos para las excursiones.' }
                 ],
                 servicios_adicionales: [],
-                
+
                 paquete_valor: 0,
                 metodo_pago: 'Transferencia Bancaria',
                 pago_titular: 'Vive Travel Col',
                 pago_entidad: 'Bancolombia',
                 pago_cuenta: 'Ahorros ****789',
                 pago_referencia: '',
-                
+
                 abonos: [],
                 condiciones: [
                     {
@@ -169,7 +217,7 @@ const DocumentosComponent = {
         };
     },
 
-    newBlankDocument: function() {
+    newBlankDocument: function () {
         this.resetActiveDoc();
         this.fillDOMFromActiveDoc();
         this.renderEditorLists();
@@ -180,7 +228,7 @@ const DocumentosComponent = {
         UI.showToast("Nuevo borrador en blanco iniciado.", "info");
     },
 
-    saveActiveDocument: function() {
+    saveActiveDocument: function () {
         this.onInputChanged();
 
         if (!this.activeDoc.id) {
@@ -192,7 +240,7 @@ const DocumentosComponent = {
 
         const saved = localStorage.getItem('crm_saved_documentos');
         let docs = saved ? JSON.parse(saved) : [];
-        
+
         const existingIdx = docs.findIndex(doc => doc.id === this.activeDoc.id);
         if (existingIdx !== -1) {
             docs[existingIdx] = this.activeDoc;
@@ -205,7 +253,7 @@ const DocumentosComponent = {
         UI.showToast("Borrador guardado en la biblioteca local.", "success");
     },
 
-    loadSavedDocument: function(id) {
+    loadSavedDocument: function (id) {
         if (!id) return;
         const saved = localStorage.getItem('crm_saved_documentos');
         const docs = saved ? JSON.parse(saved) : [];
@@ -220,7 +268,7 @@ const DocumentosComponent = {
         }
     },
 
-    deleteActiveDocument: function() {
+    deleteActiveDocument: function () {
         const select = document.getElementById('saved_docs_select');
         const id = select.value;
         if (!id) {
@@ -278,7 +326,51 @@ const DocumentosComponent = {
         }
     },
 
-    loadFromReserva: function(id) {
+    parseRange: function (dateStr) {
+        if (!dateStr) return null;
+        const cleanStr = dateStr.replace(/\(.*?\)/g, '').trim();
+        const splitters = [/\s+al\s+/i, /\s+a\s+/i, /\s+-\s+/];
+        for (const splitter of splitters) {
+            if (splitter.test(cleanStr)) {
+                const parts = cleanStr.split(splitter);
+                if (parts.length === 2) {
+                    const start = parseSpanishDate(parts[0].trim());
+                    const end = parseSpanishDate(parts[1].trim());
+                    if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                        return { start, end };
+                    }
+                }
+            }
+        }
+        const single = parseSpanishDate(cleanStr);
+        if (single && !isNaN(single.getTime())) {
+            return { start: single, end: single };
+        }
+        return null;
+    },
+
+    calculateDuration: function (start, end, planTipo) {
+        const isPasadia = planTipo && (planTipo.toLowerCase().includes('pasadía') || planTipo.toLowerCase().includes('pasadia'));
+        if (isPasadia) {
+            return 'Pasadía';
+        }
+        if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays < 2) {
+                return 'Pasadía';
+            } else {
+                const days = diffDays;
+                const nights = diffDays - 1;
+                const daysStr = days === 1 ? '1 Día' : `${days} Días`;
+                const nightsStr = nights === 1 ? '1 Noche' : `${nights} Noches`;
+                return `${daysStr} / ${nightsStr}`;
+            }
+        }
+        return null;
+    },
+
+    loadFromReserva: function (id) {
         if (!id) return;
         const c = DataService.clientes.find(item => item.id == id);
         if (!c) return;
@@ -291,7 +383,39 @@ const DocumentosComponent = {
         const plan = DataService.planes.find(p => p.id === c.plan_id);
         if (plan) {
             this.activeDoc.data.destino = plan.destino || plan.nombre;
-            this.activeDoc.data.duracion = plan.duracion || '4 Días / 3 Noches';
+
+            // Calcular duración dinámica
+            let duracionCalculada = '';
+            const isPasadia = plan.tipo && (plan.tipo.toLowerCase().includes('pasadía') || plan.tipo.toLowerCase().includes('pasadia'));
+            if (isPasadia) {
+                duracionCalculada = 'Pasadía';
+            } else {
+                if (c.fecha_viaje) {
+                    const range = this.parseRange(c.fecha_viaje);
+                    if (range) {
+                        duracionCalculada = this.calculateDuration(range.start, range.end, plan.tipo);
+                    }
+                }
+
+                if (!duracionCalculada) {
+                    // Fallback a las fechas del plan
+                    let start = null;
+                    let end = null;
+                    if (plan.fechas && plan.fechas.length > 0) {
+                        const firstRange = plan.fechas[0];
+                        start = parseSpanishDate(firstRange.start);
+                        end = parseSpanishDate(firstRange.end);
+                    } else if (plan.fecha_entrada && plan.fecha_salida) {
+                        start = parseSpanishDate(plan.fecha_entrada);
+                        end = parseSpanishDate(plan.fecha_salida);
+                    }
+                    if (start && end) {
+                        duracionCalculada = this.calculateDuration(start, end, plan.tipo);
+                    }
+                }
+            }
+            this.activeDoc.data.duracion = duracionCalculada || plan.duracion || '4 Días / 3 Noches';
+
             this.activeDoc.data.fechas = c.fecha_viaje ? this.formatDate(c.fecha_viaje) : '';
             this.activeDoc.data.pasajeros = `${c.pax || 1} Viajero(s)`;
         }
@@ -302,7 +426,7 @@ const DocumentosComponent = {
         // Cargar abonos desde la base de datos para este cliente
         const rawAbonos = DataService.abonos || [];
         const confirmedAbonos = rawAbonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
-        
+
         this.activeDoc.data.abonos = confirmedAbonos.map(a => {
             let dateStr = '';
             if (a.created_at) {
@@ -320,34 +444,55 @@ const DocumentosComponent = {
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
-        
+
         // Reset selector
         document.getElementById('crm_reserva_select').value = '';
         UI.showToast("Datos de la reserva y abonos cargados exitosamente.", "success");
     },
 
-    loadFromPlan: function(id) {
+    loadFromPlan: function (id) {
         if (!id) return;
         const plan = DataService.planes.find(p => p.id == id);
         if (!plan) return;
 
         this.activeDoc.data.destino = plan.destino || plan.nombre;
-        this.activeDoc.data.duracion = plan.duracion || '4 Días / 3 Noches';
+
+        let duracionCalculada = '';
+        const isPasadia = plan.tipo && (plan.tipo.toLowerCase().includes('pasadía') || plan.tipo.toLowerCase().includes('pasadia'));
+        if (isPasadia) {
+            duracionCalculada = 'Pasadía';
+        } else {
+            let start = null;
+            let end = null;
+            if (plan.fechas && plan.fechas.length > 0) {
+                const firstRange = plan.fechas[0];
+                start = parseSpanishDate(firstRange.start);
+                end = parseSpanishDate(firstRange.end);
+            } else if (plan.fecha_entrada && plan.fecha_salida) {
+                start = parseSpanishDate(plan.fecha_entrada);
+                end = parseSpanishDate(plan.fecha_salida);
+            }
+            if (start && end) {
+                duracionCalculada = this.calculateDuration(start, end, plan.tipo);
+            }
+        }
+        this.activeDoc.data.duracion = duracionCalculada || plan.duracion || '4 Días / 3 Noches';
+
         this.activeDoc.data.paquete_valor = Number(plan.precio_persona) || 0;
 
         this.fillDOMFromActiveDoc();
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
-        
+
         // Reset selector
         document.getElementById('crm_plan_select').value = '';
         UI.showToast("Tarifas y destino del plan cargados al documento.", "success");
     },
 
-    fillDOMFromActiveDoc: function() {
+    fillDOMFromActiveDoc: function () {
         const getEl = (id) => document.getElementById(id);
-        
+
         if (getEl('doc_type')) getEl('doc_type').value = this.activeDoc.type;
         if (getEl('doc_titulo_documento')) {
             getEl('doc_titulo_documento').value = this.activeDoc.data.titulo_documento || (this.activeDoc.type === 'cotizacion' ? 'COTIZACIÓN PREMIUM' : 'SOPORTE DE PAGO');
@@ -355,7 +500,7 @@ const DocumentosComponent = {
         if (getEl('doc_fecha_emision')) getEl('doc_fecha_emision').value = this.activeDoc.data.fecha_emision || '';
         if (getEl('doc_sello_texto')) getEl('doc_sello_texto').value = this.activeDoc.data.sello_texto || '';
         if (getEl('doc_sello_subtexto')) getEl('doc_sello_subtexto').value = this.activeDoc.data.sello_subtexto || '';
-        
+
         if (getEl('doc_titulo_viajero')) getEl('doc_titulo_viajero').value = this.activeDoc.data.titulo_viajero !== undefined ? this.activeDoc.data.titulo_viajero : 'INFORMACIÓN DEL VIAJERO';
         if (getEl('doc_titulo_plan')) getEl('doc_titulo_plan').value = this.activeDoc.data.titulo_plan !== undefined ? this.activeDoc.data.titulo_plan : 'RESUMEN DEL PLAN COMERCIAL';
         if (getEl('doc_titulo_servicios')) getEl('doc_titulo_servicios').value = this.activeDoc.data.titulo_servicios !== undefined ? this.activeDoc.data.titulo_servicios : 'SERVICIOS PRINCIPALES INCLUIDOS';
@@ -367,7 +512,7 @@ const DocumentosComponent = {
         if (getEl('doc_cliente_id')) getEl('doc_cliente_id').value = this.activeDoc.data.cliente_id || '';
         if (getEl('doc_cliente_tel')) getEl('doc_cliente_tel').value = this.activeDoc.data.cliente_tel || '';
         if (getEl('doc_cliente_email')) getEl('doc_cliente_email').value = this.activeDoc.data.cliente_email || '';
-        
+
         if (getEl('doc_destino')) getEl('doc_destino').value = this.activeDoc.data.destino || '';
         if (getEl('doc_fechas')) getEl('doc_fechas').value = this.activeDoc.data.fechas || '';
         if (getEl('doc_duracion')) getEl('doc_duracion').value = this.activeDoc.data.duracion || '';
@@ -411,7 +556,7 @@ const DocumentosComponent = {
         }
     },
 
-    renderEditorLists: function() {
+    renderEditorLists: function () {
         // 1. Servicios Principales
         const princContainer = document.getElementById('principales_container');
         if (princContainer) {
@@ -497,7 +642,7 @@ const DocumentosComponent = {
         }
     },
 
-    onListInputChanged: function(listName, index, field, value) {
+    onListInputChanged: function (listName, index, field, value) {
         let arrayToUpdate;
         if (listName === 'principales') arrayToUpdate = this.activeDoc.data.servicios_principales;
         if (listName === 'tours') arrayToUpdate = this.activeDoc.data.tours_actividades;
@@ -515,63 +660,63 @@ const DocumentosComponent = {
         this.recalculate();
         this.renderPreview();
     },
-    addPrincipalRow: function() {
+    addPrincipalRow: function () {
         this.activeDoc.data.servicios_principales.push({ categoria: '', descripcion: '' });
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    removePrincipalRow: function(idx) {
+    removePrincipalRow: function (idx) {
         this.activeDoc.data.servicios_principales.splice(idx, 1);
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    addTourRow: function() {
+    addTourRow: function () {
         this.activeDoc.data.tours_actividades.push({ experiencia: '', descripcion: '' });
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    removeTourRow: function(idx) {
+    removeTourRow: function (idx) {
         this.activeDoc.data.tours_actividades.splice(idx, 1);
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    addAdicionalRow: function() {
+    addAdicionalRow: function () {
         this.activeDoc.data.servicios_adicionales.push({ categoria: '', descripcion: '', valor: 0 });
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    removeAdicionalRow: function(idx) {
+    removeAdicionalRow: function (idx) {
         this.activeDoc.data.servicios_adicionales.splice(idx, 1);
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    addAbonoRow: function() {
+    addAbonoRow: function () {
         const today = new Date().toLocaleDateString('es-ES');
         this.activeDoc.data.abonos.push({ fecha: today, monto: 0 });
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    removeAbonoRow: function(idx) {
+    removeAbonoRow: function (idx) {
         this.activeDoc.data.abonos.splice(idx, 1);
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    addCondicionRow: function() {
+    addCondicionRow: function () {
         if (!this.activeDoc.data.condiciones) this.activeDoc.data.condiciones = [];
         this.activeDoc.data.condiciones.push({ titulo: '', descripcion: '' });
         this.renderEditorLists();
         this.recalculate();
         this.renderPreview();
     },
-    removeCondicionRow: function(idx) {
+    removeCondicionRow: function (idx) {
         if (this.activeDoc.data.condiciones) {
             this.activeDoc.data.condiciones.splice(idx, 1);
         }
@@ -580,9 +725,9 @@ const DocumentosComponent = {
         this.renderPreview();
     },
 
-    onInputChanged: function() {
+    onInputChanged: function () {
         if (!this.activeDoc) return;
-        
+
         const getVal = (id) => {
             const el = document.getElementById(id);
             return el ? el.value : '';
@@ -593,12 +738,12 @@ const DocumentosComponent = {
         this.activeDoc.data.fecha_emision = getVal('doc_fecha_emision');
         this.activeDoc.data.sello_texto = getVal('doc_sello_texto');
         this.activeDoc.data.sello_subtexto = getVal('doc_sello_subtexto');
-        
+
         this.activeDoc.data.cliente_nombre = getVal('doc_cliente_nombre');
         this.activeDoc.data.cliente_id = getVal('doc_cliente_id');
         this.activeDoc.data.cliente_tel = getVal('doc_cliente_tel');
         this.activeDoc.data.cliente_email = getVal('doc_cliente_email');
-        
+
         this.activeDoc.data.titulo_viajero = getVal('doc_titulo_viajero');
         this.activeDoc.data.titulo_plan = getVal('doc_titulo_plan');
         this.activeDoc.data.titulo_servicios = getVal('doc_titulo_servicios');
@@ -624,7 +769,7 @@ const DocumentosComponent = {
         this.renderPreview();
     },
 
-    recalculate: function() {
+    recalculate: function () {
         const pacoteVal = parseFloat(document.getElementById('doc_paquete_valor')?.value) || 0;
         this.activeDoc.data.paquete_valor = pacoteVal;
 
@@ -648,7 +793,7 @@ const DocumentosComponent = {
         return '$ ' + parseFloat(value).toLocaleString('es-CO');
     },
 
-    formatDate: function(dateStr) {
+    formatDate: function (dateStr) {
         if (!dateStr) return '';
         if (dateStr.includes('/')) return dateStr;
         const parts = dateStr.split('-');
@@ -663,10 +808,10 @@ const DocumentosComponent = {
     renderPreview: function () {
         const container = document.getElementById('pdf_preview_container');
         if (!container) return;
-        
+
         const html = this.buildPreviewHTML();
         container.innerHTML = html;
-        
+
         const hiddenContainer = document.getElementById('pdf-template-container');
         if (hiddenContainer) {
             hiddenContainer.innerHTML = html;
@@ -678,7 +823,7 @@ const DocumentosComponent = {
         const c1 = this.settings.color1 || '#005C7A';
         const c2 = this.settings.color2 || '#2563eb';
         const typeLabel = ((data.titulo_documento || '').trim().toUpperCase()) || (this.activeDoc.type === 'cotizacion' ? 'COTIZACIÓN PREMIUM' : 'SOPORTE DE PAGO');
-        
+
         const fmt = (val) => this.formatCurrency(val);
         const formatDate = (dStr) => this.formatDate(dStr);
 
@@ -926,7 +1071,7 @@ const DocumentosComponent = {
         </div>`;
     },
 
-    exportToPDF: function() {
+    exportToPDF: function () {
         this.onInputChanged();
         const container = document.getElementById('pdf_preview_container');
         if (!container) return;
@@ -983,13 +1128,13 @@ const DocumentosComponent = {
         });
     },
 
-    toggleSection: function(headerEl) {
+    toggleSection: function (headerEl) {
         const section = headerEl.closest('.accordion-section');
         if (!section) return;
         section.classList.toggle('collapsed');
     },
 
-    updateDefaultTitleFromType: function() {
+    updateDefaultTitleFromType: function () {
         const docType = document.getElementById('doc_type')?.value;
         const titleEl = document.getElementById('doc_titulo_documento');
         if (titleEl) {

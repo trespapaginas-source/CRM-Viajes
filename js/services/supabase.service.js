@@ -397,5 +397,59 @@ export const DataService = {
         const { error } = await supabaseClient.from('proveedores').delete().eq('id', id);
         if (error) throw error;
         await this.loadAll();
+    },
+
+    async getAgenciaConfig() {
+        try {
+            const { data, error } = await supabaseClient.from('configuracion_agencia').select('*').eq('id', 1);
+            if (error) throw error;
+            return { data: (data && data.length > 0) ? data[0] : null, error: null };
+        } catch (e) {
+            return { data: null, error: e };
+        }
+    },
+
+    async saveAgenciaConfig(settings) {
+        try {
+            const user = window.AuthModule?.currentUser;
+            const payload = {
+                id: 1,
+                logo: settings.logo,
+                color_primario: settings.color_primario || settings.logo ? settings.logo : undefined, // Manejar mapeo si es necesario
+                color_secundario: settings.color_secundario,
+                razon_social: settings.razon_social,
+                subtitulo: settings.subtitulo,
+                nit: settings.nit,
+                rnt: settings.rnt,
+                telefono: settings.telefono,
+                direccion: settings.direccion,
+                condiciones: settings.condiciones,
+                updated_by: user ? user.id : null,
+                updated_at: new Date().toISOString()
+            };
+            
+            // Mapear campos desde el formato frontend (color1, color2, razon, terms, etc.)
+            const dbPayload = {
+                id: 1,
+                logo: settings.logo,
+                color_primario: settings.color1,
+                color_secundario: settings.color2,
+                razon_social: settings.razon,
+                subtitulo: settings.subtitulo,
+                nit: settings.nit,
+                rnt: settings.rnt,
+                telefono: settings.tel,
+                direccion: settings.dir,
+                condiciones: settings.terms,
+                updated_by: user ? user.id : null,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error } = await supabaseClient.from('configuracion_agencia').upsert(dbPayload, { onConflict: 'id' });
+            if (error) throw error;
+            return { error: null };
+        } catch (e) {
+            return { error: e };
+        }
     }
 };

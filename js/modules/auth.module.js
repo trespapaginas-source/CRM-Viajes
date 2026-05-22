@@ -31,6 +31,12 @@ export const AuthModule = {
                         this._activeSessionUserId = session.user.id;
                         await this.showApp(session.user);
                     }
+                } else if (event === 'PASSWORD_RECOVERY') {
+                    if (session) {
+                        this._activeSessionUserId = session.user.id;
+                        await this.showApp(session.user);
+                        this.openChangePasswordModal();
+                    }
                 }
                 // TOKEN_REFRESHED, INITIAL_SESSION, USER_UPDATED: ignorar silenciosamente
             });
@@ -160,10 +166,10 @@ export const AuthModule = {
         event.preventDefault();
         const newPass = document.getElementById('pwd-new').value;
         const confirmPass = document.getElementById('pwd-confirm').value;
-        const regex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+        const regex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 
         if (newPass !== confirmPass) return UI.showToast("Las contraseñas no coinciden.", "error");
-        if (!regex.test(newPass)) return UI.showToast("La contraseña debe poseer al menos 8 caracteres combinando letras y números.", "error");
+        if (!regex.test(newPass)) return UI.showToast("La contraseña debe poseer al menos 8 caracteres combinando letras y números (se permiten caracteres especiales).", "error");
 
         const btn = document.getElementById('btn-pwd-save');
         btn.disabled = true;
@@ -185,7 +191,9 @@ export const AuthModule = {
     async forgotPassword() {
         const email = prompt("Suministra tu correo electrónico de acceso:");
         if (email) {
-            const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin
+            });
             if (error) {
                 UI.showToast("Fallo emitiendo el enlace de recuperación.", "error");
             } else {
