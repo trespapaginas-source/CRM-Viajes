@@ -24,6 +24,8 @@ export const AuthModule = {
 
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_OUT') {
+                    this.currentUser = null;
+                    this.userProfile = null;
                     this._activeSessionUserId = null;
                     this.showLogin();
                 } else if (event === 'SIGNED_IN') {
@@ -131,12 +133,10 @@ export const AuthModule = {
 
         const auditoriaBtn = document.getElementById('nav-auditoria-btn');
         if (auditoriaBtn) {
-            if (this.currentUser?.email === 'trespa.paginas@gmail.com' || this.currentUser?.email === 'vivemarketingdigital@outlook.com') {
-                // Para pruebas, también habilitamos a vivemarketing, pero en pro debería ser solo el super admin.
-                // Como pidió que solo sea él, lo limitaremos.
-                if (this.currentUser?.email === 'trespa.paginas@gmail.com') {
-                    auditoriaBtn.classList.remove('hidden');
-                }
+            if (this.currentUser?.email === 'trespa.paginas@gmail.com') {
+                auditoriaBtn.classList.remove('hidden');
+            } else {
+                auditoriaBtn.classList.add('hidden');
             }
         }
     },
