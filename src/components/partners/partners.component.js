@@ -307,7 +307,7 @@ export const PartnersComponent = {
 
         if (val === 'mes_actual') {
             dStart.value = formatDate(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-            dEnd.value = formatDate(hoy);
+            dEnd.value = formatDate(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0));
         } else if (val === 'mes_anterior') {
             const firstOfPrevMonth = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
             const lastOfPrevMonth = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
@@ -317,15 +317,13 @@ export const PartnersComponent = {
             dStart.value = formatDate(new Date(hoy.getFullYear(), 0, 1));
             dEnd.value = formatDate(new Date(hoy.getFullYear(), 11, 31));
         } else if (val === '3_meses') {
-            let past = new Date(hoy);
-            past.setMonth(hoy.getMonth() - 3);
+            let past = new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1);
             dStart.value = formatDate(past);
-            dEnd.value = formatDate(hoy);
+            dEnd.value = formatDate(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0));
         } else if (val === '6_meses') {
-            let past = new Date(hoy);
-            past.setMonth(hoy.getMonth() - 6);
+            let past = new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1);
             dStart.value = formatDate(past);
-            dEnd.value = formatDate(hoy);
+            dEnd.value = formatDate(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0));
         } else if (val === 'historico') {
             dStart.value = '2020-01-01';
             dEnd.value = '2099-12-31';
