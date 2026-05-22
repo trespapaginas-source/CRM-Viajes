@@ -1,5 +1,5 @@
-import { supabaseClient, DataService } from '../../js/services/supabase.service.js';
-import { formatCOP, parseSpanishDate } from '../../js/utils/format.utils.js';
+import { supabaseClient, DataService } from '../../../js/services/supabase.service.js';
+import { formatCOP, parseSpanishDate } from '../../../js/utils/format.utils.js';
 
 export const AuditoriaComponent = {
     init: function() {
