@@ -17,7 +17,7 @@ export const PartnersComponent = {
         if (this._configLoaded) return;
 
         const defaultSocios = [
-            { email: window.AuthModule?.currentUser?.email || 'trespa.paginas@gmail.com', nombre: 'Leo (Admin)', porcentaje: 18 },
+            { email: 'trespa.paginas@gmail.com', nombre: 'Leo (Admin)', porcentaje: 18 },
             { email: 'luismendezramirez@hotmail.es', nombre: 'Luis Méndez', porcentaje: 50 },
             { email: 'vivemarketingdigital@outlook.com', nombre: 'Gean Fontalvo', porcentaje: 32 }
         ];
@@ -25,8 +25,12 @@ export const PartnersComponent = {
         // Migration patch para actualizar los correos de prueba antiguos si quedaron guardados
         const patchSocios = (socios) => {
             socios.forEach(s => {
+                // Prevenir que el primer socio adopte dinámicamente el correo de otro administrador
+                if (s.nombre.includes('Leo') || s.porcentaje === 18) {
+                    s.email = 'trespa.paginas@gmail.com';
+                }
                 if (s.email === 'luis@travelers.com') s.email = 'luismendezramirez@hotmail.es';
-                if (s.email === 'jean@travelers.com') {
+                if (s.email === 'jean@travelers.com' || s.nombre === 'Jean') {
                     s.email = 'vivemarketingdigital@outlook.com';
                     if (s.nombre === 'Jean') s.nombre = 'Gean Fontalvo';
                 }
