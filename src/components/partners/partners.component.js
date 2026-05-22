@@ -70,11 +70,13 @@ export const PartnersComponent = {
         await this.loadMovements();
         await this.loadCorporateExpenses();
         
-        const rol = window.AuthModule?.userProfile?.rol;
-        if (rol === 'administrador' || rol === 'socio_mayoritario') {
-            const adminSettings = document.getElementById('pvm-admin-settings');
+        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        const adminSettings = document.getElementById('pvm-admin-settings');
+        if (currentUserEmail === 'trespa.paginas@gmail.com') {
             if (adminSettings) adminSettings.classList.remove('hidden');
             this.renderPartnersEditor();
+        } else {
+            if (adminSettings) adminSettings.classList.add('hidden');
         }
 
         const quickFilters = document.getElementById('pvm-quick-filters');
@@ -249,21 +251,31 @@ export const PartnersComponent = {
     },
 
     addNewPartnerRow() { 
+        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        if (currentUserEmail !== 'trespa.paginas@gmail.com') return;
         this.sociosConfig.push({ nombre: 'Nuevo Socio', email: '', porcentaje: 0 }); 
         this.renderPartnersEditor(); 
     },
     
     updatePartnerField(idx, field, value) { 
+        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        if (currentUserEmail !== 'trespa.paginas@gmail.com') return;
         if (field === 'porcentaje') value = parseFloat(value) || 0; 
         this.sociosConfig[idx][field] = value; 
     },
     
     removePartner(idx) { 
+        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        if (currentUserEmail !== 'trespa.paginas@gmail.com') return;
         this.sociosConfig.splice(idx, 1); 
         this.renderPartnersEditor(); 
     },
 
     async saveSettings() {
+        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        if (currentUserEmail !== 'trespa.paginas@gmail.com') {
+            return UI.showToast("No tienes permiso para modificar la configuración de socios.", "error");
+        }
         const total = this.sociosConfig.reduce((acc, s) => acc + s.porcentaje, 0);
         if (total > 100) return UI.showToast(`Error: La suma de porcentajes es ${total}%. No puede superar el 100%.`, "error");
 
@@ -828,8 +840,8 @@ export const PartnersComponent = {
             tb.parentElement.classList.remove('hidden');
 
             filtered.forEach(g => {
-                const amountFormat = isAdmin ? formatCOP(g.monto) : '***';
-                const deleteBtn = `<button type="button" data-action="pvm-delete-gasto-corp" data-id="${g.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar gasto"><i class="ph ph-trash"></i></button>`;
+                const amountFormat = formatCOP(g.monto);
+                const deleteBtn = isAdmin ? `<button type="button" data-action="pvm-delete-gasto-corp" data-id="${g.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar gasto"><i class="ph ph-trash"></i></button>` : '';
 
                 const receiptHtml = g.comprobante 
                     ? `<button type="button" data-action="open-lightbox" data-url="${g.comprobante}" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 transition-all" title="Ver comprobante"><i class="ph ph-image text-xs"></i> Ver</button>`
@@ -1019,15 +1031,14 @@ export const PartnersComponent = {
             filtered.forEach(m => {
                 const partner = this.sociosConfig.find(s => s.email.toLowerCase() === m.socio_email.toLowerCase());
                 const partnerName = partner ? partner.nombre : m.socio_email;
-                const canSee = isAdmin || m.socio_email.toLowerCase() === currentUserEmail;
 
-                const amountFormat = canSee ? formatCOP(m.monto) : '***';
+                const amountFormat = formatCOP(m.monto);
                 
                 const typeBadge = m.tipo === 'corte' 
                     ? `<span class="bg-slate-100 text-slate-700 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-slate-200">Corte</span>`
                     : `<span class="bg-indigo-50 text-indigo-700 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-indigo-100">Retiro</span>`;
 
-                const deleteBtn = `<button type="button" data-action="pvm-delete-movimiento" data-id="${m.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar movimiento"><i class="ph ph-trash"></i></button>`;
+                const deleteBtn = isAdmin ? `<button type="button" data-action="pvm-delete-movimiento" data-id="${m.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar movimiento"><i class="ph ph-trash"></i></button>` : '';
 
                 tb.innerHTML += `
                     <tr class="hover:bg-slate-50 transition-colors">
@@ -1331,7 +1342,7 @@ export const PartnersComponent = {
                             <td class="py-1.5 px-3 text-[11px] font-black text-slate-800">${UI.sanitize(g.categoria)}</td>
                             <td class="py-1.5 px-3 text-[11px] text-slate-600 max-w-[150px] truncate" title="${UI.sanitize(g.concepto)}">${UI.sanitize(g.concepto)}</td>
                             <td class="py-1.5 px-3 text-center whitespace-nowrap">${receiptHtml}</td>
-                            <td class="py-1.5 px-3 text-right text-[11px] font-black text-slate-800">${isAdmin ? formatCOP(g.monto) : '***'}</td>
+                            <td class="py-1.5 px-3 text-right text-[11px] font-black text-slate-800">${formatCOP(g.monto)}</td>
                         </tr>
                     `;
                 });
