@@ -6,8 +6,8 @@ ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS deleted_by TEXT;
 
 -- 2. Tabla Abonos de Clientes
-ALTER TABLE public.abonos_clientes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-ALTER TABLE public.abonos_clientes ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+ALTER TABLE public.abonos ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE public.abonos ADD COLUMN IF NOT EXISTS deleted_by TEXT;
 
 -- 3. Tabla Proveedores
 ALTER TABLE public.proveedores ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
