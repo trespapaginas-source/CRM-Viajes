@@ -27,6 +27,10 @@ export const AuditoriaComponent = {
     },
 
     openAuditoriaModal: async function() {
+        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+            window.UI.showToast("Acceso denegado: No tienes permisos para gestionar la papelera.", "error");
+            return;
+        }
         const modal = document.getElementById('auditoria-modal');
         if (!modal) return;
 
@@ -110,6 +114,10 @@ export const AuditoriaComponent = {
     },
 
     restoreRecord: async function(table, id) {
+        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+            window.UI.showToast("Acción denegada: Tu cuenta no tiene permisos para restaurar registros.", "error");
+            return;
+        }
         if (!confirm("¿Deseas restaurar este registro y devolverlo al sistema?")) return;
         try {
             const { error } = await supabaseClient.from(table).update({ deleted_at: null, deleted_by: null }).eq('id', id);
@@ -130,6 +138,10 @@ export const AuditoriaComponent = {
     },
 
     hardDeleteRecord: async function(table, id) {
+        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+            window.UI.showToast("Acción denegada: Tu cuenta no tiene permisos para destruir registros.", "error");
+            return;
+        }
         if (!confirm("⚠️ ADVERTENCIA: Esta acción destruirá el registro de forma permanente en la base de datos y NO se puede deshacer. ¿Continuar?")) return;
         try {
             const { error } = await supabaseClient.from(table).delete().eq('id', id);

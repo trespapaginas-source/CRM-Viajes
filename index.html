@@ -3357,6 +3357,69 @@
         </div>
     </div>
 
+    <!-- Modal de Papelera / Auditoría -->
+    <div id="auditoria-modal" class="fixed inset-0 z-[250] hidden flex items-center justify-center p-2 md:p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300" id="auditoria-bg"
+            onclick="window.AuditoriaComponent.closeAuditoriaModal()"></div>
+        <div class="bg-white/95 backdrop-blur-2xl border border-white rounded-[2rem] shadow-2xl w-full max-w-5xl flex flex-col h-[90vh] md:h-[80vh] transform scale-95 opacity-0 transition-all duration-300 relative z-10 overflow-hidden"
+            id="auditoria-content">
+            <!-- Modal Header -->
+            <div class="px-6 py-5 border-b border-slate-100/50 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center text-red-500 shadow-inner">
+                        <i class="ph ph-trash text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-slate-800 text-lg md:text-xl tracking-tight flex items-center">
+                            Papelera de Auditoría
+                        </h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            Recuperación y depuración permanente de registros (Administrador)
+                        </p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.AuditoriaComponent.closeAuditoriaModal()"
+                    class="text-slate-400 hover:text-slate-900 p-2.5 rounded-xl transition-all bg-white hover:bg-slate-100 border border-slate-200/60 shadow-sm"><i
+                        class="ph ph-x text-lg"></i></button>
+            </div>
+            
+            <!-- Modal Body (Scrollable Table) -->
+            <div class="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
+                <div class="bg-amber-50 border border-amber-200/60 p-4 rounded-2xl text-xs text-amber-900 mb-6 flex items-start shadow-sm leading-relaxed">
+                    <i class="ph ph-warning-circle text-lg mr-2.5 mt-0.5 text-amber-500 shrink-0"></i>
+                    <div>
+                        <span class="font-bold">Nota de Seguridad:</span> Los registros eliminados aquí se destruyen permanentemente de la base de datos de Supabase y no podrán recuperarse. Use la opción <span class="font-bold text-emerald-700">Restaurar</span> para reintegrarlos al sistema.
+                    </div>
+                </div>
+                
+                <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50/75 border-b border-slate-100">
+                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha Eliminación</th>
+                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Eliminado Por</th>
+                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Módulo</th>
+                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Detalle del Registro</th>
+                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditoria-list" class="divide-y divide-slate-100">
+                                <!-- Dinámico -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-slate-100/50 bg-slate-50/30 flex justify-end space-x-3 shrink-0">
+                <button type="button" onclick="window.AuditoriaComponent.closeAuditoriaModal()"
+                    class="px-5 py-3 rounded-xl font-bold text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-sm focus:outline-none text-xs">Cerrar Papelera</button>
+            </div>
+        </div>
+    </div>
+
     <div id="rentabilidad-detail-modal" class="fixed inset-0 z-[90] hidden flex items-center justify-center p-2 md:p-4">
         <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"
             id="rdm-bg" onclick="UI.closeModal('rentabilidad-detail-modal', 'rdm-bg', 'rdm-content')"></div>

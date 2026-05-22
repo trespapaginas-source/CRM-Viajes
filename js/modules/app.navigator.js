@@ -30,9 +30,15 @@ export const App = {
 
             document.querySelectorAll('.nav-btn').forEach(buttonElement => {
                 buttonElement.addEventListener('click', (evento) => {
-                    evento.preventDefault();
-                    this.navigate(buttonElement.getAttribute('data-target'));
-                    UI.closeSidebar();
+                    const target = buttonElement.getAttribute('data-target');
+                    if (target) {
+                        evento.preventDefault();
+                        this.navigate(target);
+                        UI.closeSidebar();
+                    } else if (buttonElement.getAttribute('data-action') === 'open-auditoria') {
+                        evento.preventDefault();
+                        UI.closeSidebar();
+                    }
                 });
             });
 
