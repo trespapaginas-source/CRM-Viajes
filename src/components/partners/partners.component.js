@@ -30,9 +30,9 @@ export const PartnersComponent = {
                     s.email = 'trespa.paginas@gmail.com';
                 }
                 if (s.email === 'luis@travelers.com') s.email = 'luismendezramirez@hotmail.es';
-                if (s.email === 'jean@travelers.com' || s.nombre === 'Gean' || s.nombre === 'Jean') {
+                if (s.email === 'jean@travelers.com' || s.email === 'vivemarketingdigital@outlook.com' || s.nombre.includes('Gean') || s.nombre.includes('Jean')) {
                     s.email = 'vivemarketingdigital@outlook.com';
-                    if (s.nombre === 'Gean' || s.nombre === 'Jean' || s.nombre === 'Gean Fontalvo') s.nombre = 'Jean Fontalvo';
+                    s.nombre = 'Jean Fontalvo';
                 }
             });
         };
