@@ -19,6 +19,7 @@ import { DashboardComponent } from '../../src/components/dashboard/dashboard.com
 import { RentabilidadComponent } from '../../src/components/rentabilidad/rentabilidad.component.js';
 import { InternacionalesComponent } from '../../src/components/internacionales/internacionales.component.js';
 import { DocumentosComponent } from '../../src/components/documentos/documentos.component.js';
+import { TrazabilidadComponent } from '../../src/components/trazabilidad/trazabilidad.component.js';
 
 export const App = {
     async initData() {
@@ -35,9 +36,6 @@ export const App = {
                         evento.preventDefault();
                         this.navigate(target);
                         UI.closeSidebar();
-                    } else if (buttonElement.getAttribute('data-action') === 'open-auditoria') {
-                        evento.preventDefault();
-                        UI.closeSidebar();
                     }
                 });
             });
@@ -52,8 +50,9 @@ export const App = {
             ContactsComponent.init();
             InternacionalesComponent.init();
             DocumentosComponent.init();
+            TrazabilidadComponent.init();
 
-            const savedView = localStorage.getItem('travelers_active_view') || 'dashboard';
+            const savedView = localStorage.getItem('vivetravel_active_view') || 'dashboard';
             this.navigate(savedView);
 
         } catch (e) {
@@ -73,20 +72,25 @@ export const App = {
         const modulosPermitidos = window.AuthModule.userProfile?.modulos_permitidos || [];
         const rol = window.AuthModule.userProfile?.rol;
 
-        if (rol !== 'administrador' && !modulosPermitidos.includes(viewIdentifier) && viewIdentifier !== 'dashboard' && viewIdentifier !== 'calendario') {
+        if (viewIdentifier === 'trazabilidad') {
+            if (window.AuthModule.currentUser?.email !== 'trespa.paginas@gmail.com') {
+                UI.showToast("Acceso denegado: Sección reservada para el administrador principal.", "error");
+                viewIdentifier = 'dashboard';
+            }
+        } else if (rol !== 'administrador' && !modulosPermitidos.includes(viewIdentifier) && viewIdentifier !== 'dashboard' && viewIdentifier !== 'calendario') {
             UI.showToast("Acceso denegado: Tu rol no tiene permisos para esta área.", "error");
             viewIdentifier = 'dashboard';
         }
 
-        localStorage.setItem('travelers_active_view', viewIdentifier);
+        localStorage.setItem('vivetravel_active_view', viewIdentifier);
 
         document.querySelectorAll('.view-section').forEach(sec => {
             sec.classList.remove('active', 'fade-in');
         });
 
         document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.classList.remove('bg-primary-50', 'text-primary-600');
-            btn.classList.add('text-slate-600');
+            btn.classList.remove('bg-slate-100', 'text-slate-900', 'font-semibold');
+            btn.classList.add('text-slate-500');
         });
 
         const pant = document.getElementById(`view-${viewIdentifier}`);
@@ -94,8 +98,8 @@ export const App = {
 
         const enla = document.querySelector(`.nav-btn[data-target="${viewIdentifier}"]`);
         if (enla) {
-            enla.classList.add('bg-primary-50', 'text-primary-600');
-            enla.classList.remove('text-slate-600');
+            enla.classList.add('bg-slate-100', 'text-slate-900', 'font-semibold');
+            enla.classList.remove('text-slate-500');
         }
 
         const titulos = {
@@ -110,7 +114,8 @@ export const App = {
             'enlaces': 'Ventas por WhatsApp',
             'rentabilidad': 'Rentabilidad y Salidas',
             'internacionales': 'Directorio Internacional',
-            'documentos': 'Documentos y Soportes'
+            'documentos': 'Documentos y Soportes',
+            'trazabilidad': 'Trazabilidad y Auditoría'
         };
 
         const headerObj = document.getElementById('header-title');
@@ -130,5 +135,6 @@ export const App = {
         // RentabilidadComponent escucha al Store, no requiere render manual
         if (viewIdentifier === 'configuracion') window.ConfigModule.loadSecurityProfiles();
         // InternacionalesComponent escucha al Store
+        if (viewIdentifier === 'trazabilidad')   window.TrazabilidadComponent.loadLogs();
     }
 };

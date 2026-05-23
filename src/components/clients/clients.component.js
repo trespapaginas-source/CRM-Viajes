@@ -203,22 +203,21 @@ export const ClientsComponent = {
             const plan = DataService.planes.find(p => p.id === cli.plan_id);
             const pNom = plan ? plan.nombre : 'Sin Plan Vinculado';
 
-            let cls = 'bg-slate-100 text-slate-500 border-slate-200';
+            let cls = 'bg-slate-50 text-slate-600 border-slate-100';
             const stLower = cli.estado ? cli.estado.toLowerCase() : '';
-            if (stLower === 'confirmado') cls = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-            if (stLower === 'en caja') cls = 'bg-emerald-100 text-emerald-800 border-emerald-300';
-            if (stLower === 'pendiente de pago') cls = 'bg-amber-50 text-amber-700 border-amber-200';
-            if (stLower === 'realizado') cls = 'bg-slate-100 text-slate-600 border-slate-200';
-            if (stLower === 'devolución' || stLower === 'cancelado o devolución') cls = 'bg-rose-50 text-rose-700 border-rose-200';
-            if (stLower === 'registro pendiente') cls = 'bg-indigo-50 text-indigo-600 border-indigo-200';
-            if (stLower === 'reprogramado') cls = 'bg-orange-50 text-orange-700 border-orange-200';
+            if (stLower === 'confirmado') cls = 'bg-emerald-50 text-emerald-700 border-emerald-100/50';
+            if (stLower === 'en caja') cls = 'bg-emerald-50 text-emerald-800 border-emerald-100';
+            if (stLower === 'pendiente de pago') cls = 'bg-amber-50 text-amber-700 border-amber-100/50';
+            if (stLower === 'realizado') cls = 'bg-slate-50 text-slate-600 border-slate-100';
+            if (stLower === 'devolución' || stLower === 'cancelado o devolución') cls = 'bg-rose-50 text-rose-700 border-rose-100/50';
+            if (stLower === 'registro pendiente') cls = 'bg-indigo-50 text-indigo-700 border-indigo-100/50';
+            if (stLower === 'reprogramado') cls = 'bg-orange-50 text-orange-700 border-orange-100/50';
 
             const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
             const fin = calcularFinanzas(totalAbo, cli.precio_total);
 
             const tr = document.createElement('tr');
-            // ELIMINAMOS 'slide-in-right' y la animación para quitar el parpadeo
-            tr.className = `client-row hover:bg-slate-50 transition border-b border-slate-50 cursor-pointer`;
+            tr.className = `client-row hover:bg-slate-50/70 transition-all border-b border-slate-100 cursor-pointer`;
 
             tr.setAttribute('data-id', cli.id);
             tr.setAttribute('data-ciudad', UI.sanitize(cli.ciudad || ''));
@@ -232,13 +231,10 @@ export const ClientsComponent = {
                 }
             }
 
-
-
             // 1. LÓGICA DEL GLOWING DOT (PUNTO DE SEGUIMIENTO)
             const seguimientosActivos = (DataService.seguimientos || []).filter(s => s.cliente_id === cli.id && s.estado === 'pendiente');
             let glowingDot = '';
             if (seguimientosActivos.length > 0) {
-                // Ordenar para obtener el más próximo
                 seguimientosActivos.sort((a, b) => new Date(a.fecha_programada) - new Date(b.fecha_programada));
                 const seg = seguimientosActivos[0];
                 const isPastOrToday = new Date(seg.fecha_programada + "T23:59:59") <= new Date();
@@ -256,7 +252,7 @@ export const ClientsComponent = {
 
             // 2. LÓGICA DE ETIQUETA SUTIL Y FECHA DE VIAJE
             const tagHtml = (cli.etiqueta && cli.etiqueta !== '' && cli.etiqueta !== '-- Sin Etiqueta --')
-                ? `<span class="text-[9px] font-black uppercase tracking-widest bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md shadow-sm border border-purple-200 mb-1 inline-block">${UI.sanitize(cli.etiqueta)}</span>`
+                ? `<span class="text-[9px] font-semibold bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded border border-purple-100/50 mb-1 inline-block">${UI.sanitize(cli.etiqueta)}</span>`
                 : '';
 
             let fechaLimpia = cli.fecha_viaje ? UI.sanitize(cli.fecha_viaje) : 'S/F';
@@ -264,38 +260,38 @@ export const ClientsComponent = {
             fechaLimpia = fechaLimpia.replace(/ , /g, ' ').replace(/,\s*-/g, ' -').replace(/,\s*$/, '').trim();
             const fechaBadge = fechaLimpia;
 
-            // 3. INYECCIÓN DEL HTML EN LA FILA (Incluye el Glowing Dot en el nombre)
+            // 3. INYECCIÓN DEL HTML EN LA FILA
             tr.innerHTML = `
                 <td class="py-3 px-4 text-center" onclick="event.stopPropagation()">
-                    <input type="checkbox" value="${cli.id}" onchange="window.DispatchModule.toggleClientSelection('${cli.id}')" class="client-checkbox w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer">
+                    <input type="checkbox" value="${cli.id}" onchange="window.DispatchModule.toggleClientSelection('${cli.id}')" class="client-checkbox w-4 h-4 rounded border-slate-200 text-slate-900 focus:ring-slate-900 cursor-pointer">
                 </td>
                 <td class="py-3 px-4">
                     ${tagHtml}
-                    <p class="font-bold text-slate-800 text-sm leading-none flex items-center">${UI.sanitize(cli.nombre)} ${UI.sanitize(cli.apellido)} ${glowingDot}</p>
-                    <p class="text-[11px] text-slate-400 font-mono mt-1">${UI.sanitize(cli.documento)}</p>
+                    <p class="font-semibold text-slate-900 text-sm leading-none flex items-center">${UI.sanitize(cli.nombre)} ${UI.sanitize(cli.apellido)} ${glowingDot}</p>
+                    <p class="text-[10px] text-slate-400 font-mono mt-1">${UI.sanitize(cli.documento)}</p>
                 </td>
                 <td class="py-3 px-4">
-                    <p class="text-xs font-bold text-slate-700 flex items-center"><i class="ph ph-whatsapp-logo text-green-500 mr-1 text-lg"></i> ${UI.sanitize(cli.telefono)}</p>
+                    <p class="text-xs font-medium text-slate-700 flex items-center"><i class="ph ph-whatsapp-logo text-green-500 mr-1 text-lg"></i> ${UI.sanitize(cli.telefono)}</p>
                 </td>
                 <td class="py-3 px-4">
-                    <p class="font-bold text-primary-700 text-sm leading-tight">${UI.sanitize(pNom)}</p>
-                    <p class="text-[10px] font-bold text-slate-500 flex items-center mt-1 bg-slate-100 px-1.5 py-0.5 rounded w-fit border border-slate-200"><i class="ph ph-calendar-blank mr-1"></i> ${fechaBadge}</p>
+                    <p class="font-semibold text-slate-900 text-sm leading-tight">${UI.sanitize(pNom)}</p>
+                    <p class="text-[10px] font-medium text-slate-500 flex items-center mt-1 bg-slate-50 px-1.5 py-0.5 rounded w-fit border border-slate-100"><i class="ph ph-calendar-blank mr-1"></i> ${fechaBadge}</p>
                 </td>
                 <td class="py-3 px-4 text-right">
-                    <p class="text-sm font-black text-slate-800">${formatCOP(fin.abonado)}</p>
+                    <p class="text-sm font-semibold text-slate-900">${formatCOP(fin.abonado)}</p>
                     ${this.currentTab === 'devolucion' && cli.monto_devuelto !== undefined 
-                        ? `<p class="text-[10px] font-black text-rose-600 uppercase tracking-widest mt-1 bg-rose-50 px-1 rounded inline-block border border-rose-100">Devolución: ${formatCOP(cli.monto_devuelto)}</p>`
-                        : `<div class="flex items-center justify-end mt-1 group">
-                                <div class="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden mr-2">
-                                    <div class="h-full bg-green-500" style="width: ${fin.porcentaje}%"></div>
+                        ? `<p class="text-[10px] font-semibold text-rose-600 mt-1 bg-rose-50 px-1.5 py-0.5 rounded inline-block border border-rose-100/50">Devolución: ${formatCOP(cli.monto_devuelto)}</p>`
+                        : `<div class="flex items-center justify-end mt-1">
+                                <div class="w-16 h-1 bg-slate-100 rounded-full overflow-hidden mr-2">
+                                    <div class="h-full bg-slate-900" style="width: ${fin.porcentaje}%"></div>
                                 </div>
-                                <p class="text-[10px] font-bold ${fin.porcentaje < 100 ? 'text-orange-500' : 'text-green-600'}">${fin.porcentaje}%</p>
+                                <p class="text-[10px] font-semibold text-slate-700">${fin.porcentaje}%</p>
                            </div>
-                           <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-widest">Pendiente: ${formatCOP(fin.saldo)}</p>`
+                           <p class="text-[10px] text-slate-400 mt-0.5">Pendiente: ${formatCOP(fin.saldo)}</p>`
                     }
                 </td>
                 <td class="py-3 px-4">
-                    <span class="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${cls}">${UI.sanitize(cli.estado)}</span>
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-medium border ${cls}">${UI.sanitize(cli.estado)}</span>
                 </td>
             `;
             fragment.appendChild(tr); // Guardamos en memoria
@@ -927,19 +923,19 @@ export const ClientsComponent = {
         } else {
             abs.forEach(a => {
                 let st = '';
-                if (a.estado_pago === 'pending') st = '<span class="text-orange-500 bg-orange-50 px-1 rounded border border-orange-100">Pendiente</span>';
-                else if (a.estado_pago === 'refunded') st = '<span class="text-red-500 bg-red-50 px-1 rounded border border-red-100">Reembolso</span>';
-                else st = '<span class="text-green-600 bg-green-50 px-1 rounded border border-green-100">Ok</span>';
+                if (a.estado_pago === 'pending') st = '<span class="text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-100/50 text-[9px] font-medium">Pendiente</span>';
+                else if (a.estado_pago === 'refunded') st = '<span class="text-red-700 bg-rose-50 px-1.5 py-0.5 rounded-full border border-rose-100/50 text-[9px] font-medium">Reembolso</span>';
+                else st = '<span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100/50 text-[9px] font-medium">Ok</span>';
 
                 h += `
-                <div class="flex justify-between items-center text-sm py-3 border-b border-slate-100 hover:bg-slate-50 px-3 rounded-lg transition-colors">
+                <div class="flex justify-between items-center text-sm py-3 border-b border-slate-100 hover:bg-slate-50/50 px-3 rounded-lg transition-colors">
                     <div>
-                        <span class="font-black text-slate-800 text-base">${formatCOP(a.monto)}</span><br>
-                        <span class="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shadow-sm">${a.metodo} - ${st}</span>
+                        <span class="font-semibold text-slate-900 text-base">${formatCOP(a.monto)}</span><br>
+                        <span class="text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 inline-block mt-1">${a.metodo} - ${st}</span>
                     </div>
                     <div class="text-xs text-slate-400 text-right font-medium">
                         ${new Date(a.created_at).toLocaleDateString('es-CO')}<br>
-                        <span class="text-[9px] truncate w-24 block opacity-70">${a.usuario_email || 'Staff'}</span>
+                        <span class="text-[9px] truncate w-24 block opacity-70 font-mono mt-0.5">${a.usuario_email || 'Staff'}</span>
                     </div>
                 </div>`;
             });
@@ -959,60 +955,60 @@ export const ClientsComponent = {
         document.getElementById('cdm-body').innerHTML = `
             <div class="p-6 space-y-6">
                 <div class="flex items-center space-x-4">
-                    <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-primary-600 to-primary-400 text-white flex items-center justify-center font-black text-2xl shadow-lg shadow-primary-500/30 uppercase">
+                    <div class="w-14 h-14 rounded-2xl bg-slate-50 text-slate-700 flex items-center justify-center font-semibold text-xl border border-slate-100 shrink-0 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                         ${safeNombre.charAt(0)}${safeApellido.charAt(0)}
                     </div>
                     <div>
-                        <h2 class="text-xl font-black text-slate-800 tracking-tight">${safeNombre} ${safeApellido}</h2>
-                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">${safeDoc}</p>
+                        <h2 class="text-xl font-semibold text-slate-900 tracking-tight leading-none">${safeNombre} ${safeApellido}</h2>
+                        <span class="inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-400 font-mono mt-1.5"><i class="ph ph-identification-card text-xs"></i> CC ${safeDoc}</span>
                     </div>
                 </div>
                 
-                <div class="bg-primary-50 border border-primary-100 p-5 rounded-2xl shadow-inner relative overflow-hidden">
-                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-white opacity-40 rounded-full"></div>
-                    <p class="text-[10px] font-black text-primary-600 uppercase tracking-widest relative z-10">Plan Elegido</p>
-                    <p class="text-xl font-black text-slate-800 mb-4 relative z-10">${safePlan} <span class="bg-white px-2 py-0.5 rounded-md shadow-sm ml-2 text-sm text-primary-600 border border-primary-100">x ${c.pax}</span></p>
+                <div class="bg-slate-50 border border-slate-100 p-5 rounded-2xl relative overflow-hidden text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                    <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1">Plan Seleccionado</p>
+                    <p class="text-lg font-semibold text-slate-900 flex items-center justify-between">
+                        <span>${safePlan}</span>
+                        <span class="bg-white px-2.5 py-0.5 rounded-lg border border-slate-200/60 text-[10px] font-medium text-slate-600">x ${c.pax} PAX</span>
+                    </p>
                     
-                    <div class="grid grid-cols-2 gap-4 border-t border-dashed border-primary-200 pt-4 relative z-10">
+                    <div class="grid grid-cols-2 gap-4 border-t border-slate-200/40 pt-4 mt-4 text-xs font-mono">
                         <div>
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Total Plan</p>
-                            <p class="text-lg font-black text-slate-800">${formatCOP(c.precio_total)}</p>
+                            <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">Total Venta</p>
+                            <p class="text-sm font-semibold text-slate-900">${formatCOP(c.precio_total)}</p>
                         </div>
-                        <div class="text-right border-l border-primary-200 pl-4">
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Abonado</p>
-                            <p class="text-lg font-black text-blue-600">${formatCOP(fn.abonado)}</p>
+                        <div class="text-right border-l border-slate-200/40 pl-4">
+                            <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">Abonado</p>
+                            <p class="text-sm font-semibold text-slate-900">${formatCOP(fn.abonado)}</p>
                         </div>
                         <div>
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Pendiente</p>
-                            <p class="text-lg font-black ${fn.saldo <= 0 ? 'text-green-600' : 'text-orange-500'}">${formatCOP(fn.saldo)}</p>
+                            <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">Saldo Pendiente</p>
+                            <p class="text-sm font-semibold ${fn.saldo <= 0 ? 'text-slate-900' : 'text-slate-900'}">${formatCOP(fn.saldo)}</p>
                         </div>
-                        <div class="text-right border-l border-primary-200 pl-4 flex flex-col justify-end">
-                            <p class="text-[10px] font-black uppercase ${fn.saldo <= 0 ? 'text-green-500' : 'text-blue-500'} tracking-wider">% Pagado</p>
-                            <p class="text-2xl font-black ${fn.saldo <= 0 ? 'text-green-600' : 'text-blue-600'} leading-none">${fn.porcentaje}%</p>
+                        <div class="text-right border-l border-slate-200/40 pl-4 flex flex-col justify-end">
+                            <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">% Pagado</p>
+                            <p class="text-2xl font-semibold ${fn.saldo <= 0 ? 'text-emerald-600' : 'text-slate-900'} leading-none mt-0.5">${fn.porcentaje}%</p>
                         </div>
                         ${(c.estado || '').toLowerCase() === 'devolución' && c.monto_devuelto !== undefined ? `
-                        <div class="col-span-2 mt-2 bg-rose-50 p-3 rounded-xl border border-rose-100 flex justify-between items-center">
-                            <p class="text-xs font-black text-rose-700 uppercase tracking-widest flex items-center"><i class="ph ph-arrow-u-up-left mr-2"></i> Monto Reembolsado</p>
-                            <p class="text-xl font-black text-rose-600">${formatCOP(c.monto_devuelto)}</p>
+                        <div class="col-span-2 mt-2 bg-rose-50 p-3 rounded-xl border border-rose-100/50 flex justify-between items-center text-rose-755">
+                            <p class="text-[10px] font-sans font-medium uppercase tracking-wider flex items-center"><i class="ph ph-arrow-u-up-left mr-2 text-sm"></i> Monto Reembolsado</p>
+                            <p class="text-lg font-semibold text-rose-700">${formatCOP(c.monto_devuelto)}</p>
                         </div>
                         ` : ''}
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 hover:shadow-sm transition-shadow">
-                        <p class="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-1">WhatsApp de Contacto</p>
-                        <a href="https://wa.me/57${safeTel.replace(/\D/g, '')}" target="_blank" class="font-bold text-green-600 flex items-center hover:underline text-sm truncate"><i class="ph ph-whatsapp-logo mr-1.5 text-lg"></i> ${safeTel}</a>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-emerald-50/30 border border-emerald-100/50 p-4 rounded-2xl transition-all">
+                        <p class="font-medium text-emerald-800 text-[10px] mb-1.5 flex items-center gap-1"><i class="ph ph-whatsapp-logo text-xs"></i> WhatsApp</p>
+                        <a href="https://wa.me/57${safeTel.replace(/\D/g, '')}" target="_blank" class="font-semibold text-emerald-700 flex items-center hover:underline text-xs truncate">${safeTel}</a>
                     </div>
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 hover:shadow-sm transition-shadow">
-                        <p class="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-1">Status Operativo</p>
-                        <span class="block w-full font-bold text-slate-700 uppercase text-[10px] tracking-wider py-1">
-                            ${c.estado ? c.estado : 'Sin Estado'}
-                        </span>
+                    <div class="bg-slate-50 border border-slate-100 p-4 rounded-2xl">
+                        <p class="font-medium text-slate-400 text-[10px] mb-1.5 flex items-center gap-1"><i class="ph ph-flag text-xs"></i> Estado</p>
+                        <span class="block font-semibold text-slate-800 text-[10px] truncate">${c.estado ? c.estado : 'Sin Estado'}</span>
                     </div>
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 hover:shadow-sm transition-shadow">
-                        <p class="font-bold text-slate-400 uppercase tracking-widest text-[9px] mb-1">Etiqueta</p>
-                        <select data-action="quick-etiqueta" data-cliente-id="${id}" class="w-full bg-transparent font-bold text-purple-700 outline-none cursor-pointer">
+                    <div class="bg-purple-50/30 border border-purple-100/50 p-4 rounded-2xl flex flex-col justify-between">
+                        <p class="font-medium text-purple-800 text-[10px] mb-1 flex items-center gap-1"><i class="ph ph-tag text-xs"></i> Etiqueta</p>
+                        <select data-action="quick-etiqueta" data-cliente-id="${id}" class="w-full bg-transparent font-semibold text-purple-700 outline-none cursor-pointer text-xs">
                             <option value="" ${!c.etiqueta ? 'selected' : ''}>-- Sin Etiqueta --</option>
                             <option value="Orgánico" ${c.etiqueta === 'Orgánico' ? 'selected' : ''}>Orgánico</option>
                             <option value="Ads" ${c.etiqueta === 'Ads' ? 'selected' : ''}>Ads</option>
@@ -1023,64 +1019,45 @@ export const ClientsComponent = {
                     </div>
                 </div>
                 
-                <div class="border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden">
-                    <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
-                        <h4 class="font-black text-xs uppercase text-slate-700 tracking-widest flex items-center"><i class="ph ph-receipt mr-2 text-lg"></i> Flujo de Caja</h4>
-                        <button onclick="document.getElementById('quick-abono-panel').classList.toggle('hidden')" class="bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider shadow-sm hover:bg-slate-50 hover:text-green-600 transition-colors flex items-center">
+                <div class="border border-slate-100 rounded-2xl bg-white overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                    <div class="bg-slate-50/50 p-4 border-b border-slate-100 flex justify-between items-center">
+                        <h4 class="font-medium text-xs text-slate-500 flex items-center"><i class="ph ph-receipt mr-2 text-base"></i> Flujo de Caja</h4>
+                        <button onclick="document.getElementById('quick-abono-panel').classList.toggle('hidden')" class="bg-white border border-slate-200 text-slate-700 px-3 py-1 rounded-lg text-[10px] font-semibold transition-all hover:bg-slate-50 flex items-center cursor-pointer">
                             <i class="ph ph-plus mr-1"></i> Abono Rápido
                         </button>
                     </div>
                     
-                    <div id="quick-abono-panel" class="hidden bg-slate-50/80 p-4 border-b border-slate-200 shadow-inner slide-up">
+                    <div id="quick-abono-panel" class="hidden bg-slate-50/60 p-4 border-b border-slate-100 shadow-inner">
                         <div class="flex flex-col sm:flex-row gap-2">
                             <div class="relative flex-1">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">$</span>
-                                <input type="number" id="qa-monto" placeholder="Ej: 100000" min="1" class="w-full pl-8 py-2.5 border border-slate-300 rounded-xl text-sm font-black outline-none shadow-sm focus:ring-2 focus:ring-primary-500 transition-all text-slate-800">
+                                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">$</span>
+                                <input type="number" id="qa-monto" placeholder="Ej: 100000" min="1" class="w-full pl-8 pr-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-semibold outline-none shadow-sm focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all text-slate-800">
                             </div>
-                            <select id="qa-metodo" class="border border-slate-300 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none shadow-sm text-slate-700">
+                            <select id="qa-metodo" class="border border-slate-200 bg-white rounded-lg px-4 py-2 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
                                 <option value="Transferencia">Transferencia</option>
                                 <option value="Efectivo">Efectivo</option>
                                 <option value="Nequi/Daviplata">Nequi/Daviplata</option>
                             </select>
-                            <button type="button" data-action="quick-abono" data-cliente-id="${id}" id="btn-quick-abono" class="bg-slate-900 text-white font-bold px-4 py-2.5 rounded-xl shadow-md shadow-slate-900/20 text-sm hover:bg-slate-800 transition-colors flex items-center justify-center min-w-[100px]">
+                            <button type="button" data-action="quick-abono" data-cliente-id="${id}" id="btn-quick-abono" class="bg-slate-900 text-white font-semibold px-4 py-2 rounded-lg shadow-sm text-xs hover:bg-slate-800 transition-colors flex items-center justify-center min-w-[100px] cursor-pointer">
                                 Guardar
                             </button>
                         </div>
                     </div>
                     
-                    <div class="p-3">
+                    <div class="p-3 divide-y divide-slate-100/60">
                         ${h}
                     </div>
                 </div>
-
-                <div class="border border-slate-200 rounded-2xl bg-white shadow-sm overflow-hidden">
-                    <div class="bg-slate-100 p-4 border-b border-slate-200">
-                        <h4 class="font-black text-xs uppercase text-slate-700 tracking-widest flex items-center"><i class="ph ph-clock-counter-clockwise mr-2 text-lg"></i> Historial de Cambios</h4>
+                
+                <div class="border border-slate-100 rounded-2xl bg-white overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                    <div class="bg-slate-50/50 p-4 border-b border-slate-100">
+                        <h4 class="font-medium text-xs text-slate-500 flex items-center"><i class="ph ph-clock-counter-clockwise mr-2 text-base"></i> Historial de Cambios</h4>
                     </div>
-                    <div class="p-3 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        ${(() => {
-                            const historial = (DataService.historial_reservas || []).filter(item => item.cliente_id === id);
-                            if (historial.length === 0) {
-                                return '<div class="p-6 text-center text-slate-400 uppercase tracking-widest font-black text-[10px]">No hay historial de cambios registrado</div>';
-                            }
-                            let htmlH = '';
-                            historial.forEach(item => {
-                                htmlH += `
-                                <div class="py-3 border-b border-slate-100 hover:bg-slate-50 px-3 rounded-lg transition-colors">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="text-xs font-black text-slate-800 uppercase tracking-wider">${UI.sanitize(item.campo)}</span>
-                                        <span class="text-[9px] text-slate-400 font-bold">${new Date(item.created_at).toLocaleString('es-CO')}</span>
-                                    </div>
-                                    <div class="text-[11px] text-slate-600 flex items-center flex-wrap gap-1 mt-2">
-                                        <span class="bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 line-through truncate max-w-[150px]" title="${UI.sanitize(item.valor_anterior)}">${UI.sanitize(item.valor_anterior)}</span>
-                                        <i class="ph ph-arrow-right text-slate-400"></i>
-                                        <span class="bg-green-50 text-green-700 px-1.5 py-0.5 rounded border border-green-100 font-bold truncate max-w-[150px]" title="${UI.sanitize(item.valor_nuevo)}">${UI.sanitize(item.valor_nuevo)}</span>
-                                    </div>
-                                    <p class="text-[9px] text-slate-400 mt-2 italic">Por: ${UI.sanitize(item.usuario_email)}</p>
-                                </div>`;
-                            });
-                            return htmlH;
-                        })()}
+                    <div id="client-history-timeline" class="p-3 max-h-[300px] overflow-y-auto custom-scrollbar divide-y divide-slate-100/60">
+                        <div class="py-8 text-center text-slate-400 text-xs font-semibold flex items-center justify-center gap-2">
+                            <i class="ph ph-circle-notch animate-spin text-lg text-indigo-500"></i>
+                            Sincronizando historial...
+                        </div>
                     </div>
                 </div>
             </div>`;
@@ -1093,6 +1070,86 @@ export const ClientsComponent = {
         }
         document.getElementById('btn-delete-client-modal').setAttribute('onclick', `promptGlobalDelete('${id}', 'cliente', '${c.nombre.replace(/'/g, "\\'")} ${c.apellido.replace(/'/g, "\\'")}')`);
         UI.openModal('client-detail-modal', 'cdm-bg', 'cdm-content');
+        this.loadAndRenderClientHistory(id);
+    },
+
+    async loadAndRenderClientHistory(id) {
+        const container = document.getElementById('client-history-timeline');
+        if (!container) return;
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('historial_reservas')
+                .select('*')
+                .eq('cliente_id', id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="py-6 text-center text-slate-400 uppercase tracking-widest font-black text-[10px]">No hay historial de cambios registrado</div>';
+                return;
+            }
+
+            let htmlH = '';
+            data.forEach(item => {
+                let badgeClass = 'bg-slate-50 text-slate-600 border border-slate-100 px-2 py-0.5 rounded-full text-[8px] font-medium inline-flex items-center gap-1';
+                if (item.tipo_evento === 'CREACION') {
+                    badgeClass = 'bg-emerald-50 text-emerald-700 border border-emerald-100/50 px-2 py-0.5 rounded-full text-[8px] font-medium inline-flex items-center gap-1';
+                } else if (item.tipo_evento === 'SEGURIDAD') {
+                    badgeClass = 'bg-rose-50 text-rose-700 border border-rose-100/50 px-2 py-0.5 rounded-full text-[8px] font-medium inline-flex items-center gap-1 animate-pulse';
+                } else if (item.tipo_evento === 'ELIMINACION') {
+                    badgeClass = 'bg-orange-50 text-orange-700 border border-orange-100/50 px-2 py-0.5 rounded-full text-[8px] font-medium inline-flex items-center gap-1';
+                } else if (item.tipo_evento === 'SISTEMA') {
+                    badgeClass = 'bg-purple-50 text-purple-700 border border-purple-100/50 px-2 py-0.5 rounded-full text-[8px] font-medium inline-flex items-center gap-1';
+                } else {
+                    badgeClass = 'bg-sky-50 text-sky-700 border border-sky-100/50 px-2 py-0.5 rounded-full text-[8px] font-medium inline-flex items-center gap-1';
+                }
+
+                const dotColor = item.tipo_evento === 'CREACION' ? 'bg-emerald-500' :
+                                 item.tipo_evento === 'SEGURIDAD' ? 'bg-rose-600' :
+                                 item.tipo_evento === 'ELIMINACION' ? 'bg-orange-500' :
+                                 item.tipo_evento === 'SISTEMA' ? 'bg-purple-500' : 'bg-sky-500';
+
+                const valAnt = item.valor_anterior || '';
+                const valNue = item.valor_nuevo || '';
+                let diffHtml = '';
+
+                if (valAnt === 'N/A' || valAnt === '' || valAnt === 'null') {
+                    diffHtml = `<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100/50 font-mono text-[9px] font-medium max-w-xs truncate" title="${UI.sanitize(valNue)}"><i class="ph ph-plus-circle text-xs text-emerald-500"></i> ${UI.sanitize(valNue)}</span>`;
+                } else {
+                    diffHtml = `
+                        <div class="flex items-center gap-1.5 flex-wrap font-mono text-[9px]">
+                            <span class="inline-flex bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded border border-rose-100/50 line-through truncate max-w-[120px]" title="${UI.sanitize(valAnt)}">${UI.sanitize(valAnt)}</span>
+                            <i class="ph ph-caret-right text-slate-400 text-xs"></i>
+                            <span class="inline-flex bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100/50 font-semibold truncate max-w-[120px]" title="${UI.sanitize(valNue)}">${UI.sanitize(valNue)}</span>
+                        </div>
+                    `;
+                }
+
+                htmlH += `
+                <div class="py-3 border-b border-slate-100 hover:bg-slate-50/50 px-2 rounded-xl transition-all duration-200">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-semibold text-slate-800 flex items-center gap-2">
+                            <span class="${badgeClass}">
+                                <span class="w-1.5 h-1.5 rounded-full ${dotColor}"></span>
+                                ${item.tipo_evento || 'MODIFICACION'}
+                            </span>
+                            ${UI.sanitize(item.campo)}
+                        </span>
+                        <span class="text-[9px] text-slate-400 font-medium">${new Date(item.created_at).toLocaleDateString('es-CO')} ${new Date(item.created_at).toLocaleTimeString('es-CO', {hour: '2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    <div class="mb-2">
+                        ${diffHtml}
+                    </div>
+                    <p class="text-[9px] text-slate-400 font-medium flex items-center gap-1.5"><i class="ph ph-user text-[10px]"></i> Por: ${UI.sanitize(item.usuario_email)}</p>
+                </div>`;
+            });
+            container.innerHTML = htmlH;
+        } catch (e) {
+            console.error("Error cargando historial de cliente:", e);
+            container.innerHTML = '<div class="py-6 text-center text-red-500 text-xs font-semibold">Error al cargar el historial</div>';
+        }
     },
 
     async quickStatusChange(id, ns) {

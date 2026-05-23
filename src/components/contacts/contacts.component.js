@@ -136,7 +136,7 @@ export const ContactsComponent = {
 
         const link = document.createElement("a");
         link.setAttribute("href", encodeURI(csvContent));
-        link.setAttribute("download", `Contactos_Travelers_${new Date().getTime()}.csv`);
+        link.setAttribute("download", `Contactos_Vive_Travel_${new Date().getTime()}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

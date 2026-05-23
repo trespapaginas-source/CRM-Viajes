@@ -1,0 +1,100 @@
+/* ============================================================
+   css/trazabilidad.css — Estilos Premium (Aesthetics Upgraded)
+   ============================================================ */
+
+/* Tipografía de cabecera sans-serif */
+.font-heading {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+}
+
+/* Transiciones suaves en las subpestañas segmentadas */
+.trazabilidad-sub-tab {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.trazabilidad-sub-tab:hover:not(.bg-white) {
+    background-color: rgba(241, 245, 249, 0.6);
+    color: #0f172a;
+}
+
+/* Efectos de vidrio (Glassmorphism) para contenedores y KPIs */
+.shadow-glass {
+    box-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.shadow-soft {
+    box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.04);
+}
+
+/* Reglas específicas para el Diff Visual (Git-like) */
+.font-mono {
+    font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+}
+
+/* Personalización del scroll de tablas */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.15);
+    border-radius: 99px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.3);
+}
+
+/* Glowing Pulsing state para alertas críticas de Seguridad */
+@keyframes alert-glow {
+    0%, 100% {
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
+        background-color: rgba(254, 242, 242, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.45);
+        background-color: rgba(254, 242, 242, 0.95);
+    }
+}
+
+.animate-pulse {
+    animation: alert-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes alert-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
+}
+
+/* Filas con efectos de hover premium */
+#trazabilidad-logs-tbody tr,
+#trazabilidad-papelera-tbody tr {
+    transition: all 0.2s ease-in-out;
+    border-bottom: 1px solid rgba(241, 245, 249, 0.8);
+}
+
+#trazabilidad-logs-tbody tr:hover,
+#trazabilidad-papelera-tbody tr:hover {
+    background-color: rgba(248, 250, 252, 0.95) !important;
+    transform: scale(1.001);
+}
+
+/* Botones de acción dinámicos */
+button[data-action] {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button[data-action]:hover {
+    transform: translateY(-0.5px);
+}

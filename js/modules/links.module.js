@@ -1,9 +1,9 @@
-﻿// js/modules/links.module.js — Generador WhatsApp de Reservas
+// js/modules/links.module.js — Generador WhatsApp de Reservas
 // Cross-module: window.AuthModule, window.DashboardModule
 // Extraído de app.js líneas 3725–3974
 import { DataService } from '../services/supabase.service.js';
 import { UI } from '../utils/ui.utils.js';
-import { formatCOP, formatShortDate } from '../utils/format.utils.js';
+import { formatCOP, formatShortDate, formatDoubleDate } from '../utils/format.utils.js';
 
 export const LinksModule = {
     init() {
@@ -82,7 +82,7 @@ export const LinksModule = {
             document.getElementById('link-generado-url').value = finalUrl;
 
             const planName = DataService.planes.find(p => p.id === planId)?.nombre || 'su viaje';
-            const msg = `¡Hola ${nombre}! Confirmo la recepción de tu abono por ${formatCOP(abono)} para tu reserva de ${planName} el ${fecha}. 🎉\n\nPor favor, completa tus datos personales y médicos (Alergias/EPS) en el siguiente enlace seguro en las próximas 24 horas para emitir tus pólizas:\n\n${finalUrl}\n\n¡Gracias por elegir Travelers!`;
+            const msg = `¡Hola ${nombre}! Confirmo la recepción de tu abono por ${formatCOP(abono)} para tu reserva de ${planName} el ${fecha}. 🎉\n\nPor favor, completa tus datos personales y médicos (Alergias/EPS) en el siguiente enlace seguro en las próximas 24 horas para emitir tus pólizas:\n\n${finalUrl}\n\n¡Gracias por elegir Vive Travel!`;
 
             const telLimpio = telefono.replace(/\D/g, '');
             document.getElementById('link-whatsapp-btn').href = `https://wa.me/57${telLimpio}?text=${encodeURIComponent(msg)}`;
@@ -166,7 +166,7 @@ export const LinksModule = {
             tr.className = 'hover:bg-slate-50 transition-colors';
             tr.innerHTML = `
                 <td class="py-3 px-4"><p class="font-bold text-slate-800 text-sm">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)}</p><p class="text-[10px] text-slate-500 mt-0.5 flex items-center"><i class="ph ph-phone mr-1"></i>${UI.sanitize(c.telefono)}</p></td>
-                <td class="py-3 px-4"><p class="font-bold text-primary-700 text-xs">${UI.sanitize(planNombre)}</p><p class="text-[10px] text-slate-500 mt-0.5 flex items-center"><i class="ph ph-calendar-blank mr-1"></i> ${UI.sanitize(c.fecha_viaje)}</p></td>
+                <td class="py-3 px-4"><p class="font-bold text-primary-700 text-xs">${UI.sanitize(planNombre)}</p><p class="text-[10px] text-slate-500 mt-0.5 flex items-center"><i class="ph ph-calendar-blank mr-1"></i> ${UI.sanitize(formatDoubleDate(c.fecha_viaje))}</p></td>
                 <td class="py-3 px-4 text-center">${estadoBadge}</td>
                 <td class="py-3 px-4 text-center">${accionesHtml}</td>`;
             fragment.appendChild(tr);

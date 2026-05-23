@@ -122,6 +122,16 @@ export const AuditoriaComponent = {
         try {
             const { error } = await supabaseClient.from(table).update({ deleted_at: null, deleted_by: null }).eq('id', id);
             if (error) throw error;
+            
+            const logId = table === 'clientes' ? id : null;
+            await window.DataService.registrarHistorial(
+                logId,
+                'Registro Restaurado de Papelera',
+                `Tabla: ${table} | ID: ${id}`,
+                'Restaurado con éxito',
+                'SISTEMA'
+            );
+
             window.UI.showToast("Registro restaurado con éxito.", "success");
             await this.loadDeletedRecords();
             // Refrescar BD global para que reaparezca
@@ -144,6 +154,14 @@ export const AuditoriaComponent = {
         }
         if (!confirm("⚠️ ADVERTENCIA: Esta acción destruirá el registro de forma permanente en la base de datos y NO se puede deshacer. ¿Continuar?")) return;
         try {
+            const logId = table === 'clientes' ? id : null;
+            await window.DataService.registrarHistorial(
+                logId,
+                'Registro Destruido Permanentemente (Hard Delete)',
+                `Tabla: ${table} | ID: ${id}`,
+                'Destruido físicamente de la base de datos',
+                'ELIMINACION'
+            );
             const { error } = await supabaseClient.from(table).delete().eq('id', id);
             if (error) throw error;
             window.UI.showToast("Registro destruido permanentemente.", "success");

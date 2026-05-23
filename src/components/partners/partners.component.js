@@ -1,7 +1,7 @@
 import { DataService, supabaseClient } from '../../../js/services/supabase.service.js';
 import { Store } from '../../core/store.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, formatShortDate } from '../../../js/utils/format.utils.js';
+import { formatCOP, formatShortDate, formatDoubleDate } from '../../../js/utils/format.utils.js';
 
 export const PartnersComponent = {
     sociosConfig: [],
@@ -569,7 +569,7 @@ export const PartnersComponent = {
                 tb.innerHTML += `
                     <tr class="transition-colors ${rowClass}">
                         <td class="py-2.5 px-4 whitespace-nowrap"><div class="flex items-center"><p class="text-xs font-black text-slate-800">${UI.sanitize(v.planName)}</p>${badgeHtml}</div></td>
-                        <td class="py-2.5 px-4 whitespace-nowrap"><p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">${UI.sanitize(v.fechaFormat)}</p></td>
+                        <td class="py-2.5 px-4 whitespace-nowrap"><p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">${UI.sanitize(formatDoubleDate(v.fechaFormat))}</p></td>
                         <td class="py-2.5 px-4 text-center whitespace-nowrap"><span class="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded shadow-sm">${v.paxAsistentes}</span></td>
                         <td class="py-2.5 px-4 text-center whitespace-nowrap"><span class="text-xs font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded shadow-sm">${v.paxRetenidos}</span></td>
                         <td class="py-2.5 px-4 text-right whitespace-nowrap"><p class="text-xs font-medium text-slate-600">${isAdmin ? formatCOP(v.ingresoBruto) : '***'}</p></td>

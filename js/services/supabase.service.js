@@ -41,7 +41,7 @@ export const DataService = {
         // IMPLEMENTACIÓN DE PAGINACIÓN SEGURA:
         // Se añaden límites (limit) para prevenir cuellos de botella de memoria
         // sin romper las relaciones de datos actuales.
-        const [resPlanes, resClientes, resProv, resAbo, resGastos, resSeguimientos, resB2BAli, resB2BServ, resB2BNeg, resHistorial] = await Promise.all([
+        const [resPlanes, resClientes, resProv, resAbo, resGastos, resSeguimientos, resB2BAli, resB2BServ, resB2BNeg] = await Promise.all([
             supabaseClient.from('planes').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(500),
             supabaseClient.from('clientes').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(2000),
             supabaseClient.from('proveedores').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(1000),
@@ -52,8 +52,7 @@ export const DataService = {
             supabaseClient.from('seguimientos').select('*').order('created_at', { ascending: false }).limit(2000),
             supabaseClient.from('b2b_aliados').select('*').order('created_at', { ascending: false }).limit(1000),
             supabaseClient.from('b2b_servicios_catalogo').select('*').order('created_at', { ascending: false }).limit(1000),
-            supabaseClient.from('b2b_negocios').select('*').order('created_at', { ascending: false }).limit(2000),
-            supabaseClient.from('historial_reservas').select('*').order('created_at', { ascending: false }).limit(3000)
+            supabaseClient.from('b2b_negocios').select('*').order('created_at', { ascending: false }).limit(2000)
         ]);
 
         if (resPlanes.data) this.planes = resPlanes.data;
@@ -73,7 +72,6 @@ export const DataService = {
         if (resB2BAli && resB2BAli.data) this.b2b_aliados = resB2BAli.data; else this.b2b_aliados = [];
         if (resB2BServ && resB2BServ.data) this.b2b_servicios = resB2BServ.data; else this.b2b_servicios = [];
         if (resB2BNeg && resB2BNeg.data) this.b2b_negocios = resB2BNeg.data; else this.b2b_negocios = [];
-        if (resHistorial && resHistorial.data) this.historial_reservas = resHistorial.data; else this.historial_reservas = [];
         
         Store.setState({
             planes: this.planes,
@@ -85,8 +83,7 @@ export const DataService = {
             b2b_aliados: this.b2b_aliados,
             b2b_servicios: this.b2b_servicios,
             b2b_negocios: this.b2b_negocios,
-            ciudades: this.ciudades,
-            historial_reservas: this.historial_reservas
+            ciudades: this.ciudades
         });
 
         this.autoClassifyReservas();
@@ -238,19 +235,21 @@ export const DataService = {
         } catch (e) { throw e; }
     },
 
-    async registrarHistorial(clienteId, campo, valorAnterior, valorNuevo) {
+    async registrarHistorial(clienteId, campo, valorAnterior, valorNuevo, tipoEvento = 'MODIFICACION', detalles = {}) {
         try {
             const payload = {
                 cliente_id: clienteId,
                 campo: campo,
                 valor_anterior: String(valorAnterior || ''),
                 valor_nuevo: String(valorNuevo || ''),
-                usuario_email: window.AuthModule?.currentUser?.email || 'Staff'
+                usuario_email: window.AuthModule?.currentUser?.email || 'Staff',
+                tipo_evento: tipoEvento,
+                detalles: detalles
             };
             const { error } = await supabaseClient.from('historial_reservas').insert([payload]);
             if (error) {
                 if (error.code === '42P01') {
-                    console.warn("Aviso DB: Crea la tabla 'historial_reservas' en Supabase con cliente_id (uuid), campo, valor_anterior, valor_nuevo, usuario_email.");
+                    console.warn("Aviso DB: Crea la tabla 'historial_reservas' en Supabase con cliente_id (uuid), campo, valor_anterior, valor_nuevo, usuario_email, tipo_evento, detalles.");
                 } else {
                     console.error("Error guardando historial:", error);
                 }
@@ -269,7 +268,7 @@ export const DataService = {
                 
                 if (!resultadoDB.error && resultadoDB.data && resultadoDB.data[0]) {
                     // Historial de creación
-                    await this.registrarHistorial(resultadoDB.data[0].id, 'Creación de Reserva', 'N/A', 'Reserva Creada Inicialmente');
+                    await this.registrarHistorial(resultadoDB.data[0].id, 'Creación de Reserva', 'N/A', 'Reserva Creada Inicialmente', 'CREACION');
                 }
             } else {
                 const { id, ...datosMapeados } = datosParaGuardar;
@@ -277,7 +276,7 @@ export const DataService = {
                 // Buscar cliente actual para comparar
                 const clienteActual = this.clientes.find(c => c.id === id);
                 if (clienteActual) {
-                    const camposAComparar = ['nombre', 'apellido', 'documento', 'telefono', 'email', 'pax', 'plan_id', 'fecha_viaje', 'precio_total', 'estado', 'etiqueta'];
+                    const camposAComparar = ['nombre', 'apellido', 'documento', 'telefono', 'email', 'pax', 'plan_id', 'fecha_viaje', 'precio_total', 'estado', 'etiqueta', 'dni', 'vendedor', 'costo_total', 'notas_financieras'];
                     for (const campo of camposAComparar) {
                         if (datosMapeados[campo] !== undefined && String(datosMapeados[campo]) !== String(clienteActual[campo])) {
                             let valAnt = clienteActual[campo];
@@ -288,7 +287,25 @@ export const DataService = {
                                 valAnt = planAnt ? planAnt.nombre : valAnt;
                                 valNue = planNue ? planNue.nombre : valNue;
                             }
-                            await this.registrarHistorial(id, campo, valAnt, valNue);
+                            await this.registrarHistorial(id, campo, valAnt, valNue, 'MODIFICACION');
+                        }
+                    }
+
+                    // Comparación de pasajeros internacionales (JSON)
+                    if (datosMapeados.pasajeros_internacionales !== undefined) {
+                        const jsonAnt = JSON.stringify(clienteActual.pasajeros_internacionales || []);
+                        const jsonNue = JSON.stringify(datosMapeados.pasajeros_internacionales || []);
+                        if (jsonAnt !== jsonNue) {
+                            const cantAnt = (clienteActual.pasajeros_internacionales || []).length;
+                            const cantNue = (datosMapeados.pasajeros_internacionales || []).length;
+                            await this.registrarHistorial(
+                                id, 
+                                'Pasajeros Internacionales Modificados', 
+                                `${cantAnt} pasajeros`, 
+                                `${cantNue} pasajeros`, 
+                                'MODIFICACION',
+                                { detalles_previos: clienteActual.pasajeros_internacionales, detalles_nuevos: datosMapeados.pasajeros_internacionales }
+                            );
                         }
                     }
                 }
@@ -320,6 +337,14 @@ export const DataService = {
             if (posiblesDuplicados.length > 0) {
                 const diffMin = (new Date() - new Date(posiblesDuplicados[posiblesDuplicados.length - 1].created_at || new Date())) / 1000 / 60;
                 if (diffMin < 2) {
+                    await this.registrarHistorial(
+                        datosParaGuardar.cliente_id, 
+                        'Alerta Antifraude: Intento de Abono Duplicado', 
+                        'N/A', 
+                        `Monto: $${datosParaGuardar.monto} | Método: ${datosParaGuardar.metodo}`, 
+                        'SEGURIDAD', 
+                        { intento_por: datosParaGuardar.usuario_email || 'Staff' }
+                    );
                     window.UI.showToast('Abono idéntico detectado hace menos de 2 minutos. Bloqueado por seguridad anti-duplicados.', 'error');
                     throw new Error("DUPLICATE_PAYMENT");
                 }
@@ -337,7 +362,22 @@ export const DataService = {
                 resAbono = await supabaseClient.from('abonos').insert([fallbackData]);
                 if (!resAbono.error) {
                     window.UI.showToast("Pago guardado (Modo Compatibilidad). Se recomienda actualizar la BD.", "info");
+                    await this.registrarHistorial(
+                        datosParaGuardar.cliente_id,
+                        'Registro de Abono (Modo Compatibilidad)',
+                        'N/A',
+                        `Abono de $${datosParaGuardar.monto} vía ${datosParaGuardar.metodo}`,
+                        'CREACION'
+                    );
                 }
+            } else if (!resAbono.error) {
+                await this.registrarHistorial(
+                    datosParaGuardar.cliente_id,
+                    'Registro de Abono',
+                    'N/A',
+                    `Abono de $${datosParaGuardar.monto} vía ${datosParaGuardar.metodo}`,
+                    'CREACION'
+                );
             }
 
             if (resAbono.error) throw resAbono.error;
@@ -349,6 +389,10 @@ export const DataService = {
     async deleteAbono(abonoId, clienteId) {
         try {
             const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            const abono = this.abonos.find(a => a.id === abonoId);
+            if (abono) {
+                await this.registrarHistorial(clienteId, 'Abono Eliminado', `Abono de $${abono.monto} (${abono.metodo})`, 'Movido a la Papelera', 'ELIMINACION', { abono_id: abonoId });
+            }
             const { error } = await supabaseClient.from('abonos').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', abonoId);
             if (error) throw error;
             await this.loadAll();
@@ -358,6 +402,15 @@ export const DataService = {
 
     async editAbono(abonoId, clienteId, nuevoMonto, status) {
         try {
+            const abonoPrev = this.abonos.find(a => a.id === abonoId);
+            if (abonoPrev) {
+                if (Number(abonoPrev.monto) !== Number(nuevoMonto)) {
+                    await this.registrarHistorial(clienteId, 'Monto de Abono Modificado', `$${abonoPrev.monto}`, `$${nuevoMonto}`, 'MODIFICACION', { abono_id: abonoId });
+                }
+                if (abonoPrev.estado_pago !== status) {
+                    await this.registrarHistorial(clienteId, 'Estado de Abono Modificado', abonoPrev.estado_pago || 'confirmed', status, 'MODIFICACION', { abono_id: abonoId });
+                }
+            }
             let res = await supabaseClient.from('abonos').update({ monto: nuevoMonto, estado_pago: status }).eq('id', abonoId);
             if (res.error && res.error.code === '42703') {
                 console.warn("Fallback Seguro: Ignorando columna estado_pago.");
@@ -386,18 +439,27 @@ export const DataService = {
 
     async deletePlan(id) {
         const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+        const plan = this.planes.find(p => p.id === id);
+        const nombrePlan = plan ? plan.nombre : id;
+        await this.registrarHistorial(null, 'Plan Eliminado (Soft Delete)', `Plan: ${nombrePlan}`, 'Movido a la Papelera', 'ELIMINACION', { plan_id: id });
         const { error } = await supabaseClient.from('planes').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
     },
     async deleteCliente(id) {
         const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+        const clienteActual = this.clientes.find(c => c.id === id);
+        const desc = clienteActual ? `${clienteActual.nombre} ${clienteActual.apellido}` : id;
+        await this.registrarHistorial(id, 'Eliminación (Soft Delete)', `Reserva de ${desc}`, 'Movida a la Papelera', 'ELIMINACION');
         const { error } = await supabaseClient.from('clientes').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
     },
     async deleteProveedor(id) {
         const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+        const prov = this.proveedores.find(p => p.id === id);
+        const razonSocial = prov ? prov.razon_social : id;
+        await this.registrarHistorial(null, 'Proveedor Eliminado (Soft Delete)', `Proveedor: ${razonSocial}`, 'Movido a la Papelera', 'ELIMINACION', { proveedor_id: id });
         const { error } = await supabaseClient.from('proveedores').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
@@ -448,6 +510,14 @@ export const DataService = {
                 updated_by: user ? user.id : null,
                 updated_at: new Date().toISOString()
             };
+
+            await this.registrarHistorial(
+                null,
+                'Configuración de Agencia Actualizada',
+                'Valores Anteriores',
+                `Razón Social: ${settings.razon || 'N/A'} | NIT: ${settings.nit || 'N/A'}`,
+                'SISTEMA'
+            );
 
             const { error } = await supabaseClient.from('configuracion_agencia').upsert(dbPayload, { onConflict: 'id' });
             if (error) throw error;

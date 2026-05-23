@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Travelers CRM | Gestión Turística</title>
+    <title>Vive Travel CRM | Gestión Turística</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -19,14 +19,15 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/utilities.css">
+    <link rel="stylesheet" href="css/trazabilidad.css">
 
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'Jost', 'sans-serif'],
-                        heading: ['Bodoni Moda', 'serif']
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                        heading: ['Plus Jakarta Sans', 'Inter', 'sans-serif']
                     },
                     colors: {
                         // Paleta Luxury Apple/SaaS: Navy profundo, grises neutros y acentos sutiles
@@ -76,8 +77,8 @@
     <div id="login-screen" class="hidden fixed inset-0 login-bg flex flex-col items-center justify-center p-4 z-[100]">
         <div class="w-full max-w-md login-glass rounded-[2rem] p-8 md:p-10 slide-up relative overflow-hidden">
             <div class="text-center mb-8 relative z-10">
-                <h1 class="text-3xl font-black text-slate-900 tracking-[0.2em] uppercase font-heading">Travelers</h1>
-                <p class="text-[9px] text-slate-500 mt-1 font-bold tracking-[0.3em] uppercase">Boutique CRM</p>
+                <h1 class="text-3xl font-black text-slate-900 tracking-[0.1em] uppercase font-heading">Vive Travel</h1>
+                <p class="text-[9px] text-slate-500 mt-1 font-bold tracking-[0.2em] uppercase">Boutique CRM</p>
             </div>
 
             <form id="login-form" class="space-y-5 relative z-10" onsubmit="AuthModule.handleLogin(event)">
@@ -88,7 +89,7 @@
                     <div class="relative">
                         <i
                             class="ph ph-envelope-simple absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 text-lg"></i>
-                        <input type="email" id="login-email" required placeholder="admin@travelers.com"
+                        <input type="email" id="login-email" required placeholder="admin@vivetravel.co"
                             class="w-full pl-11 pr-4 py-3 bg-white/60 border border-slate-200/60 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900 outline-none transition-all shadow-sm">
                     </div>
                 </div>
@@ -121,12 +122,11 @@
         <div id="sidebar-overlay" class="sidebar-overlay" onclick="UI.toggleSidebar()"></div>
 
         <aside id="sidebar"
-            class="w-64 glass-panel border-r border-slate-200/40 flex flex-col h-full shadow-xl mobile-sidebar transition-transform duration-500 z-50">
-            <div class="h-20 flex items-center px-8 border-b border-slate-200/50 justify-between shrink-0">
+            class="w-64 bg-white border-r border-slate-100 flex flex-col h-full mobile-sidebar transition-transform duration-500 z-50">
+            <div class="h-20 flex items-center px-8 border-b border-slate-100 justify-between shrink-0">
                 <div class="flex flex-col justify-center">
-                    <h1 class="font-black text-lg tracking-[0.15em] text-slate-900 uppercase font-heading">Travelers
-                    </h1>
-                    <p class="text-[8px] font-bold tracking-[0.4em] text-slate-400 uppercase mt-0.5">Boutique CRM</p>
+                    <h1 class="font-black text-lg tracking-[0.1em] text-slate-900 uppercase font-heading">Vive Travel</h1>
+                    <p class="text-[8px] font-bold tracking-[0.3em] text-slate-400 uppercase mt-0.5">Boutique CRM</p>
                 </div>
                 <button class="md:hidden text-slate-400 hover:text-slate-900 transition-colors"
                     onclick="UI.toggleSidebar()">
@@ -139,7 +139,7 @@
                     Operaciones</p>
 
                 <a href="#" data-target="dashboard"
-                    class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group active">
+                    class="nav-btn flex items-center px-4 py-2.5 rounded-xl bg-slate-100 text-slate-900 font-semibold transition-all group">
                     <i
                         class="ph ph-chart-pie-slice text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity"></i>
                     <span class="font-bold text-sm">Dashboard</span>
@@ -189,10 +189,10 @@
                     <span class="font-bold text-sm">Rentabilidad</span>
                 </a>
 
-                <a href="#" data-action="open-auditoria" id="nav-auditoria-btn"
+                <a href="#" data-target="trazabilidad" id="nav-trazabilidad-btn"
                     class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group hidden">
-                    <i class="ph ph-trash text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity text-red-400"></i>
-                    <span class="font-bold text-sm">Papelera (Admin)</span>
+                    <i class="ph ph-shield-checkered text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity text-indigo-500"></i>
+                    <span class="font-bold text-sm">Trazabilidad y Papelera</span>
                 </a>
 
                 <a href="#" data-target="proveedores"
@@ -257,8 +257,8 @@
             </div>
         </aside>
 
-        <main class="flex-1 flex flex-col min-w-0 min-h-0 bg-white relative z-0 h-full">
-            <header class="h-16 lg:h-20 border-b border-slate-200/50 bg-white/80 backdrop-blur-md flex items-center justify-between px-4 lg:px-8 shrink-0 relative z-10 shadow-sm">
+        <main class="flex-1 flex flex-col min-w-0 min-h-0 bg-slate-50/30 relative z-0 h-full">
+            <header class="h-16 lg:h-20 border-b border-slate-100 bg-white flex items-center justify-between px-4 lg:px-8 shrink-0 relative z-10">
                 <div class="flex items-center gap-4">
                     <button class="md:hidden text-slate-400 hover:text-slate-900 transition-colors" onclick="UI.toggleSidebar()">
                         <i class="ph ph-list text-2xl"></i>
@@ -282,116 +282,96 @@
             <div class="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 lg:p-8 relative scroll-smooth bg-slate-50/50" id="main-scroll-area">
 
                 <section id="view-dashboard" class="view-section active fade-in max-w-7xl mx-auto">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-                        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[100px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-currency-dollar text-lg"></i>
-                                </div>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Ingresos</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Ingresos Brutos</span>
+                                <i class="ph ph-arrow-up-right text-slate-400 text-base"></i>
                             </div>
                             <div>
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-ingresos">$0</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Facturación Bruta</p>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-ingresos">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Facturación total negociada</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-receipt text-lg"></i>
-                                </div>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Costos</span>
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Costos de Operación</span>
+                                <i class="ph ph-arrow-up-right text-slate-400 text-base"></i>
                             </div>
                             <div>
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-costos">$0</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Operación Total</p>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-costos">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Total de egresos registrados</p>
                             </div>
                         </div>
 
-                        <div class="bg-slate-900 rounded-2xl p-5 shadow-md border border-slate-800 flex flex-col justify-between min-h-[120px] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group relative overflow-hidden">
-                            <div class="absolute inset-0 bg-gradient-to-br from-primary-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                            <div class="flex justify-between items-center mb-3 relative z-10">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center border border-slate-700 shrink-0">
-                                        <i class="ph ph-chart-line-up text-lg text-primary-400"></i>
-                                    </div>
-                                    <span class="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">Utilidad</span>
-                                </div>
-                                <span class="text-[9px] font-black text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded border border-primary-500/20" id="kpi-margen-pct">0% MG</span>
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Utilidad Neta</span>
+                                <span class="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100/50" id="kpi-margen-pct">0% MG</span>
                             </div>
-                            <div class="relative z-10">
-                                <h3 class="text-2xl font-black text-white tracking-tighter" id="kpi-margen">$0</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Beneficio Neto</p>
+                            <div>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-margen">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Beneficio neto estimado</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-users-three text-lg"></i>
-                                </div>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Ventas</span>
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Pasajeros Activos</span>
+                                <i class="ph ph-arrow-up-right text-slate-400 text-base"></i>
                             </div>
                             <div>
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-clientes">0</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Pasajeros Activos</p>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-clientes">0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Clientes activos registrados</p>
                             </div>
                         </div>
                     </div>
 
 
                     <!-- FILA 2: KPIs Estratégicos CEO -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 fade-in" style="animation-delay: 0.05s;">
-                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-wallet text-lg"></i>
-                                </div>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Recaudado</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Recaudado Real</span>
+                                <i class="ph ph-arrow-up-right text-slate-400 text-base"></i>
                             </div>
                             <div>
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-recaudado">$0</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Total Cobrado</p>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-recaudado">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Total de abonos cobrados</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-clock-countdown text-lg"></i>
-                                </div>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Cartera</span>
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Cartera Pendiente</span>
+                                <i class="ph ph-arrow-up-right text-slate-400 text-base"></i>
                             </div>
                             <div>
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-cartera">$0</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Cuentas por Cobrar</p>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-cartera">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Saldos pendientes de pago</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-airplane-takeoff text-lg"></i>
-                                </div>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Próximas</span>
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Próximas Salidas</span>
+                                <i class="ph ph-arrow-up-right text-slate-400 text-base"></i>
                             </div>
                             <div>
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-proximas">0</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Salidas en 7 Días</p>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-proximas">0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Salidas en los próximos 7 días</p>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:border-slate-300 transition-all duration-300 group">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 flex items-center justify-center border border-slate-100 group-hover:bg-rose-600 group-hover:text-white transition-colors duration-300 shrink-0">
-                                    <i class="ph ph-x-circle text-lg"></i>
-                                </div>
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Cancelación</span>
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-all">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Tasa de Cancelación</span>
+                                <i class="ph ph-arrow-up-right text-slate-400 text-base"></i>
                             </div>
                             <div>
-                                <h3 class="text-2xl font-black text-slate-900 tracking-tighter" id="kpi-cancelacion">0%</h3>
-                                <p class="text-[9px] text-slate-400 mt-0.5 font-bold uppercase tracking-wider">Tasa de Desistimiento</p>
+                                <h3 class="text-2xl font-semibold text-slate-900 tracking-tight" id="kpi-cancelacion">0%</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Porcentaje de clientes cancelados</p>
                             </div>
                         </div>
                     </div>
@@ -1512,7 +1492,7 @@
                                         <label
                                             class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nombre
                                             Comercial</label>
-                                        <input type="text" value="Travelers CRM"
+                                        <input type="text" value="Vive Travel CRM"
                                             class="w-full border border-slate-200/60 rounded-xl px-4 py-3 text-sm font-semibold bg-slate-50/50 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all shadow-sm">
                                     </div>
                                     <div>
@@ -1556,7 +1536,7 @@
                                         <label
                                             class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Correo
                                             principal para alertas</label>
-                                        <input type="email" value="admin@travelers.com"
+                                        <input type="email" value="admin@vivetravel.co"
                                             class="w-full sm:w-1/2 border border-slate-200/60 rounded-xl px-4 py-3 text-sm font-semibold bg-slate-50/50 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all shadow-sm">
                                     </div>
                                 </div>
@@ -1647,7 +1627,7 @@
                                                     class="block text-[10px] font-black text-primary-800 mb-1.5 uppercase tracking-widest">Correo
                                                     del Nuevo Operador</label>
                                                 <input type="email" id="new-vendor-email" required
-                                                    placeholder="operador@travelers.com"
+                                                    placeholder="operador@vivetravel.co"
                                                     class="w-full border border-primary-200 rounded-xl px-4 py-3 text-sm font-semibold bg-white outline-none focus:ring-2 focus:ring-primary-500 shadow-sm transition-all">
                                             </div>
                                             <div>
@@ -2184,7 +2164,7 @@
                             </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Razón Social</label>
-                                <input type="text" id="setting_razon" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Travelers S.A.S">
+                                <input type="text" id="setting_razon" class="w-full px-4 py-3 bg-slate-50 border border-slate-200/60 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Vive Travel S.A.S">
                             </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Subtítulo / Lema de la Empresa</label>
@@ -2219,10 +2199,174 @@
                     </div>
                 </div>
 
+                <!-- SECCIÓN: TRAZABILIDAD Y AUDITORÍA DE LOGS -->
+                <section id="view-trazabilidad" class="view-section max-w-7xl mx-auto hidden pb-12">
+                    <!-- Cabecera del Módulo Premium -->
+                    <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                        <div>
+                            <h2 class="font-heading text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                                <span class="bg-indigo-500/10 text-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center border border-indigo-500/20 shadow-sm shrink-0">
+                                    <i class="ph ph-shield-checkered text-2xl"></i>
+                                </span>
+                                Trazabilidad y Auditoría
+                            </h2>
+                            <p class="text-xs text-slate-500 font-medium mt-1">Supervisión integral de logs de actividad, detección antifraude y control seguro de la papelera.</p>
+                        </div>
+                    </div>
+
+                    <!-- KPIs superiores -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+                        <div class="bg-gradient-to-tr from-cyan-500/5 to-white rounded-3xl p-6 shadow-soft border border-slate-200/50 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-cyan-100/80 text-cyan-600 flex items-center justify-center border border-cyan-200 shadow-sm shrink-0">
+                                    <i class="ph ph-activity text-xl"></i>
+                                </div>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em]">Actividad</span>
+                            </div>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tight" id="kpi-logs-hoy">0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Eventos Registrados Hoy</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-tr from-rose-500/5 to-white rounded-3xl p-6 shadow-soft border border-slate-200/50 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-rose-100/80 text-rose-600 flex items-center justify-center border border-rose-200 shadow-sm shrink-0" id="kpi-logs-alertas-icon">
+                                    <i class="ph ph-shield-warning text-xl animate-pulse"></i>
+                                </div>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em]">Seguridad</span>
+                            </div>
+                            <div>
+                                <h3 class="text-3xl font-black text-rose-600 tracking-tight" id="kpi-logs-alertas">0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Alertas Antifraude</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-tr from-indigo-500/5 to-white rounded-3xl p-6 shadow-soft border border-slate-200/50 flex flex-col justify-between min-h-[120px] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-indigo-100/80 text-indigo-600 flex items-center justify-center border border-indigo-200 shadow-sm shrink-0">
+                                    <i class="ph ph-trash text-xl"></i>
+                                </div>
+                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em]">Papelera</span>
+                            </div>
+                            <div>
+                                <h3 class="text-3xl font-black text-slate-900 tracking-tight" id="kpi-logs-papelera">0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Registros Eliminados</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pestañas Internas del Módulo -->
+                    <div class="flex bg-slate-100/60 p-1.5 rounded-2xl gap-2 w-fit mb-8 border border-slate-200/40">
+                        <button id="trazabilidad-tab-logs" data-action="switch-trazabilidad-tab" data-tab-id="logs"
+                            class="trazabilidad-sub-tab px-5 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 border-none text-slate-800 bg-white shadow-sm cursor-pointer">
+                            <i class="ph ph-list-bullets text-base"></i>Historial de Logs
+                        </button>
+                        <button id="trazabilidad-tab-papelera" data-action="switch-trazabilidad-tab" data-tab-id="papelera"
+                            class="trazabilidad-sub-tab px-5 py-3 text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 border-none text-slate-500 hover:text-slate-800 hover:bg-slate-50/50 cursor-pointer">
+                            <i class="ph ph-trash-simple text-base"></i>Papelera de Reciclaje
+                        </button>
+                    </div>
+
+                    <!-- CONTENEDOR PRINCIPAL: PESTAÑA HISTORIAL -->
+                    <div id="trazabilidad-panel-logs" class="space-y-6">
+                        <!-- Filtros del Historial -->
+                        <div class="flex flex-wrap gap-4 bg-slate-50/50 p-5 rounded-3xl border border-slate-200/50 items-center">
+                            <div class="relative flex-1 min-w-[260px]">
+                                <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
+                                <input type="text" id="log-filter-search" placeholder="Buscar por cliente, documento, campo..."
+                                    class="w-full pl-11 pr-4 py-3 bg-white border border-slate-200/60 rounded-2xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all shadow-sm">
+                            </div>
+                            <select id="log-filter-tipo"
+                                class="border border-slate-200/60 rounded-2xl px-5 py-3 text-xs font-bold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 cursor-pointer min-w-[170px] shadow-sm transition-all">
+                                <option value="">Todos los Eventos</option>
+                                <option value="CREACION">CREACION</option>
+                                <option value="MODIFICACION">MODIFICACION</option>
+                                <option value="ELIMINACION">ELIMINACION</option>
+                                <option value="SEGURIDAD">SEGURIDAD</option>
+                                <option value="SISTEMA">SISTEMA</option>
+                            </select>
+                            <select id="log-filter-usuario"
+                                class="border border-slate-200/60 rounded-2xl px-5 py-3 text-xs font-bold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 cursor-pointer min-w-[180px] shadow-sm transition-all">
+                                <option value="">Todos los Operadores</option>
+                            </select>
+                            <button id="btn-trazabilidad-clear"
+                                class="text-xs font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest transition-colors px-4 py-3 bg-indigo-50 rounded-2xl border border-indigo-100 hover:bg-indigo-100 flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                <i class="ph ph-arrows-clockwise"></i> Limpiar Filtros
+                            </button>
+                        </div>
+
+                        <!-- Tabla de Logs -->
+                        <div class="bg-white rounded-3xl shadow-glass border border-slate-200/40 overflow-hidden">
+                            <div class="overflow-x-auto custom-scrollbar">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            <th class="py-4.5 px-6">Fecha y Hora</th>
+                                            <th class="py-4.5 px-6">Operador</th>
+                                            <th class="py-4.5 px-6">Tipo</th>
+                                            <th class="py-4.5 px-6">Acción / Campo</th>
+                                            <th class="py-4.5 px-6">Cambio Realizado</th>
+                                            <th class="py-4.5 px-6 text-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="trazabilidad-logs-tbody" class="divide-y divide-slate-100/60">
+                                        <!-- Se carga dinámicamente -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="p-5 border-t border-slate-100 bg-slate-50/40 flex justify-center hidden" id="trazabilidad-pagination">
+                                <button id="btn-trazabilidad-load-more"
+                                    class="px-6 py-3 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2 hover:-translate-y-0.5 transition-all cursor-pointer">
+                                    <i class="ph ph-arrow-down"></i> Cargar Más Actividad
+                                </button>
+                            </div>
+                            <div id="trazabilidad-logs-empty" class="p-12 text-center text-slate-400 font-bold border-t border-slate-100 hidden">
+                                <i class="ph ph-folder-open text-5xl mb-3 opacity-30 text-indigo-500 block mx-auto"></i>
+                                <span class="text-slate-500 text-sm font-semibold">No se encontraron registros de actividad con los filtros seleccionados.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR PRINCIPAL: PESTAÑA PAPELERA -->
+                    <div id="trazabilidad-panel-papelera" class="space-y-6 hidden">
+                        <div class="p-5 border-b bg-indigo-500/5 border-indigo-100/60 rounded-3xl flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-200">
+                                <i class="ph ph-info text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-black text-indigo-900 tracking-tight mb-1">Papelera de Reciclaje (Soft-Delete)</h4>
+                                <p class="text-xs text-indigo-700/80 leading-relaxed font-medium">Desde este panel el administrador principal puede auditar registros descartados del CRM. Puede optar por restaurar un elemento para devolverlo al flujo de trabajo normal, o bien destruirlo permanentemente de la base de datos de Supabase.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-3xl shadow-glass border border-slate-200/40 overflow-hidden">
+                            <div class="overflow-x-auto custom-scrollbar">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50/70 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            <th class="py-4.5 px-6">Fecha Eliminación</th>
+                                            <th class="py-4.5 px-6">Eliminado Por</th>
+                                            <th class="py-4.5 px-6">Módulo/Tabla</th>
+                                            <th class="py-4.5 px-6">Descripción del Registro</th>
+                                            <th class="py-4.5 px-6 text-right">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="trazabilidad-papelera-tbody" class="divide-y divide-slate-100/60">
+                                        <!-- Carga dinámica -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="trazabilidad-papelera-empty" class="p-12 text-center text-slate-400 font-bold border-t border-slate-100 hidden">
+                                <i class="ph ph-check-circle text-5xl mb-3 opacity-30 text-emerald-500 block mx-auto"></i>
+                                <span class="text-slate-500 text-sm font-semibold">La papelera de reciclaje está limpia.</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Template HTML Oculto para Generar PDF -->
                 <div id="pdf-template-container" style="display: none;"></div>
-
-
             </div>
         </main>
     </div>
@@ -3357,68 +3501,6 @@
         </div>
     </div>
 
-    <!-- Modal de Papelera / Auditoría -->
-    <div id="auditoria-modal" class="fixed inset-0 z-[250] hidden flex items-center justify-center p-2 md:p-4">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300" id="auditoria-bg"
-            onclick="window.AuditoriaComponent.closeAuditoriaModal()"></div>
-        <div class="bg-white/95 backdrop-blur-2xl border border-white rounded-[2rem] shadow-2xl w-full max-w-5xl flex flex-col h-[90vh] md:h-[80vh] transform scale-95 opacity-0 transition-all duration-300 relative z-10 overflow-hidden"
-            id="auditoria-content">
-            <!-- Modal Header -->
-            <div class="px-6 py-5 border-b border-slate-100/50 flex justify-between items-center bg-slate-50/50 shrink-0">
-                <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center text-red-500 shadow-inner">
-                        <i class="ph ph-trash text-2xl"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-black text-slate-800 text-lg md:text-xl tracking-tight flex items-center">
-                            Papelera de Auditoría
-                        </h3>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            Recuperación y depuración permanente de registros (Administrador)
-                        </p>
-                    </div>
-                </div>
-                <button type="button" onclick="window.AuditoriaComponent.closeAuditoriaModal()"
-                    class="text-slate-400 hover:text-slate-900 p-2.5 rounded-xl transition-all bg-white hover:bg-slate-100 border border-slate-200/60 shadow-sm"><i
-                        class="ph ph-x text-lg"></i></button>
-            </div>
-            
-            <!-- Modal Body (Scrollable Table) -->
-            <div class="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
-                <div class="bg-amber-50 border border-amber-200/60 p-4 rounded-2xl text-xs text-amber-900 mb-6 flex items-start shadow-sm leading-relaxed">
-                    <i class="ph ph-warning-circle text-lg mr-2.5 mt-0.5 text-amber-500 shrink-0"></i>
-                    <div>
-                        <span class="font-bold">Nota de Seguridad:</span> Los registros eliminados aquí se destruyen permanentemente de la base de datos de Supabase y no podrán recuperarse. Use la opción <span class="font-bold text-emerald-700">Restaurar</span> para reintegrarlos al sistema.
-                    </div>
-                </div>
-                
-                <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="bg-slate-50/75 border-b border-slate-100">
-                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha Eliminación</th>
-                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Eliminado Por</th>
-                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Módulo</th>
-                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider">Detalle del Registro</th>
-                                    <th class="py-3 px-4 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="auditoria-list" class="divide-y divide-slate-100">
-                                <!-- Dinámico -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Modal Footer -->
-            <div class="px-6 py-4 border-t border-slate-100/50 bg-slate-50/30 flex justify-end space-x-3 shrink-0">
-                <button type="button" onclick="window.AuditoriaComponent.closeAuditoriaModal()"
-                    class="px-5 py-3 rounded-xl font-bold text-slate-500 bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-sm focus:outline-none text-xs">Cerrar Papelera</button>
-            </div>
-        </div>
-    </div>
 
     <div id="rentabilidad-detail-modal" class="fixed inset-0 z-[90] hidden flex items-center justify-center p-2 md:p-4">
         <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"

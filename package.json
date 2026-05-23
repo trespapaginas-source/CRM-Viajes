@@ -1,7 +1,7 @@
 {
-  "name": "travelers-crm",
+  "name": "vive-travel-crm",
   "version": "1.0.0",
-  "description": "Travelers CRM - Console and Document Management System",
+  "description": "Vive Travel CRM - Console and Document Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

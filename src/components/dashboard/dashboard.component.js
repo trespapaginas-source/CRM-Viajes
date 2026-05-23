@@ -216,48 +216,48 @@ export const DashboardComponent = {
             const margenReal = p.totalRecaudado - p.costos;
 
             container.innerHTML += `
-                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/60 hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col relative overflow-hidden group">
+                <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col relative overflow-hidden transition-all shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
                     <div class="relative z-10 flex-1 flex flex-col">
-                        <h4 class="font-black text-slate-900 text-lg leading-tight truncate pr-2 font-heading">${UI.sanitize(p.nombre)}</h4>
-                        <p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold mb-4 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
-                        <div class="grid grid-cols-2 gap-y-4 gap-x-4 mb-5">
+                        <h4 class="font-semibold text-slate-900 text-base leading-tight truncate pr-2">${UI.sanitize(p.nombre)}</h4>
+                        <p class="text-[10px] text-slate-400 font-medium mb-3 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
+                        <div class="grid grid-cols-2 gap-y-3 gap-x-4 mb-4">
                             <div>
-                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Total Vendido</p>
-                                <p class="text-sm font-black text-slate-900 tracking-tight">${formatCOP(p.totalVendido)}</p>
+                                <p class="text-[10px] text-slate-400 font-medium mb-0.5">Total Vendido</p>
+                                <p class="text-sm font-semibold text-slate-900 tracking-tight">${formatCOP(p.totalVendido)}</p>
                             </div>
                             <div class="text-right">
-                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Costos Base</p>
-                                <p class="text-sm font-bold text-slate-500 tracking-tight">${formatCOP(p.costos)}</p>
+                                <p class="text-[10px] text-slate-400 font-medium mb-0.5">Costos Base</p>
+                                <p class="text-sm font-medium text-slate-500 tracking-tight">${formatCOP(p.costos)}</p>
                             </div>
                             <div>
-                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Recaudado</p>
-                                <p class="text-sm font-black text-slate-900 tracking-tight">${formatCOP(p.totalRecaudado)}</p>
+                                <p class="text-[10px] text-slate-400 font-medium mb-0.5">Recaudado</p>
+                                <p class="text-sm font-semibold text-slate-900 tracking-tight">${formatCOP(p.totalRecaudado)}</p>
                             </div>
                             <div class="text-right">
-                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">Margen a Hoy</p>
-                                <p class="text-sm font-black tracking-tight ${margenReal >= 0 ? 'text-slate-900' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
+                                <p class="text-[10px] text-slate-400 font-medium mb-0.5">Margen a Hoy</p>
+                                <p class="text-sm font-semibold tracking-tight ${margenReal >= 0 ? 'text-slate-900' : 'text-rose-500'}">${formatCOP(margenReal)}</p>
                             </div>
                         </div>
                         <div class="mt-auto">
                             <div class="flex justify-between items-center mb-1.5">
-                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Progreso</span>
-                                <span class="text-[9px] font-black text-slate-800">${pct}%</span>
+                                <span class="text-[10px] font-medium text-slate-500">Progreso</span>
+                                <span class="text-[10px] font-semibold text-slate-855">${pct}%</span>
                             </div>
                             <div class="w-full bg-slate-100 h-1 rounded-full overflow-hidden mb-4">
-                                <div class="bg-primary-500 h-full rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
+                                <div class="bg-slate-900 h-full rounded-full transition-all duration-1000" style="width: ${pct}%"></div>
                             </div>
                             <div class="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
                                 <div class="flex items-center justify-center bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100/50">
                                     <i class="ph ph-users text-slate-400 mr-1.5 text-[10px]"></i>
-                                    <span class="text-[9px] font-black text-slate-700">${p.pax} <span class="font-bold text-[8px] text-slate-400 uppercase ml-0.5">Pax</span></span>
+                                    <span class="text-[10px] font-semibold text-slate-700">${p.pax} <span class="font-normal text-[8px] text-slate-400 uppercase ml-0.5">Pax</span></span>
                                 </div>
                                 <div class="flex items-center justify-center bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100/50">
                                     <i class="ph ph-check-circle text-slate-400 mr-1.5 text-[10px]"></i>
-                                    <span class="text-[9px] font-black text-slate-700">${p.pagados} <span class="font-bold text-[8px] text-slate-400 uppercase ml-0.5">Al día</span></span>
+                                    <span class="text-[10px] font-semibold text-slate-700">${p.pagados} <span class="font-normal text-[8px] text-slate-400 uppercase ml-0.5">Al día</span></span>
                                 </div>
                                 <div class="flex items-center justify-center bg-slate-50 rounded-lg py-1.5 px-1 border border-slate-100/50">
                                     <i class="ph ph-warning-circle text-slate-400 mr-1.5 text-[10px]"></i>
-                                    <span class="text-[9px] font-black text-slate-700">${p.deben} <span class="font-bold text-[8px] text-slate-400 uppercase ml-0.5">Deben</span></span>
+                                    <span class="text-[10px] font-semibold text-slate-700">${p.deben} <span class="font-normal text-[8px] text-slate-400 uppercase ml-0.5">Deben</span></span>
                                 </div>
                             </div>
                         </div>
@@ -269,12 +269,12 @@ export const DashboardComponent = {
         const emptySlots = 3 - top3Plans.length;
         for (let i = 0; i < emptySlots; i++) {
             container.innerHTML += `
-                <div class="border border-dashed border-slate-200 bg-transparent rounded-[20px] flex flex-col items-center justify-center text-slate-400 min-h-[300px] p-6 transition-colors hover:bg-slate-50/50">
-                    <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 mb-3">
+                <div class="border border-dashed border-slate-200 bg-transparent rounded-2xl flex flex-col items-center justify-center text-slate-400 min-h-[280px] p-6 transition-colors hover:bg-slate-50/50">
+                    <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-[0_1px_2px_rgba(15,23,42,0.02)] border border-slate-100 mb-3">
                         <i class="ph ph-map-trifold text-2xl text-slate-300"></i>
                     </div>
-                    <p class="text-[11px] font-black uppercase tracking-widest text-center text-slate-500">Espacio Disponible</p>
-                    <p class="text-[10px] font-semibold text-center mt-2 max-w-[200px] text-slate-400">El sistema añadirá automáticamente un nuevo plan cuando registre ventas.</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-wider text-center text-slate-500">Espacio Disponible</p>
+                    <p class="text-[10px] text-center mt-2 max-w-[200px] text-slate-400 font-medium">El sistema añadirá automáticamente un nuevo plan cuando registre ventas.</p>
                 </div>
             `;
         }
@@ -303,8 +303,8 @@ export const DashboardComponent = {
                 data: {
                     labels: labels.length > 0 ? labels : ['Sin datos'],
                     datasets: [
-                        { label: 'Venta Total Negociada', data: dataVendido.length > 0 ? dataVendido : [0], backgroundColor: '#38BDF8', borderRadius: 6 },
-                        { label: 'Dinero Real Recaudado', data: dataRecaudado.length > 0 ? dataRecaudado : [0], backgroundColor: '#0EA5E9', borderRadius: 6 }
+                        { label: 'Venta Total Negociada', data: dataVendido.length > 0 ? dataVendido : [0], backgroundColor: '#cbd5e1', borderRadius: 4 },
+                        { label: 'Dinero Real Recaudado', data: dataRecaudado.length > 0 ? dataRecaudado : [0], backgroundColor: '#0f172a', borderRadius: 4 }
                     ]
                 },
                 options: {
@@ -323,7 +323,7 @@ export const DashboardComponent = {
         const pieCanvas = document.getElementById('packagesChart');
         if (pieCanvas) {
             const ctxDoughnut = pieCanvas.getContext('2d');
-            const bgColors = ['#0EA5E9', '#38BDF8', '#7DD3FC', '#BAE6FD', '#E0F2FE', '#F0F9FF', '#F97316', '#FB923C', '#FDBA74'];
+            const bgColors = ['#0f172a', '#334155', '#475569', '#64748b', '#94a3b8', '#cbd5e1', '#e2e8f0', '#f1f5f9'];
             this.doughnutChart = new Chart(ctxDoughnut, {
                 type: 'doughnut',
                 data: {

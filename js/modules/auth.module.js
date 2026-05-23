@@ -131,12 +131,13 @@ export const AuthModule = {
             if (styleEl) styleEl.remove();
         }
 
-        const auditoriaBtn = document.getElementById('nav-auditoria-btn');
-        if (auditoriaBtn) {
+
+        const trazabilidadBtn = document.getElementById('nav-trazabilidad-btn');
+        if (trazabilidadBtn) {
             if (this.currentUser?.email === 'trespa.paginas@gmail.com') {
-                auditoriaBtn.classList.remove('hidden');
+                trazabilidadBtn.classList.remove('hidden');
             } else {
-                auditoriaBtn.classList.add('hidden');
+                trazabilidadBtn.classList.add('hidden');
             }
         }
     },
@@ -161,7 +162,7 @@ export const AuthModule = {
 
     async logout() {
         await supabaseClient.auth.signOut();
-        localStorage.removeItem('travelers_active_view');
+        localStorage.removeItem('vivetravel_active_view');
     },
 
     openChangePasswordModal() {

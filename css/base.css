@@ -17,7 +17,7 @@ body {
 h1, h2, h3, h4, h5, h6,
 .font-black,
 .font-heading {
-    font-family: 'Outfit', sans-serif !important;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
     letter-spacing: -0.02em;
 }
 
@@ -29,13 +29,12 @@ h1, h2, h3, h4, h5, h6,
 
 /* Transiciones Suaves Globales */
 button, a, input, select {
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 button.bg-slate-900:hover,
 button.bg-primary-900:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.2);
+    opacity: 0.9;
 }
 
 /* UX Refinements */

@@ -112,27 +112,27 @@ export const InternacionalesComponent = {
                 const totalMonto = pasajeros.reduce((sum, p) => sum + (Number(p.monto_pago) || 0), 0);
                 
                 html += `
-                    <tr class="hover:bg-slate-50/50 transition-colors cursor-pointer group">
-                        <td class="py-4 px-4 align-top" data-action="edit-int" data-id="${c.id}">
+                    <tr class="hover:bg-slate-50/70 transition-all border-b border-slate-100 cursor-pointer group">
+                        <td class="py-3 px-4 align-middle" data-action="edit-int" data-id="${c.id}">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">${(c.nombre || 'I').charAt(0).toUpperCase()}</div>
+                                <div class="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 font-medium text-xs shrink-0">${(c.nombre || 'I').charAt(0).toUpperCase()}</div>
                                 <div>
-                                    <p class="text-sm font-bold text-slate-800">${UI.sanitize(c.nombre)}</p>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">DNI: ${UI.sanitize(c.dni)}</p>
+                                    <p class="text-sm font-semibold text-slate-900">${UI.sanitize(c.nombre)}</p>
+                                    <p class="text-[10px] text-slate-400 font-mono mt-0.5">DNI: ${UI.sanitize(c.dni)}</p>
                                 </div>
                             </div>
                         </td>
-                        <td class="py-4 px-4 align-top" data-action="edit-int" data-id="${c.id}">
-                            <p class="text-xs font-semibold text-slate-600">${UI.sanitize(c.telefono || 'N/A')}</p>
+                        <td class="py-3 px-4 align-middle" data-action="edit-int" data-id="${c.id}">
+                            <p class="text-xs font-medium text-slate-600">${UI.sanitize(c.telefono || 'N/A')}</p>
                         </td>
-                        <td class="py-4 px-4 align-top" data-action="edit-int" data-id="${c.id}">
-                            <p class="text-xs font-bold text-slate-700">${UI.sanitize(planName)}</p>
-                            <p class="text-[10px] text-slate-500 mt-1">${pasajeros.length} Pasajero(s)</p>
+                        <td class="py-3 px-4 align-middle" data-action="edit-int" data-id="${c.id}">
+                            <p class="text-xs font-semibold text-slate-900">${UI.sanitize(planName)}</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">${pasajeros.length} Pasajero(s)</p>
                         </td>
-                        <td class="py-4 px-4 text-right align-top" data-action="edit-int" data-id="${c.id}">
-                            <p class="text-sm font-black text-emerald-600">${formatCOP(totalMonto)}</p>
+                        <td class="py-3 px-4 text-right align-middle" data-action="edit-int" data-id="${c.id}">
+                            <p class="text-sm font-semibold text-slate-900">${formatCOP(totalMonto)}</p>
                         </td>
-                        <td class="py-4 px-4 text-center align-top">
+                        <td class="py-3 px-4 text-center align-middle">
                             <button data-action="delete-int" data-id="${c.id}" class="btn-delete-protected text-slate-300 hover:text-red-500 transition-colors p-1" title="Eliminar Reserva">
                                 <i class="ph ph-trash text-lg pointer-events-none"></i>
                             </button>

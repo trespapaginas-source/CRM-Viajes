@@ -2,7 +2,7 @@ import { DataService, supabaseClient } from '../../../js/services/supabase.servi
 import { Store } from '../../core/store.js';
 import { PartnersComponent } from '../partners/partners.component.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, formatShortDate, parseSpanishDate } from '../../../js/utils/format.utils.js';
+import { formatCOP, formatShortDate, parseSpanishDate, formatDoubleDate } from '../../../js/utils/format.utils.js';
 import { ClientsComponent } from '../clients/clients.component.js';
 
 export const RentabilidadComponent = {
@@ -221,7 +221,7 @@ export const RentabilidadComponent = {
                 <div data-action="open-financial-modal" data-plan-id="${data.plan_id}" data-fecha-viaje="${data.fecha_viaje}" class="bg-white rounded-2xl shadow-soft border border-slate-100 p-5 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden group">
                     <div class="absolute -right-4 -top-4 w-16 h-16 ${isRentable ? 'bg-green-50' : 'bg-red-50'} rounded-full opacity-50 group-hover:scale-150 transition-transform"></div>
                     <div class="flex justify-between items-start mb-3 relative z-10">
-                        <span class="text-[10px] font-black uppercase tracking-widest bg-slate-800 text-white px-2.5 py-1 rounded-md">${data.fecha_viaje}</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest bg-slate-800 text-white px-2.5 py-1 rounded-md">${formatDoubleDate(data.fecha_viaje)}</span>
                         <span class="text-[10px] font-black flex items-center ${isRentable ? 'text-green-600' : 'text-red-500'}"><i class="ph ${isRentable ? 'ph-trend-up' : 'ph-trend-down'} mr-1"></i> ${isRentable ? 'Rentable' : 'Pérdida'}</span>
                     </div>
                     <h4 class="font-black text-slate-800 text-lg leading-tight mb-4 relative z-10">${data.plan_nombre}</h4>
@@ -243,7 +243,7 @@ export const RentabilidadComponent = {
 
         const plan = DataService.planes.find(p => p.id === planId) || { nombre: 'Plan Eliminado del Sistema', costo_base: 0 };
         document.getElementById('rdm-title').innerHTML = `<i class="ph ph-briefcase text-primary-600 mr-2 text-2xl"></i> Finanzas: ${UI.sanitize(plan.nombre)}`;
-        document.getElementById('rdm-subtitle').innerText = `Salida del ${UI.sanitize(fecha)}`;
+        document.getElementById('rdm-subtitle').innerText = `Salida del ${UI.sanitize(formatDoubleDate(fecha))}`;
 
         const clientesSalida = DataService.clientes.filter(c => {
             const st = c.estado ? c.estado.toLowerCase() : '';

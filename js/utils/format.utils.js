@@ -101,3 +101,47 @@ export function updateFinancialUI(reservationData) {
         badge.remove();
     }
 }
+
+export function formatDoubleDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split(/\s+AL\s+/i);
+    if (parts.length !== 2) {
+        // Keep single dates exactly as they are
+        return dateStr;
+    }
+
+    const cleanDatePart = (partStr, keepYear) => {
+        const tokens = partStr.trim().split(/\s+/);
+        // Find first numeric token
+        const dayIndex = tokens.findIndex(t => /^\d+$/.test(t));
+        if (dayIndex === -1) return partStr;
+
+        let cleanTokens = tokens.slice(dayIndex);
+
+        if (!keepYear) {
+            if (cleanTokens.length >= 3) {
+                const lastToken = cleanTokens[cleanTokens.length - 1];
+                if (/^\d{4}$/.test(lastToken)) {
+                    cleanTokens.pop();
+                    const prevToken = cleanTokens[cleanTokens.length - 1].toLowerCase();
+                    if (prevToken === 'del' || prevToken === 'de') {
+                        cleanTokens.pop();
+                    }
+                }
+            }
+        }
+
+        return cleanTokens.map(token => {
+            const lower = token.toLowerCase();
+            if (lower === 'de' || lower === 'del') return lower;
+            if (/^\d+$/.test(token)) return token;
+            return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+        }).join(' ');
+    };
+
+    const part1 = cleanDatePart(parts[0], false);
+    const part2 = cleanDatePart(parts[1], true);
+
+    return `${part1} al ${part2}`;
+}
+

@@ -1,5 +1,5 @@
 // ============================================================
-// js/main.js — ORQUESTADOR MAESTRO | Travelers CRM
+// js/main.js — ORQUESTADOR MAESTRO | Vive Travel CRM
 // Versión: Arquitectura Modular ES2024 (sin bundler)
 // ============================================================
 
@@ -26,7 +26,7 @@ import { B2BModule }          from './modules/b2b.module.js';
 
 import { SearchModule }          from './modules/search.module.js';
 import { DocumentosComponent } from '../src/components/documentos/documentos.component.js';
-import { AuditoriaComponent }  from '../src/components/auditoria/auditoria.component.js';
+import { TrazabilidadComponent } from '../src/components/trazabilidad/trazabilidad.component.js';
 
 // ════════════════════════════════════════════════════════════
 // PUENTE GLOBAL — Necesario para onclick="" del HTML
@@ -59,14 +59,14 @@ window.B2BModule          = B2BModule;
 
 window.SearchModule       = SearchModule;
 window.DocumentosComponent = DocumentosComponent;
-window.AuditoriaComponent = AuditoriaComponent;
+window.TrazabilidadComponent = TrazabilidadComponent;
 
 // ════════════════════════════════════════════════════════════
 // ARRANQUE DEL SISTEMA
 // ════════════════════════════════════════════════════════════
 AuthModule.init();
 SearchModule.init();
-AuditoriaComponent.init();
+TrazabilidadComponent.init();
 
 // Listener global ESC para cerrar modales laterales
 document.addEventListener('keydown', (e) => {
