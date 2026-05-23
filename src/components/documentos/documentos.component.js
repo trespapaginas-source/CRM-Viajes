@@ -179,6 +179,8 @@ const DocumentosComponent = {
                 cliente_id: '',
                 cliente_tel: '',
                 cliente_email: '',
+                crm_cliente_id: '',
+                pax: 1,
 
                 destino: '',
                 fechas: '',
@@ -301,7 +303,7 @@ const DocumentosComponent = {
                     option.value = c.id;
                     const plan = DataService.planes.find(p => p.id === c.plan_id);
                     const planNom = plan ? plan.nombre : 'Plan Genérico';
-                    option.textContent = `${c.dni || 'CC'} - ${c.nombre} ${c.apellido || ''} (${planNom})`;
+                    option.textContent = `${c.documento || 'CC'} - ${c.nombre} ${c.apellido || ''} (${planNom})`;
                     selectRes.appendChild(option);
                 });
                 if (currentVal) selectRes.value = currentVal;
@@ -376,9 +378,11 @@ const DocumentosComponent = {
         if (!c) return;
 
         this.activeDoc.data.cliente_nombre = `${c.nombre} ${c.apellido || ''}`.trim();
-        this.activeDoc.data.cliente_id = c.dni || '';
+        this.activeDoc.data.cliente_id = c.documento || '';
         this.activeDoc.data.cliente_tel = c.telefono || '';
         this.activeDoc.data.cliente_email = c.email || '';
+        this.activeDoc.data.crm_cliente_id = c.id || '';
+        this.activeDoc.data.pax = c.pax || 1;
 
         const plan = DataService.planes.find(p => p.id === c.plan_id);
         if (plan) {
@@ -421,7 +425,7 @@ const DocumentosComponent = {
         }
 
         this.activeDoc.data.paquete_valor = Number(c.precio_total) || 0;
-        this.activeDoc.data.pago_referencia = `Reserva CC ${c.dni || ''}`;
+        this.activeDoc.data.pago_referencia = `Reserva CC ${c.documento || ''}`;
 
         // Cargar abonos desde la base de datos para este cliente
         const rawAbonos = DataService.abonos || [];
@@ -517,6 +521,7 @@ const DocumentosComponent = {
         if (getEl('doc_fechas')) getEl('doc_fechas').value = this.activeDoc.data.fechas || '';
         if (getEl('doc_duracion')) getEl('doc_duracion').value = this.activeDoc.data.duracion || '';
         if (getEl('doc_pasajeros')) getEl('doc_pasajeros').value = this.activeDoc.data.pasajeros || '';
+        if (getEl('doc_pax_count')) getEl('doc_pax_count').value = this.activeDoc.data.pax || 1;
 
         if (getEl('doc_metodo_pago')) getEl('doc_metodo_pago').value = this.activeDoc.data.metodo_pago || '';
         if (getEl('doc_pago_titular')) getEl('doc_pago_titular').value = this.activeDoc.data.pago_titular || '';
@@ -525,6 +530,20 @@ const DocumentosComponent = {
         if (getEl('doc_pago_referencia')) getEl('doc_pago_referencia').value = this.activeDoc.data.pago_referencia || '';
 
         if (getEl('doc_paquete_valor')) UI.setCurrencyValue('doc_paquete_valor', this.activeDoc.data.paquete_valor || 0);
+
+        // Actualizar el estado visual del botón de registro rápido
+        const btnReg = getEl('btn_quick_register_client');
+        if (btnReg) {
+            if (this.activeDoc.data.crm_cliente_id) {
+                btnReg.innerHTML = '<i class="ph ph-check-circle text-base text-emerald-100"></i> Cliente Registrado';
+                btnReg.className = 'bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-default';
+                btnReg.disabled = true;
+            } else {
+                btnReg.innerHTML = '<i class="ph ph-user-plus text-base text-indigo-100"></i> Registrar Cliente en CRM';
+                btnReg.className = 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl shadow-md transition-all flex items-center gap-1.5';
+                btnReg.disabled = false;
+            }
+        }
 
         // Backward compatibility: map legacy conditions to the new array structure
         if (!this.activeDoc.data.condiciones) {
@@ -733,6 +752,11 @@ const DocumentosComponent = {
             return el ? el.value : '';
         };
 
+        const oldName = this.activeDoc.data.cliente_nombre || '';
+        const oldId = this.activeDoc.data.cliente_id || '';
+        const oldTel = this.activeDoc.data.cliente_tel || '';
+        const oldEmail = this.activeDoc.data.cliente_email || '';
+
         this.activeDoc.type = getVal('doc_type') || 'soporte';
         this.activeDoc.data.titulo_documento = getVal('doc_titulo_documento');
         this.activeDoc.data.fecha_emision = getVal('doc_fecha_emision');
@@ -743,6 +767,22 @@ const DocumentosComponent = {
         this.activeDoc.data.cliente_id = getVal('doc_cliente_id');
         this.activeDoc.data.cliente_tel = getVal('doc_cliente_tel');
         this.activeDoc.data.cliente_email = getVal('doc_cliente_email');
+
+        const newName = this.activeDoc.data.cliente_nombre;
+        const newId = this.activeDoc.data.cliente_id;
+        const newTel = this.activeDoc.data.cliente_tel;
+        const newEmail = this.activeDoc.data.cliente_email;
+
+        // Si se altera el cliente manualmente, se rompe el vínculo con el cliente del CRM
+        if (this.activeDoc.data.crm_cliente_id && (oldName !== newName || oldId !== newId || oldTel !== newTel || oldEmail !== newEmail)) {
+            this.activeDoc.data.crm_cliente_id = '';
+            const btnReg = document.getElementById('btn_quick_register_client');
+            if (btnReg) {
+                btnReg.innerHTML = '<i class="ph ph-user-plus text-base text-indigo-100"></i> Registrar Cliente en CRM';
+                btnReg.className = 'bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider px-4 py-2 rounded-xl shadow-md transition-all flex items-center gap-1.5';
+                btnReg.disabled = false;
+            }
+        }
 
         this.activeDoc.data.titulo_viajero = getVal('doc_titulo_viajero');
         this.activeDoc.data.titulo_plan = getVal('doc_titulo_plan');
@@ -755,6 +795,7 @@ const DocumentosComponent = {
         this.activeDoc.data.fechas = getVal('doc_fechas');
         this.activeDoc.data.duracion = getVal('doc_duracion');
         this.activeDoc.data.pasajeros = getVal('doc_pasajeros');
+        this.activeDoc.data.pax = parseInt(getVal('doc_pax_count')) || 1;
 
         this.activeDoc.data.metodo_pago = getVal('doc_metodo_pago');
         this.activeDoc.data.pago_titular = getVal('doc_pago_titular');
@@ -1126,6 +1167,191 @@ const DocumentosComponent = {
             if (printEl.parentNode) document.body.removeChild(printEl);
             UI.showToast("Error al compilar y generar el PDF.", "error");
         });
+    },
+
+    onPaxCountChanged: function () {
+        const paxInput = document.getElementById('doc_pax_count');
+        const paxVal = parseInt(paxInput?.value) || 1;
+        const pasajerosInput = document.getElementById('doc_pasajeros');
+        if (pasajerosInput) {
+            if (paxVal > 1) {
+                pasajerosInput.value = `${paxVal} Viajeros (1 Titular + ${paxVal - 1} Acompañante(s))`;
+            } else {
+                pasajerosInput.value = `1 Viajero (Titular)`;
+            }
+        }
+        this.onInputChanged();
+    },
+
+    openQuickRegisterModal: function () {
+        const getVal = (id) => document.getElementById(id)?.value || '';
+
+        const fullName = getVal('doc_cliente_nombre').trim();
+        if (!fullName) {
+            return UI.showToast("Por favor digite el nombre completo del viajero.", "error");
+        }
+        const docId = getVal('doc_cliente_id').trim();
+        if (!docId) {
+            return UI.showToast("Por favor digite la identificación del viajero.", "error");
+        }
+
+        // Dividir el nombre completo en Nombre y Apellido
+        const parts = fullName.split(/\s+/);
+        const nombre = parts[0] || '';
+        const apellido = parts.slice(1).join(' ') || '';
+
+        // Pre-rellenar los inputs del modal
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val;
+        };
+
+        setVal('qcf_nombre', nombre);
+        setVal('qcf_apellido', apellido);
+        setVal('qcf_documento', docId);
+        setVal('qcf_telefono', getVal('doc_cliente_tel'));
+        setVal('qcf_email', getVal('doc_cliente_email'));
+        setVal('qcf_ciudad', '');
+
+        // Plan: seleccionar el plan actual del selector si coincide
+        const planSelector = document.getElementById('crm_plan_select');
+        const planId = planSelector ? planSelector.value : '';
+        
+        const qcfPlanSelect = document.getElementById('qcf_plan_id');
+        if (qcfPlanSelect) {
+            qcfPlanSelect.innerHTML = '<option value="">-- Conectar a Plan --</option>';
+            (DataService.planes || []).forEach(p => {
+                qcfPlanSelect.innerHTML += `<option value="${p.id}">${p.nombre} (${p.destino || 'Destino'})</option>`;
+            });
+            qcfPlanSelect.value = planId;
+        }
+
+        setVal('qcf_pax', parseInt(getVal('doc_pax_count')) || 1);
+        
+        const pacoteVal = UI.parseCurrency(document.getElementById('doc_paquete_valor')?.value) || 0;
+        if (document.getElementById('qcf_precio_total')) {
+            UI.setCurrencyValue('qcf_precio_total', pacoteVal);
+        }
+
+        // Abrir el modal
+        UI.openModal('modal-quick-client', 'mqc-bg', 'mqc-content');
+    },
+
+    saveQuickClient: async function () {
+        const form = document.getElementById('quick-client-form');
+        if (form && !form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const getVal = (id) => document.getElementById(id)?.value || '';
+
+        const nombre = getVal('qcf_nombre').trim();
+        const apellido = getVal('qcf_apellido').trim();
+        const documento = getVal('qcf_documento').trim();
+        const telefono = getVal('qcf_telefono').trim();
+        const email = getVal('qcf_email').trim();
+        const ciudad = getVal('qcf_ciudad').trim();
+        const plan_id = getVal('qcf_plan_id');
+        const pax = parseInt(getVal('qcf_pax')) || 1;
+        const precio_total = UI.parseCurrency(document.getElementById('qcf_precio_total')?.value) || 0;
+        const estado = getVal('qcf_estado') || 'pendiente de pago';
+
+        // 1. Prevención de Duplicados: verificar si existe un cliente con este documento
+        const existing = (DataService.clientes || []).find(c => c.documento === documento && !c.deleted_at);
+        if (existing) {
+            const confirmLink = confirm(`Alerta de Duplicidad: Ya existe un cliente con el documento "${documento}" (${existing.nombre} ${existing.apellido || ''}).\n\n¿Deseas vincular esta cotización a este cliente existente en lugar de registrar uno nuevo?`);
+            if (confirmLink) {
+                this.linkToExistingClient(existing);
+                return;
+            } else {
+                return; // Aborta la operación para corregir el documento
+            }
+        }
+
+        if (!plan_id) {
+            return UI.showToast("Debe conectar al cliente a un plan válido.", "error");
+        }
+
+        const btn = document.getElementById('btn-save-quick-client');
+        const origHTML = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Guardando...';
+        }
+
+        const payload = {
+            nombre,
+            apellido,
+            documento,
+            telefono,
+            email,
+            ciudad,
+            plan_id,
+            pax,
+            precio_total,
+            estado,
+            fecha_viaje: 'Fecha Abierta',
+            etiqueta: 'normal',
+            abono_acumulado: 0,
+            saldo_restante: precio_total
+        };
+
+        try {
+            const res = await DataService.saveCliente(payload);
+            if (res) {
+                UI.showToast("Cliente registrado y sincronizado en el CRM.", "success");
+                UI.closeModal('modal-quick-client', 'mqc-bg', 'mqc-content');
+                
+                // Actualizar cotización activa con este cliente
+                this.activeDoc.data.crm_cliente_id = res.id;
+                this.activeDoc.data.cliente_nombre = `${res.nombre} ${res.apellido || ''}`.trim();
+                this.activeDoc.data.cliente_id = res.documento || '';
+                this.activeDoc.data.cliente_tel = res.telefono || '';
+                this.activeDoc.data.cliente_email = res.email || '';
+                this.activeDoc.data.pax = res.pax || 1;
+
+                this.fillDOMFromActiveDoc();
+                this.recalculate();
+                this.renderPreview();
+
+                // Recargar el selector superior de reservas
+                await this.loadCRMData();
+            }
+        } catch (err) {
+            console.error("Error al registrar cliente rápido:", err);
+            UI.showToast("Error guardando el cliente en la base de datos.", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origHTML;
+            }
+        }
+    },
+
+    linkToExistingClient: function (existingClient) {
+        UI.closeModal('modal-quick-client', 'mqc-bg', 'mqc-content');
+        
+        // Llenar cotización con datos del cliente existente
+        this.activeDoc.data.crm_cliente_id = existingClient.id;
+        this.activeDoc.data.cliente_nombre = `${existingClient.nombre} ${existingClient.apellido || ''}`.trim();
+        this.activeDoc.data.cliente_id = existingClient.documento || '';
+        this.activeDoc.data.cliente_tel = existingClient.telefono || '';
+        this.activeDoc.data.cliente_email = existingClient.email || '';
+        this.activeDoc.data.pax = existingClient.pax || 1;
+
+        // Si el cliente tiene un plan, traerlo
+        const plan = DataService.planes.find(p => p.id === existingClient.plan_id);
+        if (plan) {
+            this.activeDoc.data.destino = plan.destino || plan.nombre;
+            this.activeDoc.data.duracion = plan.duracion || '';
+            this.activeDoc.data.paquete_valor = Number(existingClient.precio_total) || Number(plan.precio_persona) || 0;
+        }
+
+        this.fillDOMFromActiveDoc();
+        this.recalculate();
+        this.renderPreview();
+        UI.showToast("Cotización vinculada al cliente existente con éxito.", "success");
     },
 
     toggleSection: function (headerEl) {
