@@ -918,8 +918,9 @@ const DocumentosComponent = {
         const pacoteVal = UI.parseCurrency(document.getElementById('doc_paquete_valor')?.value) || 0;
         this.activeDoc.data.paquete_valor = pacoteVal;
 
+        const paxVal = parseInt(this.activeDoc.data.pax) || 1;
         const adicionalesSum = this.activeDoc.data.servicios_adicionales.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
-        const totalViaje = pacoteVal + adicionalesSum;
+        const totalViaje = (pacoteVal * paxVal) + adicionalesSum;
         const abonosSum = this.activeDoc.data.abonos.reduce((sum, item) => sum + (Number(item.monto) || 0), 0);
         const saldoPendiente = totalViaje - abonosSum;
 
@@ -972,8 +973,9 @@ const DocumentosComponent = {
         const fmt = (val) => this.formatCurrency(val);
         const formatDate = (dStr) => this.formatDate(dStr);
 
+        const paxVal = parseInt(data.pax) || 1;
         const adicionalesSum = data.servicios_adicionales.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);
-        const totalViaje = (Number(data.paquete_valor) || 0) + adicionalesSum;
+        const totalViaje = ((Number(data.paquete_valor) || 0) * paxVal) + adicionalesSum;
         const abonosSum = data.abonos.reduce((sum, item) => sum + (Number(item.monto) || 0), 0);
         const saldoPendiente = totalViaje - abonosSum;
 
@@ -1183,8 +1185,8 @@ const DocumentosComponent = {
                 <div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px; color: #334155;">
                         <tr style="border-bottom: 1px solid #f1f5f9;">
-                            <td style="padding: 6px 0; text-align: left; color: #64748b;">Valor Plan Turístico:</td>
-                            <td style="padding: 6px 0; text-align: right; font-weight: 600;">${fmt(data.paquete_valor)}</td>
+                            <td style="padding: 6px 0; text-align: left; color: #64748b;">Valor Plan Turístico${paxVal > 1 ? ` (c/u x ${paxVal})` : ''}:</td>
+                            <td style="padding: 6px 0; text-align: right; font-weight: 600;">${fmt(data.paquete_valor * paxVal)}</td>
                         </tr>
                         ${adicionalesSum > 0 ? `
                         <tr style="border-bottom: 1px solid #f1f5f9;">
