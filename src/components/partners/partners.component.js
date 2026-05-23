@@ -168,6 +168,30 @@ export const PartnersComponent = {
                 if (confirm("¿Estás seguro de que deseas eliminar este gasto corporativo?")) {
                     this.handleDeleteGastoCorp(id);
                 }
+            } else if (action === 'pvm-delete-adelanto') {
+                const id = target.dataset.id;
+                if (confirm("¿Estás seguro de que deseas eliminar este adelanto operativo?")) {
+                    this.handleDeleteAdelanto(id);
+                }
+            } else if (action === 'pvm-approve-adelanto') {
+                const id = target.dataset.id;
+                this.handleAdelantoStatusChange(id, 'aprobado');
+            } else if (action === 'pvm-execute-adelanto') {
+                const id = target.dataset.id;
+                this.openEjecutarModal(id);
+            } else if (action === 'pvm-lost-adelanto') {
+                const id = target.dataset.id;
+                if (confirm("¿Estás seguro de declarar este adelanto como perdido? El monto no recuperado se sumará como gasto corporativo de este periodo.")) {
+                    this.handleAdelantoStatusChange(id, 'perdido');
+                }
+            } else if (action === 'pvm-credit-adelanto') {
+                const id = target.dataset.id;
+                this.handleAdelantoStatusChange(id, 'credito_proveedor');
+            } else if (action === 'pvm-pend-adelanto') {
+                const id = target.dataset.id;
+                this.handleAdelantoStatusChange(id, 'ejecutado');
+            } else if (action === 'close-pvm-ejecutar' || e.target.id === 'pvm-ejec-bg') {
+                UI.closeModal('pvm-ejecutar-modal', 'pvm-ejec-bg', 'pvm-ejec-content');
             }
         });
 
@@ -232,6 +256,137 @@ export const PartnersComponent = {
         if (removePreviewBtn) {
             removePreviewBtn.addEventListener('click', () => {
                 this.clearGastoCorpPreview();
+            });
+        }
+
+        // OPERATIONAL ADVANCES LISTENERS
+        const adelantoForm = document.getElementById('pvm-adelanto-form');
+        if (adelantoForm) {
+            adelantoForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleAdelantoSubmit();
+            });
+        }
+
+        const ejecutarForm = document.getElementById('pvm-ejecutar-form');
+        if (ejecutarForm) {
+            ejecutarForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleEjecutarSubmit();
+            });
+        }
+
+        const adelantoFileInput = document.getElementById('pvm-adelanto-comprobante');
+        if (adelantoFileInput) {
+            adelantoFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const label = document.getElementById('pvm-adelanto-file-name');
+                    if (label) label.innerText = file.name;
+                    
+                    const previewContainer = document.getElementById('pvm-adelanto-preview-container');
+                    const previewImg = document.getElementById('pvm-adelanto-preview');
+                    const previewName = document.getElementById('pvm-adelanto-preview-name');
+                    
+                    if (previewImg) previewImg.src = URL.createObjectURL(file);
+                    if (previewName) previewName.innerText = file.name;
+                    if (previewContainer) previewContainer.classList.remove('hidden');
+                }
+            });
+        }
+        const adelantoRemovePreviewBtn = document.getElementById('pvm-adelanto-preview-remove');
+        if (adelantoRemovePreviewBtn) {
+            adelantoRemovePreviewBtn.addEventListener('click', () => {
+                this.clearAdelantoPreview();
+            });
+        }
+
+        const ejecFileInput = document.getElementById('pvm-ejec-comprobante');
+        if (ejecFileInput) {
+            ejecFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const label = document.getElementById('pvm-ejec-file-name');
+                    if (label) label.innerText = file.name;
+                    
+                    const previewContainer = document.getElementById('pvm-ejec-preview-container');
+                    const previewImg = document.getElementById('pvm-ejec-preview');
+                    const previewName = document.getElementById('pvm-ejec-preview-name');
+                    
+                    if (previewImg) previewImg.src = URL.createObjectURL(file);
+                    if (previewName) previewName.innerText = file.name;
+                    if (previewContainer) previewContainer.classList.remove('hidden');
+                }
+            });
+        }
+        const ejecRemovePreviewBtn = document.getElementById('pvm-ejec-preview-remove');
+        if (ejecRemovePreviewBtn) {
+            ejecRemovePreviewBtn.addEventListener('click', () => {
+                this.clearEjecutarPreview();
+            });
+        }
+
+        const tipoRelacion = document.getElementById('pvm-adelanto-tipo-relacion');
+        if (tipoRelacion) {
+            tipoRelacion.addEventListener('change', (e) => {
+                const isIndividual = e.target.value === 'individual';
+                const indGroup = document.getElementById('pvm-adelanto-relacion-individual-group');
+                const grupGroup = document.getElementById('pvm-adelanto-relacion-grupal-group');
+                if (indGroup) {
+                    if (isIndividual) indGroup.classList.remove('hidden');
+                    else indGroup.classList.add('hidden');
+                }
+                if (grupGroup) {
+                    if (isIndividual) grupGroup.classList.add('hidden');
+                    else grupGroup.classList.remove('hidden');
+                }
+            });
+        }
+
+        const planSelect = document.getElementById('pvm-adelanto-plan-id');
+        if (planSelect) {
+            planSelect.addEventListener('change', (e) => {
+                const planId = e.target.value;
+                const dateSelect = document.getElementById('pvm-adelanto-fecha-viaje');
+                if (!dateSelect) return;
+                dateSelect.innerHTML = '<option value="">-- Seleccionar Fecha --</option>';
+                if (!planId) return;
+
+                const dates = [...new Set(DataService.clientes
+                    .filter(c => c.plan_id === planId && c.fecha_viaje && !['desistió', 'cancelado o devolución', 'cancelados'].includes(c.estado ? c.estado.toLowerCase() : ''))
+                    .map(c => c.fecha_viaje)
+                )];
+                dates.forEach(d => {
+                    dateSelect.innerHTML += `<option value="${d}">${d}</option>`;
+                });
+            });
+        }
+
+        const totalInput = document.getElementById('pvm-adelanto-monto-total');
+        const cubiertoInput = document.getElementById('pvm-adelanto-monto-cubierto');
+        const diffText = document.getElementById('pvm-adelanto-diferencia-text');
+        const riskWarning = document.getElementById('pvm-adelanto-risk-warning');
+
+        const recalculateDiff = () => {
+            const total = UI.parseCurrency(totalInput?.value) || 0;
+            const cubierto = UI.parseCurrency(cubiertoInput?.value) || 0;
+            const diff = total - cubierto;
+            
+            if (diffText) diffText.innerText = formatCOP(diff);
+            
+            if (riskWarning) {
+                if (diff > 2000000) riskWarning.classList.remove('hidden');
+                else riskWarning.classList.add('hidden');
+            }
+        };
+
+        if (totalInput) totalInput.addEventListener('input', recalculateDiff);
+        if (cubiertoInput) cubiertoInput.addEventListener('input', recalculateDiff);
+
+        const statusFilter = document.getElementById('pvm-adelantos-filtro-estado');
+        if (statusFilter) {
+            statusFilter.addEventListener('change', () => {
+                this.renderAdelantosList();
             });
         }
 
@@ -480,6 +635,9 @@ export const PartnersComponent = {
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
 
+        // 1. Reconciliar estados de adelantos operativos con abonos
+        this.reconciliarEstadosAdelantos();
+
         // Filtered Realized trips
         const filteredRealizedTrips = allTrips.filter(t => t.dateObj >= dateStart && t.dateObj <= dateEnd && t.dateObj <= hoy);
 
@@ -492,9 +650,18 @@ export const PartnersComponent = {
             return d >= dateStart && d <= dateEnd;
         });
 
+        // 2. Filtrar y calcular pérdidas de adelantos declarados como "perdido" en este rango de fechas
+        const lostAdvancesList = (DataService.adelantos_operativos || []).filter(a => {
+            if (a.estado !== 'perdido') return false;
+            const d = new Date(`${a.fecha}T00:00:00`);
+            return d >= dateStart && d <= dateEnd;
+        });
+        const totalLostAdvances = lostAdvancesList.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
+
         // Totals
         const filteredUB = filteredRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-        const filteredGC = filteredCorpExpenses.reduce((acc, g) => acc + g.monto, 0);
+        // Las pérdidas operativas por adelantos se sumarán directamente al total de egresos corporativos
+        const filteredGC = filteredCorpExpenses.reduce((acc, g) => acc + g.monto, 0) + totalLostAdvances;
         const filteredUP = filteredFutureTrips.reduce((acc, t) => acc + t.margen, 0);
 
         // Prioridad Financiera (Opción B)
@@ -676,7 +843,7 @@ export const PartnersComponent = {
     // TAB NAVIGATION
     switchTab(tabName) {
         this.activeTab = tabName;
-        const tabs = ['desempeno', 'saldos', 'rentabilidad-mensual', 'gastos-corporativos', 'planes-rendimiento'];
+        const tabs = ['desempeno', 'saldos', 'rentabilidad-mensual', 'gastos-corporativos', 'planes-rendimiento', 'adelantos-operativos'];
         tabs.forEach(t => {
             const btn = document.getElementById(`pvm-tab-btn-${t}`);
             const panel = document.getElementById(`pvm-panel-${t}`);
@@ -709,6 +876,8 @@ export const PartnersComponent = {
             this.renderCorporateExpenses();
         } else if (this.activeTab === 'planes-rendimiento') {
             this.renderPlanesRendimiento();
+        } else if (this.activeTab === 'adelantos-operativos') {
+            this.renderAdelantosPanel();
         }
     },
 
@@ -1737,6 +1906,568 @@ export const PartnersComponent = {
         const previewName = document.getElementById('pvm-gasto-corp-preview-name');
         const fileNameLabel = document.getElementById('pvm-gasto-corp-file-name');
         const fileInput = document.getElementById('pvm-gasto-corp-comprobante');
+
+        if (fileInput) fileInput.value = '';
+        if (previewContainer) previewContainer.classList.add('hidden');
+        if (previewImg) previewImg.src = '';
+        if (previewName) previewName.innerText = '';
+        if (fileNameLabel) fileNameLabel.innerText = 'Adjuntar Comprobante';
+    },
+
+    // ─── ADELANTOS OPERATIVOS BUSINESS LOGIC ───────────────────
+    reconciliarEstadosAdelantos() {
+        if (!DataService.adelantos_operativos || DataService.adelantos_operativos.length === 0) return;
+
+        DataService.adelantos_operativos.forEach(adv => {
+            if (adv.deleted_at) return;
+            // Solo auto-conciliar si está ejecutado o ya recuperado (para auto-corregir si cambian abonos)
+            if (adv.estado !== 'ejecutado' && adv.estado !== 'recuperado') return;
+
+            let totalAbonos = 0;
+            if (adv.cliente_id) {
+                // Relación individual
+                const clientAbonos = DataService.abonos.filter(a => a.cliente_id === adv.cliente_id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
+                totalAbonos = clientAbonos.reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            } else if (adv.plan_id && adv.fecha_viaje) {
+                // Relación grupal (Salida completa)
+                const groupClientes = DataService.clientes.filter(c => c.plan_id === adv.plan_id && c.fecha_viaje === adv.fecha_viaje && !['desistió', 'cancelado o devolución', 'cancelados'].includes(c.estado ? c.estado.toLowerCase() : ''));
+                const groupAbonos = DataService.abonos.filter(a => groupClientes.some(c => c.id === a.cliente_id) && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
+                totalAbonos = groupAbonos.reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            }
+
+            const baseCubierta = Number(adv.monto_cubierto_cliente) || 0;
+            const montoAdelantado = Number(adv.monto_adelantado) || 0;
+            
+            // Lógica de recuperación acumulativa por abonos
+            const newRecuperado = Math.max(0, Math.min(montoAdelantado, totalAbonos - baseCubierta));
+            let newEstado = adv.estado;
+            
+            if (newRecuperado >= montoAdelantado && montoAdelantado > 0) {
+                newEstado = 'recuperado';
+            } else {
+                newEstado = 'ejecutado';
+            }
+
+            if (Number(adv.monto_recuperado) !== newRecuperado || adv.estado !== newEstado) {
+                const oldEstado = adv.estado;
+                const oldRec = adv.monto_recuperado;
+                adv.monto_recuperado = newRecuperado;
+                adv.estado = newEstado;
+                
+                // Actualizar en Supabase de forma asíncrona
+                supabaseClient.from('adelantos_operativos')
+                    .update({ monto_recuperado: newRecuperado, estado: newEstado })
+                    .eq('id', adv.id)
+                    .then(({ error }) => {
+                        if (error) console.error("Error al auto-reconciliar adelanto:", error);
+                    });
+                
+                // Registrar log de trazabilidad
+                DataService.registrarHistorial(
+                    adv.cliente_id || null,
+                    'Auto-Conciliación de Adelanto',
+                    `Estado: ${oldEstado} | Rec: ${formatCOP(oldRec)}`,
+                    `Estado: ${newEstado} | Rec: ${formatCOP(newRecuperado)}`,
+                    'SISTEMA',
+                    { adelanto_id: adv.id, concepto: adv.concepto }
+                );
+            }
+        });
+    },
+
+    renderAdelantosPanel() {
+        const rol = window.AuthModule?.userProfile?.rol;
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+
+        // 1. Cargar dropdowns del formulario
+        const clientSelect = document.getElementById('pvm-adelanto-cliente-id');
+        if (clientSelect) {
+            clientSelect.innerHTML = '<option value="">-- Seleccionar Pasajero --</option>';
+            const activeClients = DataService.clientes.filter(c => !c.deleted_at);
+            activeClients.sort((a, b) => a.nombre.localeCompare(b.nombre));
+            activeClients.forEach(c => {
+                const plan = DataService.planes.find(p => p.id === c.plan_id);
+                const planNom = plan ? plan.nombre : 'Plan Genérico';
+                clientSelect.innerHTML += `<option value="${c.id}">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)} - ${UI.sanitize(planNom)} (${c.fecha_viaje})</option>`;
+            });
+        }
+
+        const planSelect = document.getElementById('pvm-adelanto-plan-id');
+        if (planSelect) {
+            planSelect.innerHTML = '<option value="">-- Seleccionar Plan --</option>';
+            const activePlanes = DataService.planes.filter(p => !p.deleted_at);
+            activePlanes.sort((a, b) => a.nombre.localeCompare(b.nombre));
+            activePlanes.forEach(p => {
+                planSelect.innerHTML += `<option value="${p.id}">${UI.sanitize(p.nombre)}</option>`;
+            });
+        }
+
+        // Default Date
+        const fechaInput = document.getElementById('pvm-adelanto-fecha');
+        if (fechaInput) {
+            fechaInput.value = new Date().toISOString().substring(0, 10);
+        }
+
+        // 2. Calcular KPIs
+        const activeAdelantos = (DataService.adelantos_operativos || []).filter(a => !a.deleted_at);
+        const transitAdelantos = activeAdelantos.filter(a => a.estado === 'ejecutado');
+        const creditAdelantos = activeAdelantos.filter(a => a.estado === 'credito_proveedor');
+        
+        const recuperadoTotal = activeAdelantos.reduce((sum, a) => sum + (Number(a.monto_recuperado) || 0), 0);
+        const totalTransito = transitAdelantos.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
+        const totalVouchers = creditAdelantos.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
+
+        // Caja Estimada
+        const hoy = new Date();
+        hoy.setHours(23, 59, 59, 999);
+        const allTrips = this.getAllTrips();
+        const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
+        const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+        const histGC = this.corporateExpenses.reduce((acc, g) => acc + g.monto, 0);
+        
+        let histUN = 0;
+        let histRetenidoFondo = 0;
+        if (histUB > histGC) {
+            const histUN_Operacion = histUB - histGC;
+            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
+            histUN = histUN_Operacion - histRetenidoFondo;
+        }
+
+        let totalSociosDisponible = 0;
+        this.sociosConfig.forEach(soc => {
+            const ganadoHistorico = histUN * (soc.porcentaje / 100);
+            const totalRetirado = this.movements
+                .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
+                .reduce((acc, m) => acc + m.monto, 0);
+            totalSociosDisponible += (ganadoHistorico - totalRetirado);
+        });
+        const balanceFondo = histRetenidoFondo - histGC;
+        const cajaTeorica = balanceFondo + totalSociosDisponible;
+        const liquidezLibre = cajaTeorica - totalTransito - totalVouchers;
+
+        // Render KPI Texts
+        if (document.getElementById('pvm-adelantos-kpi-liquidez')) {
+            document.getElementById('pvm-adelantos-kpi-liquidez').innerText = isAdmin ? formatCOP(liquidezLibre) : '***';
+        }
+        if (document.getElementById('pvm-adelantos-kpi-transito')) {
+            document.getElementById('pvm-adelantos-kpi-transito').innerText = isAdmin ? formatCOP(totalTransito) : '***';
+        }
+        if (document.getElementById('pvm-adelantos-kpi-vouchers')) {
+            document.getElementById('pvm-adelantos-kpi-vouchers').innerText = isAdmin ? formatCOP(totalVouchers) : '***';
+        }
+        if (document.getElementById('pvm-adelantos-kpi-recuperado')) {
+            document.getElementById('pvm-adelantos-kpi-recuperado').innerText = isAdmin ? formatCOP(recuperadoTotal) : '***';
+        }
+
+        // 3. Alertas de Riesgo
+        const riskAlert = document.getElementById('pvm-adelantos-risk-alert');
+        if (riskAlert) {
+            if (isAdmin && totalTransito > 10000000) {
+                riskAlert.classList.remove('hidden');
+            } else {
+                riskAlert.classList.add('hidden');
+            }
+        }
+
+        const liquidezAlert = document.getElementById('pvm-adelantos-liquidez-alert');
+        const saveAdelantoBtn = document.getElementById('pvm-btn-save-adelanto');
+        if (liquidezAlert) {
+            if (liquidezLibre < 1000000) {
+                liquidezAlert.classList.remove('hidden');
+                if (saveAdelantoBtn && !isAdmin) {
+                    saveAdelantoBtn.disabled = true;
+                    saveAdelantoBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+            } else {
+                liquidezAlert.classList.add('hidden');
+                if (saveAdelantoBtn) {
+                    saveAdelantoBtn.disabled = false;
+                    saveAdelantoBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
+        }
+
+        // 4. Renderizar Listado
+        this.renderAdelantosList();
+    },
+
+    renderAdelantosList() {
+        const rol = window.AuthModule?.userProfile?.rol;
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+
+        const filtroEstado = document.getElementById('pvm-adelantos-filtro-estado')?.value || 'todos';
+        let filtered = (DataService.adelantos_operativos || []).filter(a => !a.deleted_at);
+
+        if (filtroEstado !== 'todos') {
+            filtered = filtered.filter(a => a.estado === filtroEstado);
+        }
+
+        const countEl = document.getElementById('pvm-adelantos-count');
+        if (countEl) countEl.innerText = `${filtered.length} Adelantos`;
+
+        const tb = document.getElementById('pvm-adelantos-list');
+        const emptyState = document.getElementById('pvm-adelantos-empty');
+
+        if (!tb || !emptyState) return;
+
+        tb.innerHTML = '';
+
+        if (filtered.length === 0) {
+            emptyState.classList.remove('hidden');
+            tb.parentElement.classList.add('hidden');
+        } else {
+            emptyState.classList.add('hidden');
+            tb.parentElement.classList.remove('hidden');
+
+            filtered.forEach(adv => {
+                // Relación text description
+                let relacionHtml = '';
+                if (adv.cliente_id) {
+                    const c = DataService.clientes.find(x => x.id === adv.cliente_id);
+                    relacionHtml = c ? `<span class="font-black text-slate-800">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)}</span><br><span class="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Pasajero</span>` : '<span class="text-slate-400">Cliente Eliminado</span>';
+                } else if (adv.plan_id && adv.fecha_viaje) {
+                    const p = DataService.planes.find(x => x.id === adv.plan_id);
+                    relacionHtml = p ? `<span class="font-black text-indigo-700">👥 Grupal: ${UI.sanitize(p.nombre)}</span><br><span class="text-[8px] text-slate-400 font-bold uppercase tracking-wider">${UI.sanitize(adv.fecha_viaje)}</span>` : '<span class="text-slate-400">Plan Eliminado</span>';
+                } else {
+                    relacionHtml = '<span class="text-slate-400">Genérico</span>';
+                }
+
+                // Badges de estado
+                let badgeClass = '';
+                let badgeText = '';
+                if (adv.estado === 'solicitado') {
+                    badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+                    badgeText = 'Solicitado';
+                } else if (adv.estado === 'aprobado') {
+                    badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-100/50';
+                    badgeText = 'Aprobado';
+                } else if (adv.estado === 'ejecutado') {
+                    badgeClass = 'bg-amber-50 text-amber-700 border-amber-100/50';
+                    badgeText = 'En Tránsito';
+                } else if (adv.estado === 'recuperado') {
+                    badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-100/50';
+                    badgeText = 'Recuperado';
+                } else if (adv.estado === 'perdido') {
+                    badgeClass = 'bg-rose-50 text-rose-700 border-rose-100/50';
+                    badgeText = 'Perdido';
+                } else if (adv.estado === 'credito_proveedor') {
+                    badgeClass = 'bg-sky-50 text-sky-700 border-sky-100/50';
+                    badgeText = 'Voucher Prov';
+                }
+
+                const badgeHtml = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider ${badgeClass}">${badgeText}</span>`;
+
+                // Comprobante
+                const supportHtml = adv.comprobante 
+                    ? `<button type="button" data-action="open-lightbox" data-url="${adv.comprobante}" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 transition-all" title="Ver comprobante"><i class="ph ph-image text-xs"></i> Ver</button>`
+                    : `<span class="text-slate-300 text-[10px]">Sin soporte</span>`;
+
+                // Acciones
+                let actionsHtml = '';
+                const isMyRequest = adv.solicitado_por.toLowerCase() === userEmail;
+
+                if (isAdmin) {
+                    if (adv.estado === 'solicitado') {
+                        actionsHtml = `
+                            <button type="button" data-action="pvm-approve-adelanto" data-id="${adv.id}" class="text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-emerald-100">Aprobar</button>
+                            <button type="button" data-action="pvm-execute-adelanto" data-id="${adv.id}" class="text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-amber-100">Pagar</button>
+                        `;
+                    } else if (adv.estado === 'aprobado') {
+                        actionsHtml = `
+                            <button type="button" data-action="pvm-execute-adelanto" data-id="${adv.id}" class="text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-amber-100">Pagar</button>
+                        `;
+                    } else if (adv.estado === 'ejecutado') {
+                        actionsHtml = `
+                            <button type="button" data-action="pvm-lost-adelanto" data-id="${adv.id}" class="text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-rose-100">Perdido</button>
+                            <button type="button" data-action="pvm-credit-adelanto" data-id="${adv.id}" class="text-sky-600 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-sky-100">Voucher</button>
+                        `;
+                    } else if (adv.estado === 'credito_proveedor') {
+                        actionsHtml = `
+                            <button type="button" data-action="pvm-pend-adelanto" data-id="${adv.id}" class="text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-slate-200">En Tránsito</button>
+                        `;
+                    } else if (adv.estado === 'perdido') {
+                        actionsHtml = `
+                            <button type="button" data-action="pvm-pend-adelanto" data-id="${adv.id}" class="text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border border-slate-200">Re-activar</button>
+                        `;
+                    }
+                    
+                    // Admin delete button
+                    actionsHtml += `<button type="button" data-action="pvm-delete-adelanto" data-id="${adv.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar registro"><i class="ph ph-trash"></i></button>`;
+                } else {
+                    // Si es asesor y fue su solicitud en estado solicitado, puede borrarla/cancelarla
+                    if (adv.estado === 'solicitado' && isMyRequest) {
+                        actionsHtml = `<button type="button" data-action="pvm-delete-adelanto" data-id="${adv.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Cancelar solicitud"><i class="ph ph-trash"></i></button>`;
+                    } else {
+                        actionsHtml = `<span class="text-slate-300 text-[10px]">Sin acciones</span>`;
+                    }
+                }
+
+                tb.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-2 px-3 whitespace-nowrap text-[11px] font-medium text-slate-500">${formatShortDate(adv.fecha)}</td>
+                        <td class="py-2 px-3 text-[11px] leading-tight">${relacionHtml}</td>
+                        <td class="py-2 px-3 text-[11px] text-slate-600 max-w-[200px] truncate" title="${UI.sanitize(adv.concepto)}">
+                            <span class="font-black text-slate-800 uppercase tracking-widest text-[8px] bg-slate-100 px-1 py-0.5 rounded mr-1">${UI.sanitize(adv.tipo_servicio)}</span>
+                            ${UI.sanitize(adv.concepto)}
+                        </td>
+                        <td class="py-2 px-3 whitespace-nowrap text-right text-[11px] font-black text-slate-800">${formatCOP(adv.monto_adelantado)}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-right text-[11px] font-semibold text-emerald-600">${formatCOP(adv.monto_recuperado)}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-center">${badgeHtml}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-center">${supportHtml}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-center flex items-center justify-center gap-1.5">${actionsHtml}</td>
+                    </tr>
+                `;
+            });
+        }
+    },
+
+    async handleAdelantoSubmit() {
+        const tipoRelacion = document.getElementById('pvm-adelanto-tipo-relacion').value;
+        const clienteId = document.getElementById('pvm-adelanto-cliente-id').value;
+        const planId = document.getElementById('pvm-adelanto-plan-id').value;
+        const fechaViaje = document.getElementById('pvm-adelanto-fecha-viaje').value;
+
+        const tipoServicio = document.getElementById('pvm-adelanto-tipo-servicio').value;
+        const concepto = document.getElementById('pvm-adelanto-concepto').value.trim();
+        const totalServicio = UI.parseCurrency(document.getElementById('pvm-adelanto-monto-total').value) || 0;
+        const cubiertoCliente = UI.parseCurrency(document.getElementById('pvm-adelanto-monto-cubierto').value) || 0;
+        
+        const fecha = document.getElementById('pvm-adelanto-fecha').value;
+        const metodoPago = document.getElementById('pvm-adelanto-metodo').value.trim();
+        const fileInput = document.getElementById('pvm-adelanto-comprobante');
+
+        if (!concepto) {
+            return UI.showToast("La descripción del servicio es obligatoria.", "error");
+        }
+        if (totalServicio <= 0) {
+            return UI.showToast("El costo total del servicio debe ser mayor a cero.", "error");
+        }
+        if (totalServicio < cubiertoCliente) {
+            return UI.showToast("El costo total del servicio no puede ser menor a la cantidad cubierta por el cliente.", "error");
+        }
+
+        if (tipoRelacion === 'individual' && !clienteId) {
+            return UI.showToast("Debe seleccionar un pasajero para este adelanto individual.", "error");
+        }
+        if (tipoRelacion === 'grupal' && (!planId || !fechaViaje)) {
+            return UI.showToast("Debe seleccionar el plan y la fecha de salida para este adelanto grupal.", "error");
+        }
+
+        const montoAdelantado = totalServicio - cubiertoCliente;
+        const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        const rol = window.AuthModule?.userProfile?.rol;
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+
+        // Flujo inicial: si lo hace admin, puede registrarlo directamente ejecutado. Si es asesor, se registra como solicitado.
+        const targetEstado = isAdmin ? (fileInput.files.length > 0 ? 'ejecutado' : 'aprobado') : 'solicitado';
+
+        const submitBtn = document.getElementById('pvm-btn-save-adelanto');
+        const originalHtml = submitBtn ? submitBtn.innerHTML : 'Registrar Adelanto';
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="ph ph-spinner animate-spin text-xs"></i> Guardando...';
+            submitBtn.disabled = true;
+        }
+
+        let comprobanteBase64 = '';
+        if (fileInput.files && fileInput.files.length > 0) {
+            try {
+                comprobanteBase64 = await this.compressFileToBase64(fileInput.files[0]);
+            } catch (err) {
+                console.error("Error compressing receipt image:", err);
+                if (submitBtn) {
+                    submitBtn.innerHTML = originalHtml;
+                    submitBtn.disabled = false;
+                }
+                return UI.showToast("Error al procesar la imagen del soporte.", "error");
+            }
+        }
+
+        const payload = {
+            cliente_id: tipoRelacion === 'individual' ? clienteId : null,
+            plan_id: tipoRelacion === 'grupal' ? planId : null,
+            fecha_viaje: tipoRelacion === 'grupal' ? fechaViaje : null,
+            concepto,
+            tipo_servicio: tipoServicio,
+            monto_total_servicio: totalServicio,
+            monto_cubierto_cliente: cubiertoCliente,
+            monto_adelantado: montoAdelantado,
+            monto_recuperado: 0,
+            fecha,
+            metodo_pago: targetEstado === 'ejecutado' ? metodoPago : null,
+            comprobante: targetEstado === 'ejecutado' ? comprobanteBase64 : null,
+            estado: targetEstado,
+            solicitado_por: userEmail,
+            aprobado_por: targetEstado !== 'solicitado' ? userEmail : null,
+            fecha_ejecucion: targetEstado === 'ejecutado' ? fecha : null
+        };
+
+        try {
+            const { data, error } = await supabaseClient.from('adelantos_operativos').insert([payload]).select();
+            if (error) throw error;
+
+            UI.showToast(isAdmin ? "Adelanto operativo registrado con éxito." : "Solicitud de adelanto enviada correctamente.", "success");
+            
+            // Recargar datos locales
+            if (DataService.adelantos_operativos) {
+                if (data && data.length > 0) DataService.adelantos_operativos.unshift(data[0]);
+                else await DataService.loadAll();
+            }
+
+            // Limpiar formulario
+            document.getElementById('pvm-adelanto-form').reset();
+            this.clearAdelantoPreview();
+            
+            // Recalcular finanzas y UI
+            this.calculateDistribution();
+        } catch (e) {
+            console.error("Error saving operational advance:", e);
+            UI.showToast("Error al guardar el adelanto operativo.", "error");
+        } finally {
+            if (submitBtn) {
+                submitBtn.innerHTML = originalHtml;
+                submitBtn.disabled = false;
+            }
+        }
+    },
+
+    openEjecutarModal(id) {
+        const adv = DataService.adelantos_operativos.find(a => a.id === id);
+        if (!adv) return;
+
+        document.getElementById('pvm-ejec-id').value = id;
+        document.getElementById('pvm-ejec-concepto').value = adv.concepto;
+        document.getElementById('pvm-ejec-monto').value = formatCOP(adv.monto_adelantado);
+        document.getElementById('pvm-ejec-metodo').value = '';
+        this.clearEjecutarPreview();
+
+        UI.openModal('pvm-ejecutar-modal', 'pvm-ejec-bg', 'pvm-ejec-content');
+    },
+
+    async handleEjecutarSubmit() {
+        const id = document.getElementById('pvm-ejec-id').value;
+        const metodo = document.getElementById('pvm-ejec-metodo').value.trim();
+        const fileInput = document.getElementById('pvm-ejec-comprobante');
+
+        if (!metodo) {
+            return UI.showToast("El método de pago es obligatorio.", "error");
+        }
+        if (!fileInput.files || fileInput.files.length === 0) {
+            return UI.showToast("Debe subir un comprobante físico o captura del pago.", "error");
+        }
+
+        const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        const today = new Date().toISOString().substring(0, 10);
+
+        let comprobanteBase64 = '';
+        try {
+            comprobanteBase64 = await this.compressFileToBase64(fileInput.files[0]);
+        } catch (err) {
+            console.error("Error compressing file:", err);
+            return UI.showToast("Error al procesar la imagen del soporte.", "error");
+        }
+
+        try {
+            const { error } = await supabaseClient.from('adelantos_operativos').update({
+                metodo_pago: metodo,
+                comprobante: comprobanteBase64,
+                estado: 'ejecutado',
+                aprobado_por: userEmail,
+                fecha_ejecucion: today
+            }).eq('id', id);
+
+            if (error) throw error;
+
+            UI.showToast("Desembolso ejecutado y registrado exitosamente.", "success");
+            UI.closeModal('pvm-ejecutar-modal', 'pvm-ejec-bg', 'pvm-ejec-content');
+
+            // Actualizar localmente
+            const localAdv = DataService.adelantos_operativos.find(a => a.id === id);
+            if (localAdv) {
+                localAdv.metodo_pago = metodo;
+                localAdv.comprobante = comprobanteBase64;
+                localAdv.estado = 'ejecutado';
+                localAdv.aprobado_por = userEmail;
+                localAdv.fecha_ejecucion = today;
+            }
+
+            this.calculateDistribution();
+        } catch (e) {
+            console.error("Error executing operational advance:", e);
+            UI.showToast("Error al ejecutar el desembolso.", "error");
+        }
+    },
+
+    async handleAdelantoStatusChange(id, nextStatus) {
+        const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        const updates = { estado: nextStatus };
+
+        if (nextStatus === 'aprobado') {
+            updates.aprobado_por = userEmail;
+        }
+
+        try {
+            const { error } = await supabaseClient.from('adelantos_operativos').update(updates).eq('id', id);
+            if (error) throw error;
+
+            UI.showToast(`Estado del adelanto cambiado a "${nextStatus}" con éxito.`, "success");
+
+            // Modificar localmente
+            const localAdv = DataService.adelantos_operativos.find(a => a.id === id);
+            if (localAdv) {
+                localAdv.estado = nextStatus;
+                if (nextStatus === 'aprobado') localAdv.aprobado_por = userEmail;
+            }
+
+            this.calculateDistribution();
+        } catch (e) {
+            console.error("Error changing operational advance status:", e);
+            UI.showToast("Error al modificar el estado.", "error");
+        }
+    },
+
+    async handleDeleteAdelanto(id) {
+        const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        try {
+            const { error } = await supabaseClient.from('adelantos_operativos').update({
+                deleted_at: new Date().toISOString(),
+                deleted_by: userEmail
+            }).eq('id', id);
+
+            if (error) throw error;
+
+            UI.showToast("Registro de adelanto eliminado correctamente.", "success");
+
+            // Quitar de local
+            DataService.adelantos_operativos = DataService.adelantos_operativos.filter(a => a.id !== id);
+
+            this.calculateDistribution();
+        } catch (e) {
+            console.error("Error deleting operational advance:", e);
+            UI.showToast("Error al eliminar el registro.", "error");
+        }
+    },
+
+    clearAdelantoPreview() {
+        const previewContainer = document.getElementById('pvm-adelanto-preview-container');
+        const previewImg = document.getElementById('pvm-adelanto-preview');
+        const previewName = document.getElementById('pvm-adelanto-preview-name');
+        const fileNameLabel = document.getElementById('pvm-adelanto-file-name');
+        const fileInput = document.getElementById('pvm-adelanto-comprobante');
+
+        if (fileInput) fileInput.value = '';
+        if (previewContainer) previewContainer.classList.add('hidden');
+        if (previewImg) previewImg.src = '';
+        if (previewName) previewName.innerText = '';
+        if (fileNameLabel) fileNameLabel.innerText = 'Adjuntar Comprobante';
+    },
+
+    clearEjecutarPreview() {
+        const previewContainer = document.getElementById('pvm-ejec-preview-container');
+        const previewImg = document.getElementById('pvm-ejec-preview');
+        const previewName = document.getElementById('pvm-ejec-preview-name');
+        const fileNameLabel = document.getElementById('pvm-ejec-file-name');
+        const fileInput = document.getElementById('pvm-ejec-comprobante');
 
         if (fileInput) fileInput.value = '';
         if (previewContainer) previewContainer.classList.add('hidden');

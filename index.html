@@ -3751,6 +3751,9 @@
                 <button type="button" data-action="pvm-switch-tab" data-tab="planes-rendimiento" id="pvm-tab-btn-planes-rendimiento" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
                     <i class="ph ph-presentation-chart mr-1"></i> Rendimiento y Auditoría
                 </button>
+                <button type="button" data-action="pvm-switch-tab" data-tab="adelantos-operativos" id="pvm-tab-btn-adelantos-operativos" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
+                    <i class="ph ph-handshake mr-1"></i> Adelantos Operativos
+                </button>
             </div>
 
             <div class="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-6 space-y-5">
@@ -4187,6 +4190,222 @@
                     </div>
                 </div>
 
+                <!-- Panel 6: Adelantos Operativos -->
+                <div id="pvm-panel-adelantos-operativos" class="space-y-5 hidden">
+                    <!-- Fila de KPIs de Riesgo y Liquidez -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Liquidez Caja/Banco (Libre)</p>
+                                <p class="text-base font-black text-slate-800 mt-0.5 tracking-tight" id="pvm-adelantos-kpi-liquidez">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-600"><i class="ph ph-wallet text-lg"></i></div>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest font-bold">Capital en Tránsito (Pendiente)</p>
+                                <p class="text-base font-black text-amber-600 mt-0.5 tracking-tight" id="pvm-adelantos-kpi-transito">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center text-amber-500"><i class="ph ph-handshake text-lg"></i></div>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Créditos / Vouchers Proveedor</p>
+                                <p class="text-base font-black text-blue-600 mt-0.5 tracking-tight" id="pvm-adelantos-kpi-vouchers">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-500"><i class="ph ph-ticket text-lg"></i></div>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Recuperado</p>
+                                <p class="text-base font-black text-emerald-600 mt-0.5 tracking-tight" id="pvm-adelantos-kpi-recuperado">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-500"><i class="ph ph-check-square text-lg"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- Alertas de Riesgo y Configuración -->
+                    <div id="pvm-adelantos-risk-alert" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+                        <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5 animate-pulse"></i>
+                        <div>
+                            <p class="text-xs font-bold text-amber-900">Alerta de Riesgo: Exceso de Capital Comprometido</p>
+                            <p class="text-[10px] text-amber-700 mt-0.5 leading-relaxed" id="pvm-adelantos-risk-text">
+                                El capital de la agencia en tránsito supera el límite de riesgo recomendado de $10.000.000 COP. Se recomienda pausar nuevos adelantos.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="pvm-adelantos-liquidez-alert" class="hidden bg-rose-50 border border-rose-200 rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+                        <i class="ph ph-x-circle text-rose-600 text-lg shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="text-xs font-bold text-rose-900">Fondos Insuficientes en Caja</p>
+                            <p class="text-[10px] text-rose-700 mt-0.5 leading-relaxed">
+                                La liquidez estimada de la agencia está por debajo del mínimo de seguridad de $1.000.000 COP. No se pueden procesar nuevos adelantos operativos en este momento.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Fila Principal: Formulario y Listado -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                        <!-- Formulario de Registro -->
+                        <div class="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm h-fit" id="pvm-adelanto-form-container">
+                            <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider mb-3 flex items-center">
+                                <i class="ph ph-plus-circle mr-1.5 text-base text-slate-500"></i> Registrar / Solicitar Adelanto
+                            </h4>
+                            <form id="pvm-adelanto-form" class="space-y-3">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Tipo de Relación</label>
+                                    <select id="pvm-adelanto-tipo-relacion" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm cursor-pointer">
+                                        <option value="individual">Reserva Individual (Pasajero)</option>
+                                        <option value="grupal">Salida Grupal (Por Destino/Fecha)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Grupo: Para individual -->
+                                <div id="pvm-adelanto-relacion-individual-group" class="space-y-2">
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Pasajero / Reserva Relacionada</label>
+                                    <select id="pvm-adelanto-cliente-id" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm cursor-pointer">
+                                        <option value="">-- Seleccionar Pasajero --</option>
+                                        <!-- Opciones cargadas dinámicamente -->
+                                    </select>
+                                </div>
+
+                                <!-- Grupo: Para grupal -->
+                                <div id="pvm-adelanto-relacion-grupal-group" class="hidden space-y-3">
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Plan Turístico</label>
+                                        <select id="pvm-adelanto-plan-id" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm cursor-pointer">
+                                            <option value="">-- Seleccionar Plan --</option>
+                                            <!-- Opciones cargadas dinámicamente -->
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Fecha de Salida</label>
+                                        <select id="pvm-adelanto-fecha-viaje" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm cursor-pointer">
+                                            <option value="">-- Seleccionar Fecha --</option>
+                                            <!-- Opciones cargadas dinámicamente -->
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Tipo de Servicio Cubierto</label>
+                                    <select id="pvm-adelanto-tipo-servicio" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm cursor-pointer">
+                                        <option value="vuelos">Vuelos</option>
+                                        <option value="hotel">Hotel</option>
+                                        <option value="transporte">Transporte</option>
+                                        <option value="entradas">Entradas</option>
+                                        <option value="otro">Otro</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Concepto / Descripción (Requerido)</label>
+                                    <textarea id="pvm-adelanto-concepto" required rows="2" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="Ej: Compra tiquetes Avianca Bogotá..."></textarea>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Costo Total ($)</label>
+                                        <input type="text" id="pvm-adelanto-monto-total" required inputmode="numeric" class="currency-input w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm text-slate-800" placeholder="0">
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Cubierto Cliente ($)</label>
+                                        <input type="text" id="pvm-adelanto-monto-cubierto" required inputmode="numeric" class="currency-input w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm text-slate-800" placeholder="0">
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-50 border border-slate-100 p-2.5 rounded-xl text-center">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-wider font-bold">Diferencia a Financiar (Adelanto)</p>
+                                    <p class="text-sm font-black text-slate-800 mt-0.5" id="pvm-adelanto-diferencia-text">$0</p>
+                                </div>
+
+                                <div class="bg-indigo-50/50 border border-indigo-100/50 p-2.5 rounded-xl hidden" id="pvm-adelanto-risk-warning">
+                                    <p class="text-[8px] font-black text-indigo-700 uppercase tracking-wider flex items-center gap-1"><i class="ph ph-info"></i> Alerta de Monto Alto</p>
+                                    <p class="text-[9px] font-semibold text-indigo-900 mt-0.5 leading-relaxed">
+                                        Este monto supera el tope aconsejado de $2.000.000 COP. Requerirá autorización explícita de un Administrador/Socio para ejecutarse.
+                                    </p>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Fecha Movimiento</label>
+                                        <input type="date" id="pvm-adelanto-fecha" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm text-slate-800">
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Método de Pago</label>
+                                        <input type="text" id="pvm-adelanto-metodo" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm text-slate-800" placeholder="Ej: Tarjeta Corp">
+                                    </div>
+                                </div>
+
+                                <!-- Dropzone comprobante -->
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Evidencia / Comprobante (Socio/Admin)</label>
+                                    <div class="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-3 bg-slate-50 hover:bg-slate-100/70 transition-all cursor-pointer flex flex-col items-center justify-center gap-1 group" id="pvm-adelanto-dropzone">
+                                        <input type="file" id="pvm-adelanto-comprobante" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                                        <i class="ph ph-camera text-slate-400 text-lg group-hover:text-indigo-500 group-hover:scale-110 transition-all"></i>
+                                        <span id="pvm-adelanto-file-name" class="text-[10px] font-black text-slate-500 group-hover:text-slate-800 transition-colors">Adjuntar Comprobante</span>
+                                        <span class="text-[8px] text-slate-400">JPG, PNG (Máx. 2MB)</span>
+                                    </div>
+                                    <div id="pvm-adelanto-preview-container" class="hidden mt-2 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 p-1 flex items-center justify-between">
+                                        <img id="pvm-adelanto-preview" src="" class="h-10 w-10 object-cover rounded-md border border-slate-200">
+                                        <span id="pvm-adelanto-preview-name" class="text-[10px] font-bold text-slate-600 truncate flex-1 mx-2"></span>
+                                        <button type="button" id="pvm-adelanto-preview-remove" class="text-slate-400 hover:text-red-500 p-1"><i class="ph ph-trash text-sm"></i></button>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5" id="pvm-btn-save-adelanto">
+                                    <i class="ph ph-floppy-disk text-xs"></i> Registrar Adelanto
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Listado de Adelantos -->
+                        <div class="lg:col-span-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                                    <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center">
+                                        <i class="ph ph-list-bullet mr-1.5 text-base"></i> Historial y Cartera de Adelantos
+                                    </h4>
+                                    <div class="flex items-center gap-2">
+                                        <select id="pvm-adelantos-filtro-estado" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 outline-none">
+                                            <option value="todos">Todos los estados</option>
+                                            <option value="solicitado">Solicitados</option>
+                                            <option value="ejecutado">En tránsito (Ejecutados)</option>
+                                            <option value="recuperado">Recuperados</option>
+                                            <option value="perdido">Perdidos</option>
+                                            <option value="credito_proveedor">Créditos Proveedor</option>
+                                        </select>
+                                        <span class="bg-amber-100 text-amber-700 text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest" id="pvm-adelantos-count">0 Adelantos</span>
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left text-sm border-collapse">
+                                        <thead class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap">
+                                            <tr>
+                                                <th class="py-2 px-3">Fecha</th>
+                                                <th class="py-2 px-3">Relación</th>
+                                                <th class="py-2 px-3">Servicio / Concepto</th>
+                                                <th class="py-2 px-3 text-right">Financiado</th>
+                                                <th class="py-2 px-3 text-right">Recuperado</th>
+                                                <th class="py-2 px-3 text-center">Estado</th>
+                                                <th class="py-2 px-3 text-center">Soporte</th>
+                                                <th class="py-2 px-3 text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pvm-adelantos-list" class="divide-y divide-slate-100/50">
+                                            <!-- Rendered dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="pvm-adelantos-empty" class="hidden py-8 text-center">
+                                    <i class="ph ph-handshake text-3xl text-slate-200 mb-2"></i>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin adelantos operativos registrados</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -4251,6 +4470,64 @@
                 </div>
             </form>
         </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EJECUCIÓN DE ADELANTO -->
+    <div id="pvm-ejecutar-modal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-2 md:p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"
+            id="pvm-ejec-bg" data-action="close-pvm-ejecutar"></div>
+        <div class="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 z-10 overflow-hidden modal-mobile-safe"
+            id="pvm-ejec-content">
+            <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div>
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center">
+                        <i class="ph ph-handshake mr-2 text-slate-500"></i> Ejecutar Desembolso
+                    </h3>
+                    <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Autorizar y pagar servicio</p>
+                </div>
+                <button type="button" data-action="close-pvm-ejecutar" class="text-slate-400 hover:text-slate-900 p-1.5 rounded-lg transition-all hover:bg-slate-100">
+                    <i class="ph ph-x text-base"></i>
+                </button>
+            </div>
+            <form id="pvm-ejecutar-form" class="p-5 space-y-4">
+                <input type="hidden" id="pvm-ejec-id">
+                
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Concepto / Servicio</label>
+                    <input type="text" id="pvm-ejec-concepto" readonly class="w-full text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 outline-none text-slate-600 cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Monto a Financiar (COP)</label>
+                    <input type="text" id="pvm-ejec-monto" readonly class="w-full text-xs font-black bg-slate-100 text-slate-800 border border-slate-200 rounded-xl px-3 py-2 outline-none cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Método de Pago Usado *</label>
+                    <input type="text" id="pvm-ejec-metodo" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900" placeholder="Ej: Tarjeta de Crédito Corporativa... / Trans Bancaria">
+                </div>
+
+                <div>
+                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Comprobante de Pago (Obligatorio) *</label>
+                    <div class="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-3 bg-slate-50 hover:bg-slate-100/70 transition-all cursor-pointer flex flex-col items-center justify-center gap-1 group" id="pvm-ejec-dropzone">
+                        <input type="file" id="pvm-ejec-comprobante" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" required>
+                        <i class="ph ph-camera text-slate-400 text-lg group-hover:text-indigo-500 group-hover:scale-110 transition-all"></i>
+                        <span id="pvm-ejec-file-name" class="text-[10px] font-black text-slate-500 group-hover:text-slate-800 transition-colors">Adjuntar Comprobante</span>
+                        <span class="text-[8px] text-slate-400">JPG, PNG (Máx. 2MB)</span>
+                    </div>
+                    <div id="pvm-ejec-preview-container" class="hidden mt-2 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 p-1 flex items-center justify-between">
+                        <img id="pvm-ejec-preview" src="" class="h-10 w-10 object-cover rounded-md border border-slate-200">
+                        <span id="pvm-ejec-preview-name" class="text-[10px] font-bold text-slate-600 truncate flex-1 mx-2"></span>
+                        <button type="button" id="pvm-ejec-preview-remove" class="text-slate-400 hover:text-red-500 p-1"><i class="ph ph-trash text-sm"></i></button>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" data-action="close-pvm-ejecutar" class="flex-1 border border-slate-200 text-slate-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-700 transition-all">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md">Ejecutar Pago</button>
+                </div>
+            </form>
         </div>
     </div>
 

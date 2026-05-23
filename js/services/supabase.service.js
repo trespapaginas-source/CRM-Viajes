@@ -25,6 +25,7 @@ export const DataService = {
     b2b_aliados: [],
     b2b_servicios: [],
     b2b_negocios: [],
+    adelantos_operativos: [],
     db: {
         categories: ["Operador Turístico", "Alojamiento / Hotelería", "Transporte Especial", "Aseguradora Integral", "Restaurante y Eventos", "Guianza Local"],
         destinos: ["Barranquilla", "Cartagena", "Quindío", "Santa Marta", "La Guajira", "San Andrés"]
@@ -73,6 +74,20 @@ export const DataService = {
         if (resB2BServ && resB2BServ.data) this.b2b_servicios = resB2BServ.data; else this.b2b_servicios = [];
         if (resB2BNeg && resB2BNeg.data) this.b2b_negocios = resB2BNeg.data; else this.b2b_negocios = [];
         
+        this.adelantos_operativos = [];
+        try {
+            const { data, error } = await supabaseClient
+                .from('adelantos_operativos')
+                .select('*')
+                .is('deleted_at', null)
+                .order('created_at', { ascending: false });
+            if (!error && data) {
+                this.adelantos_operativos = data;
+            }
+        } catch (err) {
+            console.warn("Table 'adelantos_operativos' is missing or inaccessible. Fallback applied.", err);
+        }
+
         Store.setState({
             planes: this.planes,
             clientes: this.clientes,
@@ -83,7 +98,8 @@ export const DataService = {
             b2b_aliados: this.b2b_aliados,
             b2b_servicios: this.b2b_servicios,
             b2b_negocios: this.b2b_negocios,
-            ciudades: this.ciudades
+            ciudades: this.ciudades,
+            adelantos_operativos: this.adelantos_operativos
         });
 
         this.autoClassifyReservas();

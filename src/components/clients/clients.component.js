@@ -951,6 +951,24 @@ export const ClientsComponent = {
         const safePlan = UI.sanitize(pNom);
         const safeEtiqueta = UI.sanitize(c.etiqueta || '');
 
+        // Calcular si hay adelantos operativos activos para este cliente
+        const clientAdelantos = (DataService.adelantos_operativos || [])
+            .filter(a => a.cliente_id === id && !a.deleted_at && ['aprobado', 'ejecutado'].includes(a.estado));
+        const totalAdelantado = clientAdelantos.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
+
+        const bannerAdelantoHtml = totalAdelantado > 0 ? `
+            <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 shadow-[0_1px_2px_rgba(245,158,11,0.05)]">
+                <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5 animate-pulse"></i>
+                <div>
+                    <p class="text-[10px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">Adelanto Operativo Activo</p>
+                    <p class="text-xs font-semibold text-amber-900 mt-0.5">
+                        La agencia ha financiado <strong>${formatCOP(totalAdelantado)}</strong> de fondos propios para asegurar servicios de esta reserva.
+                    </p>
+                    <p class="text-[8px] text-amber-700/80 font-bold mt-1 uppercase tracking-wider">Se recuperará automáticamente cuando el cliente realice abonos.</p>
+                </div>
+            </div>
+        ` : '';
+
         document.getElementById('cdm-body').innerHTML = `
             <div class="p-6 space-y-6">
                 <div class="flex items-center space-x-4">
@@ -962,6 +980,8 @@ export const ClientsComponent = {
                         <span class="inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-400 font-mono mt-1.5"><i class="ph ph-identification-card text-xs"></i> CC ${safeDoc}</span>
                     </div>
                 </div>
+                
+                ${bannerAdelantoHtml}
                 
                 <div class="bg-slate-50 border border-slate-100 p-5 rounded-2xl relative overflow-hidden text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
                     <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1">Plan Seleccionado</p>
