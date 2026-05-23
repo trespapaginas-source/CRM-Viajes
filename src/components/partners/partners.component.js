@@ -12,6 +12,25 @@ export const PartnersComponent = {
     corporateExpenses: [],
     fallbackActive: false,
     fallbackGastosActive: false,
+    porcentajeRetencion: 10,
+
+    async loadAgencyConfig() {
+        try {
+            const res = await DataService.getAgenciaConfig();
+            if (res && res.data && res.data.porcentaje_retencion !== undefined && res.data.porcentaje_retencion !== null) {
+                this.porcentajeRetencion = Number(res.data.porcentaje_retencion);
+            } else {
+                this.porcentajeRetencion = 10;
+            }
+        } catch (e) {
+            console.warn('Error al cargar configuración de agencia:', e);
+            this.porcentajeRetencion = 10;
+        }
+        const retInput = document.getElementById('pvm-config-retencion-pct');
+        if (retInput) {
+            retInput.value = this.porcentajeRetencion;
+        }
+    },
 
     async loadConfig() {
         if (this._configLoaded) return;
@@ -69,6 +88,7 @@ export const PartnersComponent = {
         await this.loadConfig();
         await this.loadMovements();
         await this.loadCorporateExpenses();
+        await this.loadAgencyConfig();
         
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const adminSettings = document.getElementById('pvm-admin-settings');
@@ -279,14 +299,28 @@ export const PartnersComponent = {
         const total = this.sociosConfig.reduce((acc, s) => acc + s.porcentaje, 0);
         if (total > 100) return UI.showToast(`Error: La suma de porcentajes es ${total}%. No puede superar el 100%.`, "error");
 
+        const retInput = document.getElementById('pvm-config-retencion-pct');
+        let newRetPct = this.porcentajeRetencion;
+        if (retInput) {
+            const val = parseFloat(retInput.value);
+            if (!isNaN(val) && val >= 0 && val <= 100) {
+                newRetPct = val;
+            } else {
+                return UI.showToast("El porcentaje de retención debe estar entre 0% y 100%.", "error");
+            }
+        }
+
         try {
             await supabaseClient.from('socios_config').delete().neq('id', '00000000-0000-0000-0000-000000000000');
             const rows = this.sociosConfig.map(s => ({ nombre: s.nombre, email: s.email, porcentaje: s.porcentaje }));
             const { error } = await supabaseClient.from('socios_config').insert(rows);
             if (error) throw error;
 
+            await DataService.saveAgenciaConfig({ porcentaje_retencion: newRetPct });
+            this.porcentajeRetencion = newRetPct;
+
             localStorage.removeItem('trv_socios');
-            UI.showToast("Configuración de socios guardada en base de datos.", "success");
+            UI.showToast("Configuración guardada en base de datos.", "success");
         } catch (e) {
             console.error('Error guardando socios en BD:', e);
             localStorage.setItem('trv_socios', JSON.stringify(this.sociosConfig));
@@ -294,6 +328,7 @@ export const PartnersComponent = {
         }
         this.calculateDistribution();
     },
+
 
     applyQuickDates() {
         const dStart = document.getElementById('pvm-date-start');
@@ -460,8 +495,21 @@ export const PartnersComponent = {
         // Totals
         const filteredUB = filteredRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
         const filteredGC = filteredCorpExpenses.reduce((acc, g) => acc + g.monto, 0);
-        const filteredUN = filteredUB - filteredGC;
         const filteredUP = filteredFutureTrips.reduce((acc, t) => acc + t.margen, 0);
+
+        // Prioridad Financiera (Opción B)
+        const isDeficit = filteredUB <= filteredGC;
+        let filteredUN = 0;
+        let retencionFondo = 0;
+        let deficitAmount = 0;
+
+        if (isDeficit) {
+            deficitAmount = filteredGC - filteredUB;
+        } else {
+            const totalUN_Operacion = filteredUB - filteredGC;
+            retencionFondo = totalUN_Operacion * (this.porcentajeRetencion / 100);
+            filteredUN = totalUN_Operacion - retencionFondo;
+        }
 
         const filteredIngresos = filteredRealizedTrips.reduce((acc, t) => acc + t.ingresoBruto, 0);
         const filteredCostos = filteredRealizedTrips.reduce((acc, t) => acc + t.costoTotal, 0);
@@ -469,10 +517,10 @@ export const PartnersComponent = {
         const filteredAllTrips = filteredRealizedTrips.concat(filteredFutureTrips);
 
         // Let's pass these to render distribution
-        this.renderDistributionUI(filteredAllTrips, filteredIngresos, filteredCostos, filteredUN, filteredUB, filteredGC, filteredUP);
+        this.renderDistributionUI(filteredAllTrips, filteredIngresos, filteredCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo, isDeficit, deficitAmount);
     },
 
-    renderDistributionUI(viajes, gIngresos, gCostos, filteredUN, filteredUB, filteredGC, filteredUP) {
+    renderDistributionUI(viajes, gIngresos, gCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo = 0, isDeficit = false, deficitAmount = 0) {
         const rol = window.AuthModule?.userProfile?.rol;
         const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
@@ -497,8 +545,48 @@ export const PartnersComponent = {
         if (document.getElementById('pvm-gastos-corp-total')) {
             document.getElementById('pvm-gastos-corp-total').innerText = isAdmin ? formatCOP(filteredGC) : '***';
         }
+        if (document.getElementById('pvm-fondo-retencion-total')) {
+            document.getElementById('pvm-fondo-retencion-total').innerText = isAdmin ? formatCOP(retencionFondo) : '***';
+        }
         if (document.getElementById('pvm-proyectada-total')) {
             document.getElementById('pvm-proyectada-total').innerText = isAdmin ? formatCOP(filteredUP) : '***';
+        }
+
+        // Deficit alert
+        const deficitAlert = document.getElementById('pvm-deficit-alert');
+        const deficitText = document.getElementById('pvm-deficit-text');
+        if (deficitAlert) {
+            if (isAdmin && isDeficit && filteredGC > 0) {
+                deficitAlert.classList.remove('hidden');
+                if (deficitText) {
+                    deficitText.innerText = `Las utilidades brutas (${formatCOP(filteredUB)}) no alcanzan a cubrir los gastos corporativos del periodo (${formatCOP(filteredGC)}). La distribución a socios y la retención del fondo de reserva están bloqueadas debido a un déficit operativo de ${formatCOP(deficitAmount)}.`;
+                }
+            } else {
+                deficitAlert.classList.add('hidden');
+            }
+        }
+
+        // Expenses Tab KPIs
+        if (document.getElementById('pvm-gasto-corp-kpi-ingresos')) {
+            document.getElementById('pvm-gasto-corp-kpi-ingresos').innerText = isAdmin ? formatCOP(retencionFondo) : '***';
+        }
+        if (document.getElementById('pvm-gasto-corp-kpi-egresos')) {
+            document.getElementById('pvm-gasto-corp-kpi-egresos').innerText = isAdmin ? formatCOP(filteredGC) : '***';
+        }
+        const balanceEl = document.getElementById('pvm-gasto-corp-kpi-balance');
+        if (balanceEl) {
+            if (isAdmin) {
+                const bal = retencionFondo - filteredGC;
+                balanceEl.innerText = formatCOP(bal);
+                if (bal >= 0) {
+                    balanceEl.className = "text-base font-black text-emerald-600 mt-0.5 tracking-tight";
+                } else {
+                    balanceEl.className = "text-base font-black text-rose-500 mt-0.5 tracking-tight";
+                }
+            } else {
+                balanceEl.innerText = '***';
+                balanceEl.className = "text-base font-black text-slate-800 mt-0.5 tracking-tight";
+            }
         }
 
         if (document.getElementById('pvm-my-share')) {
@@ -878,8 +966,15 @@ export const PartnersComponent = {
         // Historical corporate expenses
         const histGC = this.corporateExpenses.reduce((acc, g) => acc + g.monto, 0);
 
-        // Net Profit (devengado histórico)
-        const histUN = histUB - histGC;
+        // Net Profit (devengado histórico total)
+        // Aplicando la misma jerarquía de prioridad:
+        let histUN = 0;
+        let histRetenidoFondo = 0;
+        if (histUB > histGC) {
+            const histUN_Operacion = histUB - histGC;
+            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
+            histUN = histUN_Operacion - histRetenidoFondo;
+        }
 
         // Future trips margin
         const futureTrips = allTrips.filter(t => t.dateObj > hoy);
@@ -973,6 +1068,42 @@ export const PartnersComponent = {
                     </div>
                 `;
             });
+
+            if (isAdmin) {
+                const fondoDisponible = histRetenidoFondo - histGC;
+                const balanceColorClass = fondoDisponible >= 0 ? 'text-emerald-600' : 'text-rose-500';
+                grid.innerHTML += `
+                    <div class="rounded-xl p-4 shadow-sm flex flex-col justify-between border border-dashed border-slate-300 bg-slate-50/50">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center text-xs font-black text-white uppercase"><i class="ph ph-vault"></i></div>
+                                    <div>
+                                        <h5 class="text-xs font-black text-slate-800 uppercase tracking-wider">Fondo de Reserva</h5>
+                                        <p class="text-[9px] text-slate-400 font-bold">Caja Menor / Corporativo</p>
+                                    </div>
+                                </div>
+                                <span class="bg-indigo-100 text-indigo-700 text-[9px] font-black px-1.5 py-0.5 rounded">${this.porcentajeRetencion}% Retención</span>
+                            </div>
+                            
+                            <div class="space-y-1.5 mt-3">
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-slate-500 font-medium">Total Retenido (Ingreso):</span>
+                                    <span class="text-slate-800 font-bold">${formatCOP(histRetenidoFondo)}</span>
+                                </div>
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-slate-500 font-medium">Total Gastado (Gastos Corp):</span>
+                                    <span class="text-rose-500 font-bold">${formatCOP(histGC)}</span>
+                                </div>
+                                <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-200">
+                                    <span class="text-slate-700 font-black">Saldo Disponible:</span>
+                                    <span class="${balanceColorClass} font-black">${formatCOP(fondoDisponible)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         const histFilter = document.getElementById('pvm-history-filter-partner');
@@ -1111,7 +1242,14 @@ export const PartnersComponent = {
             });
             const gastosCorp = monthGastos.reduce((acc, g) => acc + g.monto, 0);
 
-            const neta = bruta - gastosCorp;
+            // Prioridad Financiera (Opción B)
+            let neta = 0;
+            let retencionFondo = 0;
+            if (bruta > gastosCorp) {
+                const operacionNeta = bruta - gastosCorp;
+                retencionFondo = operacionNeta * (this.porcentajeRetencion / 100);
+                neta = operacionNeta - retencionFondo;
+            }
 
             // Withdrawals in this month
             const monthMovements = this.movements.filter(m => {
@@ -1132,6 +1270,7 @@ export const PartnersComponent = {
                 costos,
                 bruta,
                 gastosCorp,
+                retencionFondo,
                 neta,
                 retiros
             };
@@ -1153,8 +1292,9 @@ export const PartnersComponent = {
                 <tr>
                     <th class="py-2.5 px-4">Mes / Año</th>
                     <th class="py-2.5 px-4 text-right">Utilidad Bruta</th>
-                    <th class="py-2.5 px-4 text-right">Gastos Corp.</th>
-                    <th class="py-2.5 px-4 text-right">Utilidad Neta</th>
+                    <th class="py-2.5 px-4 text-right">Gastos Fijos</th>
+                    <th class="py-2.5 px-4 text-right">Retención Fondo</th>
+                    <th class="py-2.5 px-4 text-right">Neta Distribuible</th>
                     ${partnerCols}
                     <th class="py-2.5 px-4 text-right">Retiros</th>
                     <th class="py-2.5 px-4 text-right">Rentabilidad %</th>
@@ -1204,6 +1344,7 @@ export const PartnersComponent = {
                             <td class="py-2.5 px-4 whitespace-nowrap text-xs font-black text-slate-800 flex items-center gap-1.5"><i class="ph ph-caret-right text-[10px] text-slate-400"></i> ${formatMonthYear(row.month)}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-slate-600">${isAdmin ? formatCOP(row.bruta) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-rose-500/80">${isAdmin ? formatCOP(row.gastosCorp) : '***'}</td>
+                            <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-amber-500">${isAdmin ? formatCOP(row.retencionFondo) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-black ${netaColor}">${isAdmin ? formatCOP(row.neta) : '***'}</td>
                             ${partnerCells}
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-slate-600">${retirosDisplay}</td>

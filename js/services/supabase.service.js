@@ -507,6 +507,7 @@ export const DataService = {
                 telefono: settings.tel,
                 direccion: settings.dir,
                 condiciones: settings.terms,
+                porcentaje_retencion: settings.porcentaje_retencion !== undefined ? Number(settings.porcentaje_retencion) : undefined,
                 updated_by: user ? user.id : null,
                 updated_at: new Date().toISOString()
             };

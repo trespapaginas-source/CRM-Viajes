@@ -3765,21 +3765,25 @@
                         
                         <div class="md:col-span-8 space-y-4 relative z-10">
                             <div>
-                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">Caja Neta Devengada (Planes Realizados - Gastos Corporativos)</p>
+                                <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">Utilidad Neta Distribuible a Socios</p>
                                 <h2 class="text-2xl md:text-3xl font-black text-emerald-400 tracking-tight" id="pvm-utilidad-total">$0</h2>
                             </div>
                             
-                            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-700/40">
+                            <div class="grid grid-cols-4 gap-2 pt-2 border-t border-slate-700/40">
                                 <div>
-                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Utilidad Bruta (Planes)</p>
+                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Utilidad Bruta</p>
                                     <p class="text-xs font-black text-white" id="pvm-bruta-planes">$0</p>
                                 </div>
                                 <div>
-                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Gastos Corporativos</p>
+                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Gastos Fijos</p>
                                     <p class="text-xs font-black text-rose-400" id="pvm-gastos-corp-total">$0</p>
                                 </div>
                                 <div>
-                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Caja Proyectada (Futuro)</p>
+                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Retención Fondo</p>
+                                    <p class="text-xs font-black text-amber-400" id="pvm-fondo-retencion-total">$0</p>
+                                </div>
+                                <div>
+                                    <p class="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Proyectada (Futuro)</p>
                                     <p class="text-xs font-black text-indigo-400" id="pvm-proyectada-total">$0</p>
                                 </div>
                             </div>
@@ -3792,10 +3796,20 @@
                         </div>
                     </div>
 
+                    <div id="pvm-deficit-alert" class="hidden bg-red-50 border border-red-200 rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+                        <i class="ph ph-warning-circle text-red-600 text-lg shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="text-xs font-bold text-red-900">Alerta de Sostenibilidad Operativa</p>
+                            <p class="text-[10px] text-red-700 mt-0.5 leading-relaxed" id="pvm-deficit-text">
+                                Las utilidades brutas no alcanzan a cubrir los gastos corporativos del periodo. La distribución a socios y la retención del fondo de reserva están bloqueadas.
+                            </p>
+                        </div>
+                    </div>
+
                     <div class="flex items-center gap-3 bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-medium text-slate-600">
                         <i class="ph ph-info text-slate-400 text-base"></i>
                         <span>
-                            <strong>Nota contable:</strong> Los saldos se calculan con base en la utilidad real devengada (viajes operados hasta la fecha) restando los gastos corporativos globales. Las reservas futuras confirmadas se muestran en la sección proyectada pero no forman parte del saldo disponible.
+                            <strong>Nota contable:</strong> Los saldos se calculan con base en la utilidad neta de operación devengada (utilidad bruta menos gastos corporativos). Una vez cubiertos los gastos, se retiene el porcentaje configurado para el Fondo de Reserva y el 90% restante es distribuible.
                         </span>
                     </div>
 
@@ -3818,6 +3832,15 @@
                         </button>
                         <div id="pvm-editor-panel" class="hidden space-y-2 mb-3">
                             <div id="pvm-partners-editor" class="space-y-2"></div>
+                            <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl shadow-sm space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest pl-1 block">Retención Fondo de Reserva (% Caja Menor)</label>
+                                    <div class="relative max-w-[120px]">
+                                        <input type="number" id="pvm-config-retencion-pct" min="0" max="100" step="0.1" class="w-full text-xs font-black bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1 text-right outline-none focus:ring-2 focus:ring-slate-900" placeholder="10.0">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 pointer-events-none">%</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="flex gap-2">
                                 <button type="button" data-action="add-partner-row"
                                     class="flex-1 border border-dashed border-slate-300 text-slate-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-700 transition-all">+
@@ -3980,6 +4003,31 @@
                             <p class="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
                                 La tabla <code class="bg-amber-100/80 px-1 py-0.5 rounded text-[9px] font-mono">gastos_corporativos</code> no existe en Supabase. Los datos se guardan temporalmente en este navegador.
                             </p>
+                        </div>
+                    </div>
+
+                    <!-- Panel de Métricas del Fondo de Reserva -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Fondo Retenido (Ingresos)</p>
+                                <p class="text-base font-black text-emerald-600 mt-0.5 tracking-tight" id="pvm-gasto-corp-kpi-ingresos">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-500"><i class="ph ph-trend-up text-lg"></i></div>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Gastos Corporativos (Egresos)</p>
+                                <p class="text-base font-black text-rose-500 mt-0.5 tracking-tight" id="pvm-gasto-corp-kpi-egresos">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-rose-50 rounded-lg flex items-center justify-center text-rose-500"><i class="ph ph-trend-down text-lg"></i></div>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Saldo Disponible Fondo</p>
+                                <p class="text-base font-black text-slate-800 mt-0.5 tracking-tight" id="pvm-gasto-corp-kpi-balance">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-600"><i class="ph ph-vault text-lg"></i></div>
                         </div>
                     </div>
 
