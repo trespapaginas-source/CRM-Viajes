@@ -1,5 +1,5 @@
 import { Store } from '../../core/store.js';
-import { DataService } from '../../../js/services/supabase.service.js';
+import { DataService, supabaseClient } from '../../../js/services/supabase.service.js';
 import { UI } from '../../../js/utils/ui.utils.js';
 import { parseSpanishDate, formatShortDate } from '../../../js/utils/format.utils.js';
 
@@ -20,6 +20,7 @@ const DocumentosComponent = {
     activeDoc: null,
     planesDisponibles: [],
     reservasDisponibles: [],
+    loadedDocTimestamp: null,
 
     init: async function () {
         await this.loadSettings();
@@ -40,6 +41,7 @@ const DocumentosComponent = {
         // Suscribirse reactivamente al Store de datos
         Store.subscribe(async (state) => {
             await this.loadCRMData();
+            this.loadSavedDocsList();
             this.renderPreview();
         });
     },
@@ -143,14 +145,14 @@ const DocumentosComponent = {
     loadSavedDocsList: function () {
         const select = document.getElementById('saved_docs_select');
         if (!select) return;
-        const saved = localStorage.getItem('crm_saved_documentos');
-        const docs = saved ? JSON.parse(saved) : [];
+        const docs = DataService.documentos_guardados || [];
 
         select.innerHTML = '<option value="">-- Cargar Borrador --</option>';
         docs.forEach(doc => {
             const option = document.createElement('option');
             option.value = doc.id;
-            option.textContent = `${doc.type === 'cotizacion' ? 'Cotización' : 'Soporte'} - ${doc.name}`;
+            const creadorInfo = doc.creado_por ? ` (por ${doc.creado_por.split('@')[0]})` : '';
+            option.textContent = `${doc.tipo === 'cotizacion' ? 'Cotización' : 'Soporte'} - ${doc.nombre}${creadorInfo}`;
             select.appendChild(option);
         });
         if (this.activeDoc && this.activeDoc.id) {
@@ -230,47 +232,128 @@ const DocumentosComponent = {
         UI.showToast("Nuevo borrador en blanco iniciado.", "info");
     },
 
-    saveActiveDocument: function () {
+    saveActiveDocument: async function () {
         this.onInputChanged();
+        const userEmail = (window.AuthModule?.currentUser?.email || 'anonimo@agencia.com').toLowerCase();
 
-        if (!this.activeDoc.id) {
+        const esNvo = !this.activeDoc.id;
+
+        if (esNvo) {
             const docName = prompt("Escribe un nombre para este borrador de cotización/soporte:", `${this.activeDoc.data.cliente_nombre || 'Borrador'} - ${this.activeDoc.data.destino || 'Sin Destino'}`);
             if (docName === null) return;
-            this.activeDoc.id = Date.now().toString();
-            this.activeDoc.name = docName.trim() || `Borrador #${this.activeDoc.id.substring(8)}`;
-        }
+            this.activeDoc.name = docName.trim() || `Borrador`;
+            
+            const payload = {
+                nombre: this.activeDoc.name,
+                tipo: this.activeDoc.type,
+                datos: this.activeDoc.data,
+                creado_por: userEmail,
+                editado_por: userEmail
+            };
 
-        const saved = localStorage.getItem('crm_saved_documentos');
-        let docs = saved ? JSON.parse(saved) : [];
+            const btn = document.querySelector('button[onclick*="saveActiveDocument"]');
+            if (btn) btn.disabled = true;
 
-        const existingIdx = docs.findIndex(doc => doc.id === this.activeDoc.id);
-        if (existingIdx !== -1) {
-            docs[existingIdx] = this.activeDoc;
+            try {
+                const { data, error } = await supabaseClient.from('documentos_guardados').insert([payload]).select();
+                if (error) throw error;
+
+                if (data && data[0]) {
+                    this.activeDoc.id = data[0].id;
+                    this.loadedDocTimestamp = data[0].updated_at;
+                }
+
+                UI.showToast("Borrador guardado en la biblioteca compartida.", "success");
+                
+                await DataService.loadAll();
+                this.loadSavedDocsList();
+
+                // Auditoría
+                DataService.registrarHistorial(
+                    this.activeDoc.data.crm_cliente_id || null,
+                    'Documento Creado',
+                    'N/A',
+                    `Nombre: ${this.activeDoc.name} | Tipo: ${this.activeDoc.type}`,
+                    'CREACION'
+                );
+            } catch (err) {
+                console.error("Error al guardar documento:", err);
+                UI.showToast("Error al guardar el documento en la base de datos.", "error");
+            } finally {
+                if (btn) btn.disabled = false;
+            }
         } else {
-            docs.push(this.activeDoc);
-        }
+            // Update
+            const serverDoc = (DataService.documentos_guardados || []).find(d => d.id === this.activeDoc.id);
+            if (serverDoc && this.loadedDocTimestamp && new Date(serverDoc.updated_at) > new Date(this.loadedDocTimestamp)) {
+                const confirmOverwrite = confirm(`Conflicto de Concurrencia:\nEl documento "${serverDoc.nombre}" fue modificado por ${serverDoc.editado_por || serverDoc.creado_por} después de que lo abrieras.\n\n¿Deseas sobreescribir sus cambios de todos modos?`);
+                if (!confirmOverwrite) return;
+            }
 
-        localStorage.setItem('crm_saved_documentos', JSON.stringify(docs));
-        this.loadSavedDocsList();
-        UI.showToast("Borrador guardado en la biblioteca local.", "success");
+            const payload = {
+                nombre: this.activeDoc.name,
+                tipo: this.activeDoc.type,
+                datos: this.activeDoc.data,
+                editado_por: userEmail,
+                updated_at: new Date().toISOString()
+            };
+
+            const btn = document.querySelector('button[onclick*="saveActiveDocument"]');
+            if (btn) btn.disabled = true;
+
+            try {
+                const { data, error } = await supabaseClient.from('documentos_guardados').update(payload).eq('id', this.activeDoc.id).select();
+                if (error) throw error;
+
+                if (data && data[0]) {
+                    this.loadedDocTimestamp = data[0].updated_at;
+                } else {
+                    this.loadedDocTimestamp = payload.updated_at;
+                }
+
+                UI.showToast("Borrador actualizado en la biblioteca compartida.", "success");
+                
+                await DataService.loadAll();
+                this.loadSavedDocsList();
+
+                // Auditoría
+                DataService.registrarHistorial(
+                    this.activeDoc.data.crm_cliente_id || null,
+                    'Documento Modificado',
+                    `Modificado por ${userEmail}`,
+                    `Nombre: ${this.activeDoc.name} | Tipo: ${this.activeDoc.type}`,
+                    'MODIFICACION'
+                );
+            } catch (err) {
+                console.error("Error al actualizar documento:", err);
+                UI.showToast("Error al actualizar el documento en la base de datos.", "error");
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
     },
 
     loadSavedDocument: function (id) {
         if (!id) return;
-        const saved = localStorage.getItem('crm_saved_documentos');
-        const docs = saved ? JSON.parse(saved) : [];
+        const docs = DataService.documentos_guardados || [];
         const doc = docs.find(d => d.id === id);
         if (doc) {
-            this.activeDoc = doc;
+            this.activeDoc = {
+                id: doc.id,
+                name: doc.nombre,
+                type: doc.tipo,
+                data: doc.datos
+            };
+            this.loadedDocTimestamp = doc.updated_at;
             this.fillDOMFromActiveDoc();
             this.renderEditorLists();
             this.recalculate();
             this.renderPreview();
-            UI.showToast(`Documento "${doc.name}" cargado al editor.`, "success");
+            UI.showToast(`Documento "${doc.nombre}" cargado desde la biblioteca compartida.`, "success");
         }
     },
 
-    deleteActiveDocument: function () {
+    deleteActiveDocument: async function () {
         const select = document.getElementById('saved_docs_select');
         const id = select.value;
         if (!id) {
@@ -278,16 +361,37 @@ const DocumentosComponent = {
             return;
         }
 
-        if (!confirm("¿Estás seguro de que deseas eliminar permanentemente este borrador?")) return;
+        if (!confirm("¿Estás seguro de que deseas eliminar permanentemente este borrador de la biblioteca compartida?")) return;
 
-        const saved = localStorage.getItem('crm_saved_documentos');
-        let docs = saved ? JSON.parse(saved) : [];
-        docs = docs.filter(d => d.id !== id);
-        localStorage.setItem('crm_saved_documentos', JSON.stringify(docs));
+        const userEmail = (window.AuthModule?.currentUser?.email || 'anonimo@agencia.com').toLowerCase();
 
-        this.newBlankDocument();
-        this.loadSavedDocsList();
-        UI.showToast("Borrador eliminado de la biblioteca.", "success");
+        try {
+            const { error } = await supabaseClient.from('documentos_guardados').update({
+                deleted_at: new Date().toISOString(),
+                deleted_by: userEmail
+            }).eq('id', id);
+
+            if (error) throw error;
+
+            UI.showToast("Documento eliminado de la biblioteca compartida.", "success");
+
+            // Registrar auditoria
+            const doc = DataService.documentos_guardados.find(d => d.id === id);
+            DataService.registrarHistorial(
+                doc?.datos?.crm_cliente_id || null,
+                'Documento Eliminado',
+                `Nombre: ${doc?.nombre}`,
+                'Borrado lógico',
+                'ELIMINACION'
+            );
+
+            this.newBlankDocument();
+            await DataService.loadAll();
+            this.loadSavedDocsList();
+        } catch (e) {
+            console.error("Error al eliminar documento:", e);
+            UI.showToast("Error al eliminar el documento en Supabase.", "error");
+        }
     },
 
     async loadCRMData() {

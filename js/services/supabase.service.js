@@ -26,6 +26,7 @@ export const DataService = {
     b2b_servicios: [],
     b2b_negocios: [],
     adelantos_operativos: [],
+    documentos_guardados: [],
     db: {
         categories: ["Operador Turístico", "Alojamiento / Hotelería", "Transporte Especial", "Aseguradora Integral", "Restaurante y Eventos", "Guianza Local"],
         destinos: ["Barranquilla", "Cartagena", "Quindío", "Santa Marta", "La Guajira", "San Andrés"]
@@ -88,6 +89,20 @@ export const DataService = {
             console.warn("Table 'adelantos_operativos' is missing or inaccessible. Fallback applied.", err);
         }
 
+        this.documentos_guardados = [];
+        try {
+            const { data, error } = await supabaseClient
+                .from('documentos_guardados')
+                .select('*')
+                .is('deleted_at', null)
+                .order('updated_at', { ascending: false });
+            if (!error && data) {
+                this.documentos_guardados = data;
+            }
+        } catch (err) {
+            console.warn("Table 'documentos_guardados' is missing or inaccessible. Fallback applied.", err);
+        }
+
         Store.setState({
             planes: this.planes,
             clientes: this.clientes,
@@ -99,7 +114,8 @@ export const DataService = {
             b2b_servicios: this.b2b_servicios,
             b2b_negocios: this.b2b_negocios,
             ciudades: this.ciudades,
-            adelantos_operativos: this.adelantos_operativos
+            adelantos_operativos: this.adelantos_operativos,
+            documentos_guardados: this.documentos_guardados
         });
 
         this.autoClassifyReservas();
