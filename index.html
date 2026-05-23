@@ -1907,26 +1907,34 @@
                                         <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Título de la Sección</label>
                                         <input type="text" id="doc_titulo_plan" placeholder="RESUMEN DEL PLAN COMERCIAL" oninput="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                                     </div>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div>
                                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Destino</label>
                                             <input type="text" id="doc_destino" placeholder="Ej. San Andrés Islas" oninput="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                                         </div>
                                         <div>
-                                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Fechas del Viaje</label>
-                                            <input type="text" id="doc_fechas" placeholder="Ej. Del 15 al 20 de Junio de 2026" oninput="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Fecha de Ida</label>
+                                            <input type="date" id="doc_fecha_ida" onchange="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Fecha de Regreso</label>
+                                            <input type="date" id="doc_fecha_regreso" onchange="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                                         </div>
                                     </div>
-                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                         <div>
-                                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Duración</label>
-                                            <input type="text" id="doc_duracion" placeholder="Ej. 6 Días / 5 Noches" oninput="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Días</label>
+                                            <input type="number" id="doc_dias" min="1" oninput="DocumentosComponent.onDurationDaysChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Noches</label>
+                                            <input type="number" id="doc_noches" min="0" oninput="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                                         </div>
                                         <div>
                                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Viajeros (PAX)</label>
                                             <input type="number" id="doc_pax_count" min="1" value="1" oninput="DocumentosComponent.onPaxCountChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                                         </div>
-                                        <div>
+                                        <div class="col-span-2 sm:col-span-1">
                                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Pasajeros (Detalle)</label>
                                             <input type="text" id="doc_pasajeros" placeholder="Ej. 2 Viajeros (Adultos)" oninput="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                                         </div>

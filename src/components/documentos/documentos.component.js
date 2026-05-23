@@ -186,7 +186,11 @@ const DocumentosComponent = {
 
                 destino: '',
                 fechas: '',
+                fecha_ida: '',
+                fecha_regreso: '',
                 duracion: '',
+                dias: '',
+                noches: '',
                 pasajeros: '',
 
                 servicios_principales: [
@@ -440,8 +444,18 @@ const DocumentosComponent = {
             if (splitter.test(cleanStr)) {
                 const parts = cleanStr.split(splitter);
                 if (parts.length === 2) {
-                    const start = parseSpanishDate(parts[0].trim());
-                    const end = parseSpanishDate(parts[1].trim());
+                    let start = parseSpanishDate(parts[0].trim());
+                    let end = parseSpanishDate(parts[1].trim());
+                    
+                    // Smart parse for formats like "Del 15 al 20 de Junio de 2026"
+                    if ((!start || isNaN(start.getTime())) && end && !isNaN(end.getTime())) {
+                        const dayMatch = parts[0].trim().match(/^(?:del\s+)?(\d+)$/i);
+                        if (dayMatch) {
+                            const day = parseInt(dayMatch[1]);
+                            start = new Date(end.getFullYear(), end.getMonth(), day);
+                        }
+                    }
+                    
                     if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
                         return { start, end };
                     }
@@ -522,13 +536,58 @@ const DocumentosComponent = {
                     }
                 }
             }
-            this.activeDoc.data.duracion = duracionCalculada || plan.duracion || '4 Días / 3 Noches';
+            const dText = duracionCalculada || plan.duracion || '4 Días / 3 Noches';
+            this.activeDoc.data.duracion = dText;
+            const dMatch = dText.match(/(\d+)\s*D[íi]as\s*\/\s*(\d+)\s*Noches/i);
+            if (dMatch) {
+                this.activeDoc.data.dias = parseInt(dMatch[1]);
+                this.activeDoc.data.noches = parseInt(dMatch[2]);
+            } else if (dText.toLowerCase().includes('pasadía') || dText.toLowerCase().includes('pasadia')) {
+                this.activeDoc.data.dias = 1;
+                this.activeDoc.data.noches = 0;
+            }
 
-            this.activeDoc.data.fechas = c.fecha_viaje ? this.formatDate(c.fecha_viaje) : '';
+            let startObj = null;
+            let endObj = null;
+            if (c.fecha_viaje) {
+                const range = this.parseRange(c.fecha_viaje);
+                if (range) {
+                    startObj = range.start;
+                    endObj = range.end;
+                } else {
+                    const d = parseSpanishDate(c.fecha_viaje);
+                    if (d && !isNaN(d.getTime())) {
+                        startObj = d;
+                        endObj = d;
+                    }
+                }
+            }
+            if (startObj && endObj) {
+                const formatToISO = (date) => {
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
+                };
+                this.activeDoc.data.fecha_ida = formatToISO(startObj);
+                this.activeDoc.data.fecha_regreso = formatToISO(endObj);
+                const formatToShort = (date) => {
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${day}/${m}/${date.getFullYear()}`;
+                };
+                this.activeDoc.data.fechas = `${formatToShort(startObj)} al ${formatToShort(endObj)}`;
+            } else {
+                this.activeDoc.data.fechas = c.fecha_viaje ? this.formatDate(c.fecha_viaje) : '';
+                this.activeDoc.data.fecha_ida = '';
+                this.activeDoc.data.fecha_regreso = '';
+            }
+
             this.activeDoc.data.pasajeros = `${c.pax || 1} Viajero(s)`;
         }
 
-        this.activeDoc.data.paquete_valor = Number(c.precio_total) || 0;
+        const paxNum = Number(c.pax) || 1;
+        this.activeDoc.data.paquete_valor = Math.round((Number(c.precio_total) || 0) / paxNum);
         this.activeDoc.data.pago_referencia = `Reserva CC ${c.documento || ''}`;
 
         // Cargar abonos desde la base de datos para este cliente
@@ -582,9 +641,36 @@ const DocumentosComponent = {
             }
             if (start && end) {
                 duracionCalculada = this.calculateDuration(start, end, plan.tipo);
+                const formatToISO = (date) => {
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const d = String(date.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                };
+                this.activeDoc.data.fecha_ida = formatToISO(start);
+                this.activeDoc.data.fecha_regreso = formatToISO(end);
+                const formatToShort = (date) => {
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${day}/${m}/${date.getFullYear()}`;
+                };
+                this.activeDoc.data.fechas = `${formatToShort(start)} al ${formatToShort(end)}`;
+            } else {
+                this.activeDoc.data.fecha_ida = '';
+                this.activeDoc.data.fecha_regreso = '';
+                this.activeDoc.data.fechas = '';
             }
         }
-        this.activeDoc.data.duracion = duracionCalculada || plan.duracion || '4 Días / 3 Noches';
+        const dText = duracionCalculada || plan.duracion || '4 Días / 3 Noches';
+        this.activeDoc.data.duracion = dText;
+        const dMatch = dText.match(/(\d+)\s*D[íi]as\s*\/\s*(\d+)\s*Noches/i);
+        if (dMatch) {
+            this.activeDoc.data.dias = parseInt(dMatch[1]);
+            this.activeDoc.data.noches = parseInt(dMatch[2]);
+        } else if (dText.toLowerCase().includes('pasadía') || dText.toLowerCase().includes('pasadia')) {
+            this.activeDoc.data.dias = 1;
+            this.activeDoc.data.noches = 0;
+        }
 
         this.activeDoc.data.paquete_valor = Number(plan.precio_persona) || 0;
 
@@ -621,9 +707,36 @@ const DocumentosComponent = {
         if (getEl('doc_cliente_tel')) getEl('doc_cliente_tel').value = this.activeDoc.data.cliente_tel || '';
         if (getEl('doc_cliente_email')) getEl('doc_cliente_email').value = this.activeDoc.data.cliente_email || '';
 
+        // Fallback parsers for retrocompatibility
+        if (!this.activeDoc.data.fecha_ida && this.activeDoc.data.fechas) {
+            const range = this.parseRange(this.activeDoc.data.fechas);
+            if (range) {
+                const formatToISO = (date) => {
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const d = String(date.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                };
+                this.activeDoc.data.fecha_ida = formatToISO(range.start);
+                this.activeDoc.data.fecha_regreso = formatToISO(range.end);
+            }
+        }
+        if (!this.activeDoc.data.dias && this.activeDoc.data.duracion) {
+            const dMatch = this.activeDoc.data.duracion.match(/(\d+)\s*D[íi]as\s*\/\s*(\d+)\s*Noches/i);
+            if (dMatch) {
+                this.activeDoc.data.dias = parseInt(dMatch[1]);
+                this.activeDoc.data.noches = parseInt(dMatch[2]);
+            } else if (this.activeDoc.data.duracion.toLowerCase().includes('pasadía') || this.activeDoc.data.duracion.toLowerCase().includes('pasadia')) {
+                this.activeDoc.data.dias = 1;
+                this.activeDoc.data.noches = 0;
+            }
+        }
+
         if (getEl('doc_destino')) getEl('doc_destino').value = this.activeDoc.data.destino || '';
-        if (getEl('doc_fechas')) getEl('doc_fechas').value = this.activeDoc.data.fechas || '';
-        if (getEl('doc_duracion')) getEl('doc_duracion').value = this.activeDoc.data.duracion || '';
+        if (getEl('doc_fecha_ida')) getEl('doc_fecha_ida').value = this.activeDoc.data.fecha_ida || '';
+        if (getEl('doc_fecha_regreso')) getEl('doc_fecha_regreso').value = this.activeDoc.data.fecha_regreso || '';
+        if (getEl('doc_dias')) getEl('doc_dias').value = this.activeDoc.data.dias || '';
+        if (getEl('doc_noches')) getEl('doc_noches').value = this.activeDoc.data.noches || '';
         if (getEl('doc_pasajeros')) getEl('doc_pasajeros').value = this.activeDoc.data.pasajeros || '';
         if (getEl('doc_pax_count')) getEl('doc_pax_count').value = this.activeDoc.data.pax || 1;
 
@@ -896,8 +1009,31 @@ const DocumentosComponent = {
         this.activeDoc.data.titulo_pagos = getVal('doc_titulo_pagos');
 
         this.activeDoc.data.destino = getVal('doc_destino');
-        this.activeDoc.data.fechas = getVal('doc_fechas');
-        this.activeDoc.data.duracion = getVal('doc_duracion');
+        const fIda = getVal('doc_fecha_ida');
+        const fRegreso = getVal('doc_fecha_regreso');
+        this.activeDoc.data.fecha_ida = fIda;
+        this.activeDoc.data.fecha_regreso = fRegreso;
+        if (fIda && fRegreso) {
+            const formatToShort = (isoStr) => {
+                const parts = isoStr.split('-');
+                if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                return isoStr;
+            };
+            this.activeDoc.data.fechas = `${formatToShort(fIda)} al ${formatToShort(fRegreso)}`;
+        } else {
+            this.activeDoc.data.fechas = '';
+        }
+
+        const diasVal = parseInt(getVal('doc_dias')) || 0;
+        const nochesVal = parseInt(getVal('doc_noches')) || 0;
+        this.activeDoc.data.dias = diasVal;
+        this.activeDoc.data.noches = nochesVal;
+        if (diasVal > 0 || nochesVal > 0) {
+            this.activeDoc.data.duracion = `${diasVal} Días / ${nochesVal} Noches`;
+        } else {
+            this.activeDoc.data.duracion = '';
+        }
+
         this.activeDoc.data.pasajeros = getVal('doc_pasajeros');
         this.activeDoc.data.pax = parseInt(getVal('doc_pax_count')) || 1;
 
@@ -978,6 +1114,25 @@ const DocumentosComponent = {
         const totalViaje = ((Number(data.paquete_valor) || 0) * paxVal) + adicionalesSum;
         const abonosSum = data.abonos.reduce((sum, item) => sum + (Number(item.monto) || 0), 0);
         const saldoPendiente = totalViaje - abonosSum;
+
+        let desglosePlanesHtml = `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 6px 0; text-align: left; color: #64748b;">Valor Plan Turístico (Valor Unitario):</td>
+                <td style="padding: 6px 0; text-align: right; font-weight: 600;">${fmt(data.paquete_valor)}</td>
+            </tr>
+        `;
+        if (paxVal > 1) {
+            desglosePlanesHtml += `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 6px 0; text-align: left; color: #64748b;">Cantidad de Viajeros (PAX):</td>
+                    <td style="padding: 6px 0; text-align: right; font-weight: 600;">${paxVal}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                    <td style="padding: 6px 0; text-align: left; color: #64748b;">Subtotal Plan Turístico:</td>
+                    <td style="padding: 6px 0; text-align: right; font-weight: 700; color: #0f172a;">${fmt(data.paquete_valor * paxVal)}</td>
+                </tr>
+            `;
+        }
 
         let serviciosPrincipalesHtml = '';
         if (data.servicios_principales && data.servicios_principales.length > 0) {
@@ -1184,10 +1339,7 @@ const DocumentosComponent = {
                 <!-- DESGLOSE MATEMATICO -->
                 <div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px; color: #334155;">
-                        <tr style="border-bottom: 1px solid #f1f5f9;">
-                            <td style="padding: 6px 0; text-align: left; color: #64748b;">Valor Plan Turístico${paxVal > 1 ? ` (c/u x ${paxVal})` : ''}:</td>
-                            <td style="padding: 6px 0; text-align: right; font-weight: 600;">${fmt(data.paquete_valor * paxVal)}</td>
-                        </tr>
+                        ${desglosePlanesHtml}
                         ${adicionalesSum > 0 ? `
                         <tr style="border-bottom: 1px solid #f1f5f9;">
                             <td style="padding: 6px 0; text-align: left; color: #64748b;">Servicios Adicionales:</td>
@@ -1275,6 +1427,18 @@ const DocumentosComponent = {
         });
     },
 
+    onDurationDaysChanged: function () {
+        const diasInput = document.getElementById('doc_dias');
+        const nochesInput = document.getElementById('doc_noches');
+        if (diasInput && nochesInput) {
+            const diasVal = parseInt(diasInput.value) || 0;
+            if (diasVal > 0) {
+                nochesInput.value = Math.max(0, diasVal - 1);
+            }
+        }
+        this.onInputChanged();
+    },
+
     onPaxCountChanged: function () {
         const paxInput = document.getElementById('doc_pax_count');
         const paxVal = parseInt(paxInput?.value) || 1;
@@ -1335,8 +1499,10 @@ const DocumentosComponent = {
         setVal('qcf_pax', parseInt(getVal('doc_pax_count')) || 1);
         
         const pacoteVal = UI.parseCurrency(document.getElementById('doc_paquete_valor')?.value) || 0;
+        const paxVal = parseInt(getVal('doc_pax_count')) || 1;
+        const totalPlanVal = pacoteVal * paxVal;
         if (document.getElementById('qcf_precio_total')) {
-            UI.setCurrencyValue('qcf_precio_total', pacoteVal);
+            UI.setCurrencyValue('qcf_precio_total', totalPlanVal);
         }
 
         // Abrir el modal
@@ -1451,7 +1617,13 @@ const DocumentosComponent = {
         if (plan) {
             this.activeDoc.data.destino = plan.destino || plan.nombre;
             this.activeDoc.data.duracion = plan.duracion || '';
-            this.activeDoc.data.paquete_valor = Number(existingClient.precio_total) || Number(plan.precio_persona) || 0;
+            
+            const paxNum = Number(existingClient.pax) || 1;
+            if (existingClient.precio_total) {
+                this.activeDoc.data.paquete_valor = Math.round(Number(existingClient.precio_total) / paxNum);
+            } else {
+                this.activeDoc.data.paquete_valor = Number(plan.precio_persona) || 0;
+            }
         }
 
         this.fillDOMFromActiveDoc();
