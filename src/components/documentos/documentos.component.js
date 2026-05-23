@@ -584,6 +584,9 @@ const DocumentosComponent = {
             }
 
             this.activeDoc.data.pasajeros = `${c.pax || 1} Viajero(s)`;
+            if (plan.servicios_incluidos) {
+                this.activeDoc.data.servicios_principales = JSON.parse(JSON.stringify(plan.servicios_incluidos));
+            }
         }
 
         const paxNum = Number(c.pax) || 1;
@@ -673,6 +676,10 @@ const DocumentosComponent = {
         }
 
         this.activeDoc.data.paquete_valor = Number(plan.precio_persona) || 0;
+
+        if (plan.servicios_incluidos) {
+            this.activeDoc.data.servicios_principales = JSON.parse(JSON.stringify(plan.servicios_incluidos));
+        }
 
         this.fillDOMFromActiveDoc();
         this.renderEditorLists();
@@ -1623,6 +1630,9 @@ const DocumentosComponent = {
                 this.activeDoc.data.paquete_valor = Math.round(Number(existingClient.precio_total) / paxNum);
             } else {
                 this.activeDoc.data.paquete_valor = Number(plan.precio_persona) || 0;
+            }
+            if (plan.servicios_incluidos) {
+                this.activeDoc.data.servicios_principales = JSON.parse(JSON.stringify(plan.servicios_incluidos));
             }
         }
 

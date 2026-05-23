@@ -2600,6 +2600,21 @@
                                         class="currency-input w-full pl-8 pr-3 py-2 border border-slate-200/60 rounded-xl text-sm font-black text-emerald-600 bg-emerald-50/30 outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all shadow-sm">
                                 </div>
                             </div>
+
+                            <!-- Servicios Incluidos en el Plan -->
+                            <div class="md:col-span-2 pt-4 border-t border-slate-100 mt-2">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h5 class="text-[10px] font-black text-slate-800 uppercase tracking-widest flex items-center">
+                                        <i class="ph ph-list-checks text-slate-400 mr-1.5 text-base"></i> Servicios Incluidos en el Plan
+                                    </h5>
+                                    <button type="button" onclick="PlanesComponent.addServicioIncluidoRow()" class="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-[9px] font-black hover:bg-slate-800 flex items-center gap-1 transition-all uppercase tracking-widest">
+                                        <i class="ph ph-plus"></i> Agregar
+                                    </button>
+                                </div>
+                                <div id="pf-servicios-incluidos-container" class="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                    <!-- Se inyectan las filas dinámicamente -->
+                                </div>
+                            </div>
                         </div>
                     </div>
 

@@ -27,6 +27,7 @@ import { B2BModule }          from './modules/b2b.module.js';
 import { SearchModule }          from './modules/search.module.js';
 import { DocumentosComponent } from '../src/components/documentos/documentos.component.js';
 import { TrazabilidadComponent } from '../src/components/trazabilidad/trazabilidad.component.js';
+import { PlanesComponent }       from '../src/components/planes/planes.component.js';
 
 // ════════════════════════════════════════════════════════════
 // PUENTE GLOBAL — Necesario para onclick="" del HTML
@@ -60,6 +61,7 @@ window.B2BModule          = B2BModule;
 window.SearchModule       = SearchModule;
 window.DocumentosComponent = DocumentosComponent;
 window.TrazabilidadComponent = TrazabilidadComponent;
+window.PlanesComponent     = PlanesComponent;
 
 // ════════════════════════════════════════════════════════════
 // ARRANQUE DEL SISTEMA

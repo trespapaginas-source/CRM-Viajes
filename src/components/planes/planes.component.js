@@ -8,6 +8,7 @@ export const PlanesComponent = {
     tempProveedores: [],
     tempSelectedCatalog: [],
     tempFechas: [],
+    tempServiciosIncluidos: [],
     eventsBound: false,
 
     init() {
@@ -260,6 +261,7 @@ export const PlanesComponent = {
         this.tempProveedores = [];
         this.tempSelectedCatalog = [];
         this.tempFechas = [];
+        this.tempServiciosIncluidos = [];
 
         UI.switchTab('plan', 'info');
 
@@ -296,13 +298,20 @@ export const PlanesComponent = {
                 }
                 selTipo.value = pq.tipo;
                 this.tempProveedores = pq.proveedores_vinculados || [];
+                this.tempServiciosIncluidos = pq.servicios_incluidos || [];
             }
         } else {
             document.getElementById('plan-form-title').innerText = "Nuevo Plan";
+            this.tempServiciosIncluidos = [
+                { categoria: 'Transporte Aéreo', descripcion: 'Vuelos de ida y regreso con equipaje incluido.' },
+                { categoria: 'Alojamiento', descripcion: 'Estadía en hotel seleccionado con desayuno diario.' },
+                { categoria: 'Alimentación', descripcion: 'Desayunos diarios en el alojamiento.' }
+            ];
         }
 
         this.renderTempDates();
         this.renderTempProveedores();
+        this.renderTempServiciosIncluidos();
         UI.openModal('plan-form-modal', 'plan-form-bg', 'plan-form-content');
         this.syncSummary();
     },
@@ -407,6 +416,37 @@ export const PlanesComponent = {
         this.syncSummary();
     },
 
+    renderTempServiciosIncluidos() {
+        const dom = document.getElementById('pf-servicios-incluidos-container');
+        if (!dom) return;
+        dom.innerHTML = '';
+
+        this.tempServiciosIncluidos.forEach((item, idx) => {
+            dom.innerHTML += `
+                <div class="flex gap-2 items-center">
+                    <input type="text" placeholder="Categoría" value="${UI.sanitize(item.categoria || '')}" oninput="PlanesComponent.onServioIncluidoInputChanged(${idx}, 'categoria', this.value)" class="w-1/3 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                    <input type="text" placeholder="Descripción" value="${UI.sanitize(item.descripcion || '')}" oninput="PlanesComponent.onServioIncluidoInputChanged(${idx}, 'descripcion', this.value)" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                    <button type="button" onclick="PlanesComponent.removeServicioIncluidoRow(${idx})" class="text-rose-500 hover:text-rose-700 p-2"><i class="ph ph-trash text-base pointer-events-none"></i></button>
+                </div>`;
+        });
+    },
+
+    addServicioIncluidoRow() {
+        this.tempServiciosIncluidos.push({ categoria: '', descripcion: '' });
+        this.renderTempServiciosIncluidos();
+    },
+
+    removeServicioIncluidoRow(idx) {
+        this.tempServiciosIncluidos.splice(idx, 1);
+        this.renderTempServiciosIncluidos();
+    },
+
+    onServioIncluidoInputChanged(idx, field, val) {
+        if (this.tempServiciosIncluidos[idx]) {
+            this.tempServiciosIncluidos[idx][field] = val;
+        }
+    },
+
     syncSummary() {
         const u = UI.parseCurrency(document.getElementById('pf-precio')?.value);
         let s = 0;
@@ -452,7 +492,8 @@ export const PlanesComponent = {
             notas: document.getElementById('pf-notas').value,
             copy_promocional: document.getElementById('plan-copy-promocional').value,
             proveedores_vinculados: this.tempProveedores,
-            costo_base: cst
+            costo_base: cst,
+            servicios_incluidos: this.tempServiciosIncluidos
         };
 
         try {
