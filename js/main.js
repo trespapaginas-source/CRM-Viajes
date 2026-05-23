@@ -80,3 +80,10 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+
+// Listener global para dar formato de moneda en tiempo real a los inputs con clase .currency-input
+document.addEventListener('input', (e) => {
+    if (e.target && e.target.classList.contains('currency-input')) {
+        window.UI.formatCurrencyElement(e.target);
+    }
+});

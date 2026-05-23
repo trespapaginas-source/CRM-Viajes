@@ -120,6 +120,40 @@ export const UI = {
         setTimeout(() => {
             cajaPadre.classList.add('hidden');
         }, 300);
+    },
+
+    formatCurrencyElement(input) {
+        let val = input.value.replace(/\D/g, '');
+        if (val) {
+            if (val.length > 1) {
+                val = val.replace(/^0+/, '');
+            }
+            input.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        } else {
+            input.value = '';
+        }
+    },
+
+    parseCurrency(val) {
+        if (val === undefined || val === null || val === '') return 0;
+        if (typeof val === 'number') return val;
+        const clean = String(val).replace(/\./g, '').trim();
+        return parseFloat(clean) || 0;
+    },
+
+    setCurrencyValue(id, val) {
+        const el = document.getElementById(id);
+        if (el) {
+            if (val === undefined || val === null || val === '') {
+                el.value = '';
+                return;
+            }
+            let str = String(val).replace(/\D/g, '');
+            if (str.length > 1) {
+                str = str.replace(/^0+/, '');
+            }
+            el.value = str.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
     }
 };
 

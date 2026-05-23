@@ -411,7 +411,7 @@ export const RentabilidadComponent = {
                 categoria: document.getElementById('ng-categoria').value,
                 concepto: document.getElementById('ng-concepto').value,
                 tipo_valor: document.getElementById('ng-tipo-valor').value,
-                valor: parseFloat(document.getElementById('ng-valor').value),
+                valor: UI.parseCurrency(document.getElementById('ng-valor').value),
                 soporte_url: soporteUrl,
                 justificacion: document.getElementById('ng-justificacion').value.trim(),
                 usuario_email: window.AuthModule?.currentUser?.email || 'Staff'

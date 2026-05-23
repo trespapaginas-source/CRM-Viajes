@@ -524,7 +524,7 @@ const DocumentosComponent = {
         if (getEl('doc_pago_cuenta')) getEl('doc_pago_cuenta').value = this.activeDoc.data.pago_cuenta || '';
         if (getEl('doc_pago_referencia')) getEl('doc_pago_referencia').value = this.activeDoc.data.pago_referencia || '';
 
-        if (getEl('doc_paquete_valor')) getEl('doc_paquete_valor').value = this.activeDoc.data.paquete_valor || 0;
+        if (getEl('doc_paquete_valor')) UI.setCurrencyValue('doc_paquete_valor', this.activeDoc.data.paquete_valor || 0);
 
         // Backward compatibility: map legacy conditions to the new array structure
         if (!this.activeDoc.data.condiciones) {
@@ -599,7 +599,7 @@ const DocumentosComponent = {
                 div.innerHTML = `
                     <input type="text" placeholder="Categoría" value="${item.categoria}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'categoria', this.value)" class="w-1/4 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                     <input type="text" placeholder="Descripción" value="${item.descripcion}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'descripcion', this.value)" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
-                    <input type="number" placeholder="Valor" value="${item.valor || 0}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'valor', this.value)" class="w-1/4 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                    <input type="text" placeholder="Valor" value="${item.valor ? String(item.valor).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'valor', this.value)" class="currency-input w-1/4 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                     <button type="button" onclick="DocumentosComponent.removeAdicionalRow(${idx})" class="text-rose-500 hover:text-rose-700 p-2"><i class="ph ph-trash text-base"></i></button>
                 `;
                 adicContainer.appendChild(div);
@@ -615,7 +615,7 @@ const DocumentosComponent = {
                 div.className = 'flex gap-2 items-center';
                 div.innerHTML = `
                     <input type="text" placeholder="Fecha (Ej: 19/05/2026)" value="${item.fecha}" oninput="DocumentosComponent.onListInputChanged('abonos', ${idx}, 'fecha', this.value)" class="w-1/3 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
-                    <input type="number" placeholder="Monto" value="${item.monto || 0}" oninput="DocumentosComponent.onListInputChanged('abonos', ${idx}, 'monto', this.value)" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                    <input type="text" placeholder="Monto" value="${item.monto ? String(item.monto).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}" oninput="DocumentosComponent.onListInputChanged('abonos', ${idx}, 'monto', this.value)" class="currency-input flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                     <button type="button" onclick="DocumentosComponent.removeAbonoRow(${idx})" class="text-rose-500 hover:text-rose-700 p-2"><i class="ph ph-trash text-base"></i></button>
                 `;
                 abonosContainer.appendChild(div);
@@ -652,7 +652,7 @@ const DocumentosComponent = {
 
         if (arrayToUpdate && arrayToUpdate[index]) {
             if (field === 'valor' || field === 'monto') {
-                arrayToUpdate[index][field] = parseFloat(value) || 0;
+                arrayToUpdate[index][field] = UI.parseCurrency(value) || 0;
             } else {
                 arrayToUpdate[index][field] = value;
             }
@@ -770,7 +770,7 @@ const DocumentosComponent = {
     },
 
     recalculate: function () {
-        const pacoteVal = parseFloat(document.getElementById('doc_paquete_valor')?.value) || 0;
+        const pacoteVal = UI.parseCurrency(document.getElementById('doc_paquete_valor')?.value) || 0;
         this.activeDoc.data.paquete_valor = pacoteVal;
 
         const adicionalesSum = this.activeDoc.data.servicios_adicionales.reduce((sum, item) => sum + (Number(item.valor) || 0), 0);

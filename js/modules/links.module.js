@@ -25,7 +25,7 @@ export const LinksModule = {
         if (!pId) return;
         const plan = DataService.planes.find(p => p.id === pId);
         if (plan) {
-            inputTarifa.value = plan.precio_persona || 0;
+            UI.setCurrencyValue('link-tarifa', plan.precio_persona || 0);
             if (plan.fechas && plan.fechas.length > 0) {
                 const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
                 plan.fechas.forEach(f => {
@@ -46,8 +46,8 @@ export const LinksModule = {
         const telefono = document.getElementById('link-telefono').value;
         const planId = document.getElementById('link-plan-id').value;
         const fecha = document.getElementById('link-fecha').value;
-        const tarifa = parseFloat(document.getElementById('link-tarifa').value);
-        const abono = parseFloat(document.getElementById('link-abono').value);
+        const tarifa = UI.parseCurrency(document.getElementById('link-tarifa').value);
+        const abono = UI.parseCurrency(document.getElementById('link-abono').value);
 
         if (!planId || !fecha || isNaN(tarifa) || isNaN(abono)) return UI.showToast("Faltan datos financieros o del plan.", "error");
 

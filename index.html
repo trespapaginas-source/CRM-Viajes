@@ -1012,9 +1012,9 @@
                                     <div class="relative">
                                         <span
                                             class="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">$</span>
-                                        <input type="number" id="b2b-cat-precio" required min="0" step="0.01"
-                                            class="w-full pl-8 pr-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all"
-                                            placeholder="1500000">
+                                        <input type="text" id="b2b-cat-precio" required min="0" inputmode="numeric"
+                                            class="currency-input w-full pl-8 pr-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all"
+                                            placeholder="1.500.000">
                                     </div>
                                 </div>
                                 <div>
@@ -1121,8 +1121,8 @@
                                         <label
                                             class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Valor
                                             Venta ($) *</label>
-                                        <input type="number" id="b2b-deal-monto" required min="0" placeholder="0"
-                                            class="w-full px-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all shadow-sm">
+                                        <input type="text" id="b2b-deal-monto" required min="0" inputmode="numeric" placeholder="0"
+                                            class="currency-input w-full px-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all shadow-sm">
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -1382,8 +1382,8 @@
                                         <div class="relative">
                                             <span
                                                 class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">$</span>
-                                            <input type="number" id="link-tarifa" required min="1"
-                                                class="w-full pl-8 pr-3 py-2 border border-slate-200/60 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-white transition-all shadow-sm">
+                                            <input type="text" id="link-tarifa" required min="1" inputmode="numeric"
+                                                class="currency-input w-full pl-8 pr-3 py-2 border border-slate-200/60 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-white transition-all shadow-sm">
                                         </div>
                                     </div>
                                     <div>
@@ -1393,8 +1393,8 @@
                                         <div class="relative">
                                             <span
                                                 class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-base">$</span>
-                                            <input type="number" id="link-abono" required min="1"
-                                                class="w-full pl-8 pr-3 py-2 border border-emerald-200/60 rounded-xl text-sm font-black text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50/30 transition-all shadow-sm">
+                                            <input type="text" id="link-abono" required min="1" inputmode="numeric"
+                                                class="currency-input w-full pl-8 pr-3 py-2 border border-emerald-200/60 rounded-xl text-sm font-black text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50/30 transition-all shadow-sm">
                                         </div>
                                     </div>
                                 </div>
@@ -2053,7 +2053,7 @@
                                 <div class="accordion-content space-y-4 mt-4">
                                     <div>
                                         <label class="block text-[10px] font-black text-slate-700 mb-1.5 uppercase tracking-widest">Valor Plan Turístico ($)</label>
-                                        <input type="number" id="doc_paquete_valor" placeholder="0" oninput="DocumentosComponent.recalculate(); DocumentosComponent.renderPreview();" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none">
+                                        <input type="text" id="doc_paquete_valor" placeholder="0" inputmode="numeric" oninput="DocumentosComponent.recalculate(); DocumentosComponent.renderPreview();" class="currency-input w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-800 outline-none">
                                     </div>
 
                                     <div id="abonos_container" class="space-y-2 mt-4">
@@ -2446,8 +2446,8 @@
                         <div class="relative">
                             <span
                                 class="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-lg">$</span>
-                            <input type="number" id="qsm-cost" placeholder="0"
-                                class="w-full pl-10 pr-4 py-3 border border-slate-200/60 rounded-xl text-lg font-black text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50/30 transition-all shadow-sm">
+                            <input type="text" id="qsm-cost" placeholder="0" inputmode="numeric"
+                                class="currency-input w-full pl-10 pr-4 py-3 border border-slate-200/60 rounded-xl text-lg font-black text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50/30 transition-all shadow-sm">
                         </div>
                     </div>
                 </div>
@@ -2579,8 +2579,8 @@
                                 <div class="relative">
                                     <span
                                         class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-base">$</span>
-                                    <input type="number" id="pf-precio" required min="0"
-                                        class="w-full pl-8 pr-3 py-2 border border-slate-200/60 rounded-xl text-sm font-black text-emerald-600 bg-emerald-50/30 outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all shadow-sm">
+                                    <input type="text" id="pf-precio" required min="0" inputmode="numeric"
+                                        class="currency-input w-full pl-8 pr-3 py-2 border border-slate-200/60 rounded-xl text-sm font-black text-emerald-600 bg-emerald-50/30 outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all shadow-sm">
                                 </div>
                             </div>
                         </div>
@@ -2678,8 +2678,8 @@
                                 <div class="relative">
                                     <span
                                         class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">$</span>
-                                    <input type="number" id="pf-deposito" value="200000" min="0"
-                                        class="w-full pl-10 pr-4 py-3 border border-slate-200/60 rounded-xl text-sm font-black text-slate-800 bg-slate-50/50 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all shadow-sm">
+                                    <input type="text" id="pf-deposito" value="200.000" min="0" inputmode="numeric"
+                                        class="currency-input w-full pl-10 pr-4 py-3 border border-slate-200/60 rounded-xl text-sm font-black text-slate-800 bg-slate-50/50 outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all shadow-sm">
                                 </div>
                             </div>
                             <div>
@@ -2905,9 +2905,8 @@
                                         <div class="relative">
                                             <span
                                                 class="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 font-bold text-lg">$</span>
-                                            <input type="number" id="cf-precio-total" required
-                                                
-                                                class="w-full pl-8 pr-3 py-2.5 border border-primary-200 rounded-xl text-lg bg-white font-black text-emerald-600 outline-none focus:ring-2 focus:ring-primary-500/50 transition-all shadow-sm">
+                                            <input type="text" id="cf-precio-total" required inputmode="numeric"
+                                                class="currency-input w-full pl-8 pr-3 py-2.5 border border-primary-200 rounded-xl text-lg bg-white font-black text-emerald-600 outline-none focus:ring-2 focus:ring-primary-500/50 transition-all shadow-sm">
                                         </div>
                                     </div>
                                 </div>
@@ -2936,8 +2935,8 @@
                                 <div class="relative">
                                     <span
                                         class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                    <input type="number" id="cf-monto-devuelto" placeholder="Ej: 500000"
-                                        class="w-full pl-8 pr-3 py-2 border border-rose-200/60 bg-rose-50/30 rounded-xl text-xs font-bold text-rose-700 outline-none focus:ring-2 focus:ring-rose-500 transition-all">
+                                    <input type="text" id="cf-monto-devuelto" placeholder="Ej: 500.000" inputmode="numeric"
+                                        class="currency-input w-full pl-8 pr-3 py-2 border border-rose-200/60 bg-rose-50/30 rounded-xl text-xs font-bold text-rose-700 outline-none focus:ring-2 focus:ring-rose-500 transition-all">
                                 </div>
                             </div>
                         </div>
@@ -3039,9 +3038,8 @@
                                     <div class="relative">
                                         <span
                                             class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                        <input type="number" id="cf-abono-inicial" value="0" min="0"
-                                            
-                                            class="w-full pl-10 pr-4 py-3 border border-slate-200/60 bg-slate-50/50 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                                        <input type="text" id="cf-abono-inicial" value="0" min="0" inputmode="numeric"
+                                            class="currency-input w-full pl-10 pr-4 py-3 border border-slate-200/60 bg-slate-50/50 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
                                     </div>
                                 </div>
                                 <div id="div-abono-metodo" class="hidden">
@@ -3069,9 +3067,9 @@
                                     <div class="relative flex-1">
                                         <span
                                             class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">$</span>
-                                        <input type="number" id="cf-abono-live-monto" placeholder="Monto a sumar"
+                                        <input type="text" id="cf-abono-live-monto" placeholder="Monto a sumar" inputmode="numeric"
                                             min="1"
-                                            class="w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-xl text-sm font-black text-slate-800 bg-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-sm">
+                                            class="currency-input w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-xl text-sm font-black text-slate-800 bg-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-sm">
                                     </div>
                                     <select id="cf-abono-live-metodo"
                                         class="w-full sm:w-1/4 border border-emerald-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-sm">
@@ -3327,8 +3325,8 @@
                         Valor del Abono ($)</label>
                     <div class="relative">
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">$</span>
-                        <input type="number" id="aam-monto"
-                            class="w-full pl-10 pr-4 py-3 border border-slate-200/60 rounded-xl text-lg font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm bg-slate-50/50">
+                        <input type="text" id="aam-monto" inputmode="numeric"
+                            class="currency-input w-full pl-10 pr-4 py-3 border border-slate-200/60 rounded-xl text-lg font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm bg-slate-50/50">
                     </div>
                     <label
                         class="block text-[10px] font-black text-slate-400 mt-5 mb-1.5 uppercase tracking-widest">Estado
@@ -3630,7 +3628,7 @@
                                         <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1" id="ng-label-valor">Monto ($)</label>
                                         <div class="relative">
                                             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs" id="ng-symbol">$</span>
-                                            <input type="number" id="ng-valor" required min="0" step="0.01" placeholder="0" class="w-full pl-7 pr-3 py-2 border border-slate-200/60 rounded-lg text-xs font-black outline-none focus:ring-2 focus:ring-slate-900 bg-white transition-all shadow-sm">
+                                            <input type="text" id="ng-valor" required min="0" inputmode="numeric" placeholder="0" class="currency-input w-full pl-7 pr-3 py-2 border border-slate-200/60 rounded-lg text-xs font-black outline-none focus:ring-2 focus:ring-slate-900 bg-white transition-all shadow-sm">
                                         </div>
                                     </div>
                                 </div>
@@ -4055,7 +4053,7 @@
                                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Monto (COP)</label>
                                     <div class="relative">
                                         <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">$</span>
-                                        <input type="number" id="pvm-gasto-corp-monto" required min="1" step="0.01" class="w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-lg pl-6 pr-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="0.00">
+                                        <input type="text" id="pvm-gasto-corp-monto" required min="1" inputmode="numeric" class="currency-input w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-lg pl-6 pr-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="0">
                                     </div>
                                 </div>
 
@@ -4233,7 +4231,7 @@
                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Monto a Operar (COP)</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">$</span>
-                        <input type="number" id="pvm-mov-monto" required min="1" step="0.01" class="w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-xl pl-6 pr-3 py-2 outline-none focus:ring-2 focus:ring-slate-900" placeholder="0.00">
+                        <input type="text" id="pvm-mov-monto" required min="1" inputmode="numeric" class="currency-input w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-xl pl-6 pr-3 py-2 outline-none focus:ring-2 focus:ring-slate-900" placeholder="0">
                     </div>
                 </div>
 
@@ -4288,9 +4286,9 @@
                             Sugerido (Referencia) *</label>
                         <div class="relative">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">$</span>
-                            <input type="number" id="b2b-cat-precio" required min="0" step="0.01"
-                                class="w-full pl-8 pr-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all"
-                                placeholder="1500000">
+                            <input type="text" id="b2b-cat-precio" required min="0" inputmode="numeric"
+                                class="currency-input w-full pl-8 pr-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all"
+                                placeholder="1.500.000">
                         </div>
                     </div>
                     <div>
@@ -4396,8 +4394,8 @@
                             <label
                                 class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Valor
                                 Venta Acordado ($)</label>
-                            <input type="number" id="b2b-deal-monto" min="0" placeholder="0"
-                                class="w-full px-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all shadow-sm">
+                            <input type="text" id="b2b-deal-monto" min="0" inputmode="numeric" placeholder="0"
+                                class="currency-input w-full px-4 py-3 border border-slate-200/60 rounded-2xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all shadow-sm">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -4527,7 +4525,7 @@
                             <label class="block text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1.5">Precio Total Venta *</label>
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 font-bold">$</span>
-                                <input type="number" id="int-precio-total" required placeholder="0" class="w-full pl-8 pr-4 py-3 border border-emerald-200/60 rounded-xl text-sm font-black text-emerald-800 outline-none focus:ring-2 focus:ring-emerald-500 bg-white transition-all shadow-sm" >
+                                <input type="text" id="int-precio-total" required inputmode="numeric" placeholder="0" class="currency-input w-full pl-8 pr-4 py-3 border border-emerald-200/60 rounded-xl text-sm font-black text-emerald-800 outline-none focus:ring-2 focus:ring-emerald-500 bg-white transition-all shadow-sm" >
                             </div>
                             <p class="text-[8px] text-emerald-600/70 mt-1 uppercase tracking-widest font-bold">Cobro al cliente en COP</p>
                         </div>
@@ -4536,7 +4534,7 @@
                             <label class="block text-[9px] font-black text-orange-700 uppercase tracking-widest mb-1.5">Costo a Proveedores *</label>
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-orange-600 font-bold">$</span>
-                                <input type="number" id="int-costo-total" required placeholder="0" class="w-full pl-8 pr-4 py-3 border border-orange-200/60 rounded-xl text-sm font-black text-orange-800 outline-none focus:ring-2 focus:ring-orange-500 bg-white transition-all shadow-sm" >
+                                <input type="text" id="int-costo-total" required inputmode="numeric" placeholder="0" class="currency-input w-full pl-8 pr-4 py-3 border border-orange-200/60 rounded-xl text-sm font-black text-orange-800 outline-none focus:ring-2 focus:ring-orange-500 bg-white transition-all shadow-sm" >
                             </div>
                             <p class="text-[8px] text-orange-600/70 mt-1 uppercase tracking-widest font-bold">Lo que pagamos al mayorista en COP</p>
                         </div>

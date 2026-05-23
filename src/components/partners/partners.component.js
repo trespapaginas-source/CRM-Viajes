@@ -1538,7 +1538,11 @@ export const PartnersComponent = {
         document.getElementById('pvm-mov-fecha').value = new Date().toISOString().substring(0, 10);
         
         const montoInput = document.getElementById('pvm-mov-monto');
-        montoInput.value = tipo === 'corte' ? disponible.toFixed(2) : '';
+        if (tipo === 'corte') {
+            UI.setCurrencyValue('pvm-mov-monto', Math.floor(disponible));
+        } else {
+            montoInput.value = '';
+        }
         document.getElementById('pvm-mov-concepto').value = '';
 
         UI.openModal('pvm-movimiento-modal', 'pvm-mov-bg', 'pvm-mov-content');
@@ -1547,7 +1551,7 @@ export const PartnersComponent = {
     async handleMovimientoSubmit() {
         const email = document.getElementById('pvm-mov-socio-email').value;
         const tipo = document.getElementById('pvm-mov-tipo').value;
-        const monto = parseFloat(document.getElementById('pvm-mov-monto').value) || 0;
+        const monto = UI.parseCurrency(document.getElementById('pvm-mov-monto').value) || 0;
         const fecha = document.getElementById('pvm-mov-fecha').value;
         const concepto = document.getElementById('pvm-mov-concepto').value;
 
@@ -1619,7 +1623,7 @@ export const PartnersComponent = {
 
     async handleGastoCorpSubmit() {
         const categoria = document.getElementById('pvm-gasto-corp-categoria').value;
-        const monto = parseFloat(document.getElementById('pvm-gasto-corp-monto').value) || 0;
+        const monto = UI.parseCurrency(document.getElementById('pvm-gasto-corp-monto').value) || 0;
         const fecha = document.getElementById('pvm-gasto-corp-fecha').value;
         const concepto = document.getElementById('pvm-gasto-corp-concepto').value.trim();
         const fileInput = document.getElementById('pvm-gasto-corp-comprobante');

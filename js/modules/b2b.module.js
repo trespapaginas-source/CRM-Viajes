@@ -46,7 +46,7 @@ export const B2BModule = {
             return;
         }
         const serv = DataService.b2b_servicios.find(s => s.id === servId);
-        if (serv) document.getElementById('b2b-deal-monto').value = serv.precio_sugerido;
+        if (serv) UI.setCurrencyValue('b2b-deal-monto', serv.precio_sugerido);
     },
 
     renderGrid() {
@@ -187,7 +187,7 @@ export const B2BModule = {
             if (!aliadoIdFinal) throw new Error("Falta la asignación del Aliado.");
 
             const servicioId = document.getElementById('b2b-deal-servicio').value;
-            const monto = document.getElementById('b2b-deal-monto').value;
+            const monto = UI.parseCurrency(document.getElementById('b2b-deal-monto').value);
             const estado = document.getElementById('b2b-deal-estado').value;
             const notas = document.getElementById('b2b-deal-notas').value.trim();
 
@@ -196,7 +196,7 @@ export const B2BModule = {
 
                 const payloadUpdateDeal = {
                     servicio_id: servicioId,
-                    monto_acordado: parseFloat(monto),
+                    monto_acordado: monto,
                     estado: estado,
                     notas: notas
                 };
@@ -213,7 +213,7 @@ export const B2BModule = {
                     const payloadNewDeal = {
                         aliado_id: aliadoIdFinal,
                         servicio_id: servicioId,
-                        monto_acordado: parseFloat(monto || 0),
+                        monto_acordado: monto || 0,
                         estado: estado,
                         notas: notas
                     };
@@ -276,7 +276,7 @@ export const B2BModule = {
         document.getElementById('b2b-deal-aliado').value = deal.aliado_id;
         document.getElementById('b2b-deal-servicio').value = deal.servicio_id;
         document.getElementById('b2b-deal-servicio').required = true;
-        document.getElementById('b2b-deal-monto').value = deal.monto_acordado;
+        UI.setCurrencyValue('b2b-deal-monto', deal.monto_acordado);
         document.getElementById('b2b-deal-estado').value = deal.estado;
         document.getElementById('b2b-deal-notas').value = deal.notas || '';
 
@@ -503,7 +503,7 @@ export const B2BModule = {
         // Llenar el formulario con los datos del servicio a editar
         document.getElementById('b2b-cat-id').value = item.id;
         document.getElementById('b2b-cat-nombre').value = item.nombre;
-        document.getElementById('b2b-cat-precio').value = item.precio_sugerido;
+        UI.setCurrencyValue('b2b-cat-precio', item.precio_sugerido);
         document.getElementById('b2b-cat-desc').value = item.descripcion || '';
 
         // Cambiar la vista de los botones
@@ -544,7 +544,7 @@ export const B2BModule = {
         try {
             const payload = {
                 nombre: document.getElementById('b2b-cat-nombre').value.trim(),
-                precio_sugerido: parseFloat(document.getElementById('b2b-cat-precio').value),
+                precio_sugerido: UI.parseCurrency(document.getElementById('b2b-cat-precio').value),
                 descripcion: document.getElementById('b2b-cat-desc').value.trim()
             };
 

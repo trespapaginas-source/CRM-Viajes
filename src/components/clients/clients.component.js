@@ -334,7 +334,7 @@ export const ClientsComponent = {
                 document.getElementById('cf-eps').value = c.eps || '';
                 document.getElementById('cf-plan-id').value = c.plan_id;
                 document.getElementById('cf-pax').value = c.pax || 1;
-                document.getElementById('cf-precio-total').value = c.precio_total;
+                UI.setCurrencyValue('cf-precio-total', c.precio_total);
                 document.getElementById('cf-estado').value = c.estado;
                 document.getElementById('cf-alergias').value = c.alergias || '';
                 document.getElementById('cf-requerimientos').value = c.requerimientos || '';
@@ -347,7 +347,7 @@ export const ClientsComponent = {
                 selEtiqueta.value = c.etiqueta || '';
 
                 if (c.monto_devuelto !== undefined) {
-                    document.getElementById('cf-monto-devuelto').value = c.monto_devuelto;
+                    UI.setCurrencyValue('cf-monto-devuelto', c.monto_devuelto);
                 } else {
                     document.getElementById('cf-monto-devuelto').value = '';
                 }
@@ -409,7 +409,7 @@ export const ClientsComponent = {
         const plan = DataService.planes.find(p => p.id === id);
         if (plan) {
             if (!bloqueo) {
-                document.getElementById('cf-abono-inicial').value = plan.deposito_requerido || 0;
+                UI.setCurrencyValue('cf-abono-inicial', plan.deposito_requerido || 0);
             }
 
             // LÓGICA DEL DESPLEGABLE DE FECHAS
@@ -477,15 +477,14 @@ export const ClientsComponent = {
 
             // Solo autocalcula el precio total si es nuevo y el usuario NO está editando el campo manualmente
             if (formEsNuevo && plan && document.activeElement.id !== 'cf-precio-total') {
-                document.getElementById('cf-precio-total').value = (parseFloat(plan.precio_persona) * px).toFixed(0);
+                UI.setCurrencyValue('cf-precio-total', Math.floor(parseFloat(plan.precio_persona) * px));
             }
 
-            const tNStr = document.getElementById('cf-precio-total')?.value;
-            const tN = Math.floor(Number(tNStr || 0));
+            const tN = UI.parseCurrency(document.getElementById('cf-precio-total')?.value);
             let tA = 0;
 
             if (formEsNuevo) {
-                tA = Math.floor(Number(document.getElementById('cf-abono-inicial')?.value || 0));
+                tA = UI.parseCurrency(document.getElementById('cf-abono-inicial')?.value);
             } else {
                 tA = DataService.abonos.filter(a => a.cliente_id === document.getElementById('cf-id').value && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
             }
@@ -511,7 +510,7 @@ export const ClientsComponent = {
         } else {
             document.getElementById('div-abono-monto').classList.add('hidden');
             document.getElementById('div-abono-metodo').classList.add('hidden');
-            document.getElementById('cf-abono-inicial').value = 0;
+            UI.setCurrencyValue('cf-abono-inicial', 0);
         }
         this.calculateTotals();
     },
@@ -620,7 +619,7 @@ export const ClientsComponent = {
         document.getElementById('aam-title').innerHTML = '<i class="ph ph-pencil-simple text-blue-500 mr-2 text-2xl"></i> Editar Abono';
         document.getElementById('aam-delete-body').classList.add('hidden');
 
-        document.getElementById('aam-monto').value = monto;
+        UI.setCurrencyValue('aam-monto', monto);
         document.getElementById('aam-estado').value = status || 'confirmed';
         document.getElementById('aam-edit-body').classList.remove('hidden');
 
@@ -643,7 +642,7 @@ export const ClientsComponent = {
 
         try {
             if (type === 'edit') {
-                const nM = parseFloat(document.getElementById('aam-monto').value);
+                const nM = UI.parseCurrency(document.getElementById('aam-monto').value);
                 const st = document.getElementById('aam-estado').value;
                 if (isNaN(nM) || nM <= 0) {
                     UI.showToast("Monto inválido para edición.", "error");
@@ -689,7 +688,7 @@ export const ClientsComponent = {
         }
 
         const cli = DataService.clientes.find(x => x.id === cId);
-        const val = parseFloat(document.getElementById('cf-abono-live-monto').value);
+        const val = UI.parseCurrency(document.getElementById('cf-abono-live-monto').value);
         const met = document.getElementById('cf-abono-live-metodo').value;
         const sts = document.getElementById('cf-abono-live-status').value;
 
@@ -732,7 +731,7 @@ export const ClientsComponent = {
 
     async saveQuickAbono(cId) {
         const cli = DataService.clientes.find(x => x.id === cId);
-        const val = parseFloat(document.getElementById('qa-monto').value);
+        const val = UI.parseCurrency(document.getElementById('qa-monto').value);
         const met = document.getElementById('qa-metodo').value;
 
         if (isNaN(val) || val <= 0) {
@@ -788,7 +787,7 @@ export const ClientsComponent = {
 
         try {
             const pId = document.getElementById('cf-plan-id').value;
-            const pTot = parseFloat(document.getElementById('cf-precio-total').value);
+            const pTot = UI.parseCurrency(document.getElementById('cf-precio-total').value);
 
             if (!pId || isNaN(pTot) || pTot <= 0) {
                 btn.disabled = false;
@@ -799,7 +798,7 @@ export const ClientsComponent = {
             const fId = document.getElementById('cf-id').value;
             const esNvo = !fId;
             const mPgo = document.getElementById('cf-tipo-pago').value;
-            let ini = parseFloat(document.getElementById('cf-abono-inicial').value) || 0;
+            let ini = UI.parseCurrency(document.getElementById('cf-abono-inicial').value) || 0;
 
             const estadoEl = document.getElementById('cf-estado').value;
 
@@ -816,7 +815,7 @@ export const ClientsComponent = {
             let montoDevuelto = 0;
             if (estadoEl === 'devolución') {
                 const inputEl = document.getElementById('cf-monto-devuelto');
-                montoDevuelto = parseFloat(inputEl ? inputEl.value : 0);
+                montoDevuelto = UI.parseCurrency(inputEl ? inputEl.value : 0);
                 if (isNaN(montoDevuelto) || montoDevuelto < 0) {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="ph ph-floppy-disk mr-2 text-xl"></i> Guardar y Formalizar';
@@ -1031,7 +1030,7 @@ export const ClientsComponent = {
                         <div class="flex flex-col sm:flex-row gap-2">
                             <div class="relative flex-1">
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">$</span>
-                                <input type="number" id="qa-monto" placeholder="Ej: 100000" min="1" class="w-full pl-8 pr-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-semibold outline-none shadow-sm focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all text-slate-800">
+                                <input type="text" id="qa-monto" placeholder="Ej: 100.000" min="1" inputmode="numeric" class="currency-input w-full pl-8 pr-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-semibold outline-none shadow-sm focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all text-slate-800">
                             </div>
                             <select id="qa-metodo" class="border border-slate-200 bg-white rounded-lg px-4 py-2 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
                                 <option value="Transferencia">Transferencia</option>

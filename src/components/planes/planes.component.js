@@ -284,8 +284,8 @@ export const PlanesComponent = {
 
                 document.getElementById('pf-destino').value = pq.destino;
                 this.tempFechas = pq.fechas || [];
-                document.getElementById('pf-precio').value = pq.precio_persona;
-                document.getElementById('pf-deposito').value = pq.deposito_requerido || 0;
+                UI.setCurrencyValue('pf-precio', pq.precio_persona);
+                UI.setCurrencyValue('pf-deposito', pq.deposito_requerido || 0);
                 document.getElementById('pf-condiciones').value = pq.condiciones_pago || '';
                 document.getElementById('pf-notas').value = pq.notas || '';
                 document.getElementById('plan-copy-promocional').value = pq.copy_promocional || '';
@@ -408,7 +408,7 @@ export const PlanesComponent = {
     },
 
     syncSummary() {
-        const u = document.getElementById('pf-precio')?.value || 0;
+        const u = UI.parseCurrency(document.getElementById('pf-precio')?.value);
         let s = 0;
         this.tempProveedores.forEach(p => s += parseFloat(p.costo));
         
@@ -446,8 +446,8 @@ export const PlanesComponent = {
             categoria: document.getElementById('pf-categoria').value || 'Local',
             destino: document.getElementById('pf-destino').value,
             fechas: this.tempFechas,
-            precio_persona: parseFloat(document.getElementById('pf-precio').value) || 0,
-            deposito_requerido: parseFloat(document.getElementById('pf-deposito').value) || 0,
+            precio_persona: UI.parseCurrency(document.getElementById('pf-precio').value) || 0,
+            deposito_requerido: UI.parseCurrency(document.getElementById('pf-deposito').value) || 0,
             condiciones_pago: document.getElementById('pf-condiciones').value,
             notas: document.getElementById('pf-notas').value,
             copy_promocional: document.getElementById('plan-copy-promocional').value,
@@ -481,10 +481,12 @@ export const PlanesComponent = {
 
     async quickUpdatePrice(id, cp) {
         const np = prompt("Nueva tarifa de venta al público:", cp);
-        if (np && !isNaN(np)) {
-            await supabaseClient.from('planes').update({ precio_persona: parseFloat(np) }).eq('id', id);
-            await DataService.loadAll();
-            // Store reactive subscription will renderGrid automatically
+        if (np) {
+            const cleanPrice = UI.parseCurrency(np);
+            if (cleanPrice > 0) {
+                await supabaseClient.from('planes').update({ precio_persona: cleanPrice }).eq('id', id);
+                await DataService.loadAll();
+            }
         }
     },
 

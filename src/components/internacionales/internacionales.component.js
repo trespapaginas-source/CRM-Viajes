@@ -195,9 +195,8 @@ export const InternacionalesComponent = {
         document.getElementById('int-email').value = cliente.email || '';
         document.getElementById('int-ciudad').value = cliente.ciudad || '';
         document.getElementById('int-vendedor').value = cliente.vendedor || '';
-        document.getElementById('int-estado').value = cliente.estado || 'En Caja';
-        document.getElementById('int-precio-total').value = cliente.precio_total || '';
-        document.getElementById('int-costo-total').value = cliente.costo_total || '';
+        UI.setCurrencyValue('int-precio-total', cliente.precio_total);
+        UI.setCurrencyValue('int-costo-total', cliente.costo_total);
         document.getElementById('int-notas-financieras').value = cliente.notas_financieras || '';
         
         this.calculateUtility();
@@ -251,7 +250,7 @@ export const InternacionalesComponent = {
                     </div>
                     <div>
                         <label class="block text-[8px] font-bold text-slate-400 uppercase">Abono Inicial / Pago (COP)</label>
-                        <input type="number" class="pax-monto w-full text-xs border-b border-slate-200 py-1 outline-none focus:border-slate-800" placeholder="0" value="${monto}">
+                        <input type="text" class="pax-monto currency-input w-full text-xs border-b border-slate-200 py-1 outline-none focus:border-slate-800" placeholder="0" inputmode="numeric" value="${monto ? String(monto).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}">
                     </div>
                     <div class="sm:col-span-2">
                         <label class="block text-[8px] font-bold text-slate-400 uppercase">Concepto / Descripción</label>
@@ -321,8 +320,8 @@ export const InternacionalesComponent = {
         const ciudad = document.getElementById('int-ciudad').value;
         const vendedor = document.getElementById('int-vendedor').value;
         const estado = document.getElementById('int-estado').value;
-        const precio_total = parseFloat(document.getElementById('int-precio-total').value) || 0;
-        const costo_total = parseFloat(document.getElementById('int-costo-total').value) || 0;
+        const precio_total = UI.parseCurrency(document.getElementById('int-precio-total').value) || 0;
+        const costo_total = UI.parseCurrency(document.getElementById('int-costo-total').value) || 0;
         const notas_financieras = document.getElementById('int-notas-financieras').value;
 
         const pasajeros = [];
@@ -330,7 +329,7 @@ export const InternacionalesComponent = {
             pasajeros.push({
                 id: row.dataset.id,
                 nombre: row.querySelector('.pax-nombre').value,
-                monto_pago: parseFloat(row.querySelector('.pax-monto').value) || 0,
+                monto_pago: UI.parseCurrency(row.querySelector('.pax-monto').value) || 0,
                 descripcion_pago: row.querySelector('.pax-desc').value,
                 comprobante_url: row.querySelector('.pax-url').value
             });
@@ -423,8 +422,8 @@ export const InternacionalesComponent = {
     },
 
     calculateUtility() {
-        const precioTotal = parseFloat(document.getElementById('int-precio-total')?.value) || 0;
-        const costoTotal = parseFloat(document.getElementById('int-costo-total')?.value) || 0;
+        const precioTotal = UI.parseCurrency(document.getElementById('int-precio-total')?.value) || 0;
+        const costoTotal = UI.parseCurrency(document.getElementById('int-costo-total')?.value) || 0;
         const utilidad = precioTotal - costoTotal;
         const display = document.getElementById('int-utilidad-display');
         if (display) display.textContent = formatCOP(utilidad);
