@@ -5,6 +5,25 @@ import { DataService } from '../services/supabase.service.js';
 import { UI } from '../utils/ui.utils.js';
 import { formatCOP, formatShortDate } from '../utils/format.utils.js';
 
+const getPlanColors = (plan) => {
+    const colors = [
+        { bg: 'bg-emerald-50/70 hover:bg-emerald-50', border: 'border-l-emerald-500 border-emerald-100/30', text: 'text-emerald-950', dot: 'bg-emerald-500' },
+        { bg: 'bg-sky-50/70 hover:bg-sky-50', border: 'border-l-sky-500 border-sky-100/30', text: 'text-sky-950', dot: 'bg-sky-500' },
+        { bg: 'bg-amber-50/70 hover:bg-amber-50', border: 'border-l-amber-500 border-amber-100/30', text: 'text-amber-950', dot: 'bg-amber-500' },
+        { bg: 'bg-rose-50/70 hover:bg-rose-50', border: 'border-l-rose-500 border-rose-100/30', text: 'text-rose-950', dot: 'bg-rose-500' },
+        { bg: 'bg-violet-50/70 hover:bg-violet-50', border: 'border-l-violet-500 border-violet-100/30', text: 'text-violet-950', dot: 'bg-violet-500' },
+        { bg: 'bg-teal-50/70 hover:bg-teal-50', border: 'border-l-teal-500 border-teal-100/30', text: 'text-teal-950', dot: 'bg-teal-500' },
+        { bg: 'bg-indigo-50/70 hover:bg-indigo-50', border: 'border-l-indigo-500 border-indigo-100/30', text: 'text-indigo-950', dot: 'bg-indigo-500' }
+    ];
+    let hash = 0;
+    const str = plan.nombre || "";
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+};
+
 export const CalendarModule = {
     currentDate: new Date(),
     currentPopPlanId: null,
@@ -46,8 +65,9 @@ export const CalendarModule = {
         const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+        // Celdas vacías (mes anterior) sin bordes redundantes, usando el gap nativo
         for (let i = 0; i < firstDay; i++) {
-            grid.innerHTML += `<div class="bg-slate-50/50 border-r border-b border-slate-100/50 min-h-[90px] md:min-h-[120px]"></div>`;
+            grid.innerHTML += `<div class="bg-slate-50/30 min-h-[90px] md:min-h-[120px] transition-colors hover:bg-slate-50/50"></div>`;
         }
 
         const filterP = document.getElementById('cal-filter-plan').value;
@@ -75,33 +95,45 @@ export const CalendarModule = {
 
         for (let day = 1; day <= daysInMonth; day++) {
             const isToday = isCurrentMonth && hoy.getDate() === day;
+            
+            // Indicador del número de día
             const headerClass = isToday
-                ? "bg-slate-900 text-white w-6 h-6 flex items-center justify-center rounded-full mx-auto shadow-md"
-                : "text-slate-500 w-6 h-6 flex items-center justify-center mx-auto";
+                ? "bg-primary-600 text-white w-6 h-6 flex items-center justify-center rounded-full shadow-sm shadow-primary-600/20 font-black"
+                : "text-slate-600 font-semibold w-6 h-6 flex items-center justify-center";
 
             let eventsHtml = '';
             if (salidasMap[day]) {
                 salidasMap[day].forEach(sal => {
+                    const col = getPlanColors(sal.plan);
                     eventsHtml += `
                         <div onclick="CalendarModule.showPopover('${sal.plan.id}', '${sal.fechaFormat}', '${UI.sanitize(sal.plan.nombre).replace(/'/g, "\\'")}')"
-                            class="bg-white border border-slate-200 text-slate-700 shadow-sm text-[9px] font-black uppercase tracking-tighter px-1.5 py-1.5 md:px-2 md:py-2 mt-1.5 rounded-lg cursor-pointer hover:border-indigo-300 hover:shadow-md hover:-translate-y-px transition-all truncate flex items-center">
-                            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 shrink-0"></span>
-                            <span class="truncate">${UI.sanitize(sal.plan.nombre)}</span>
+                            class="${col.bg} border-l-4 ${col.border} ${col.text} shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-[10px] font-bold tracking-tight px-2 py-1.5 mt-1 rounded-r-lg cursor-pointer hover:shadow-md hover:-translate-y-px transition-all truncate flex items-center justify-between group">
+                            <div class="flex items-center min-w-0 flex-1">
+                                <span class="w-1.5 h-1.5 rounded-full ${col.dot} mr-1.5 shrink-0 opacity-85"></span>
+                                <span class="truncate font-bold">${UI.sanitize(sal.plan.nombre)}</span>
+                            </div>
+                            <i class="ph ph-arrow-right opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-[9px] shrink-0 text-slate-400"></i>
                         </div>`;
                 });
             }
 
+            const cellBg = isToday 
+                ? "bg-primary-50/10 hover:bg-primary-50/20" 
+                : "bg-white hover:bg-slate-50/30";
+
             grid.innerHTML += `
-                <div class="bg-white border-r border-b border-slate-100 p-1.5 md:p-2 min-h-[90px] md:min-h-[120px] flex flex-col transition-colors hover:bg-slate-50/50">
-                    <div class="text-[11px] font-black mb-1 ${headerClass}">${day}</div>
-                    <div class="flex-1 flex flex-col gap-0 overflow-y-auto custom-scrollbar px-0.5">${eventsHtml}</div>
+                <div class="${cellBg} p-2 min-h-[90px] md:min-h-[120px] flex flex-col transition-colors relative group">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="${headerClass} text-[11px]">${day}</span>
+                    </div>
+                    <div class="flex-1 flex flex-col gap-1 overflow-y-auto custom-scrollbar px-0.5">${eventsHtml}</div>
                 </div>`;
         }
 
         const totalCells = firstDay + daysInMonth;
         const remaining = (7 - (totalCells % 7)) % 7;
         for (let i = 0; i < remaining; i++) {
-            grid.innerHTML += `<div class="bg-slate-50/50 border-r border-b border-slate-100/50 min-h-[90px] md:min-h-[120px]"></div>`;
+            grid.innerHTML += `<div class="bg-slate-50/30 min-h-[90px] md:min-h-[120px] transition-colors hover:bg-slate-50/50"></div>`;
         }
     },
 

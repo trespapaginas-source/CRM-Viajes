@@ -124,6 +124,17 @@ export const App = {
         const countObj = document.getElementById('nav-client-count');
         if (countObj) countObj.innerText = DataService.clientes.length;
 
+        // Mostrar/ocultar filtros de tiempo y botón de descarga del header solo en el Dashboard
+        const timeFilters = document.getElementById('header-time-filters');
+        const downloadBtn = document.getElementById('header-download-btn');
+        if (viewIdentifier === 'dashboard') {
+            if (timeFilters) timeFilters.style.display = '';
+            if (downloadBtn) downloadBtn.style.display = '';
+        } else {
+            if (timeFilters) timeFilters.style.setProperty('display', 'none', 'important');
+            if (downloadBtn) downloadBtn.style.setProperty('display', 'none', 'important');
+        }
+
         window.scrollTo(0, 0);
 
         // Disparadores dinámicos al entrar a la sección

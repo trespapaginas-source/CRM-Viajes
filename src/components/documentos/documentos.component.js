@@ -213,8 +213,8 @@ const DocumentosComponent = {
                 abonos: [],
                 condiciones: [
                     {
-                        titulo: 'Validez y Condiciones Comerciales',
-                        descripcion: 'Este documento constituye el soporte formal de pago. Los servicios listados están confirmados y sujetos a las políticas de los proveedores finales. Por favor, presentar este documento junto con su identificación original al momento de utilizar los servicios.'
+                        titulo: 'Registro de Pago',
+                        descripcion: 'Este documento constituye el soporte formal de recibo de pago para la reserva de los servicios turísticos intermediados por Vive Travel (VIVES GROUP S.A.S.).'
                     },
                     {
                         titulo: 'Políticas de Cancelación / Penalidades',
@@ -246,7 +246,7 @@ const DocumentosComponent = {
             const docName = prompt("Escribe un nombre para este borrador de cotización/soporte:", `${this.activeDoc.data.cliente_nombre || 'Borrador'} - ${this.activeDoc.data.destino || 'Sin Destino'}`);
             if (docName === null) return;
             this.activeDoc.name = docName.trim() || `Borrador`;
-            
+
             const payload = {
                 nombre: this.activeDoc.name,
                 tipo: this.activeDoc.type,
@@ -268,7 +268,7 @@ const DocumentosComponent = {
                 }
 
                 UI.showToast("Borrador guardado en la biblioteca compartida.", "success");
-                
+
                 await DataService.loadAll();
                 this.loadSavedDocsList();
 
@@ -316,7 +316,7 @@ const DocumentosComponent = {
                 }
 
                 UI.showToast("Borrador actualizado en la biblioteca compartida.", "success");
-                
+
                 await DataService.loadAll();
                 this.loadSavedDocsList();
 
@@ -446,7 +446,7 @@ const DocumentosComponent = {
                 if (parts.length === 2) {
                     let start = parseSpanishDate(parts[0].trim());
                     let end = parseSpanishDate(parts[1].trim());
-                    
+
                     // Smart parse for formats like "Del 15 al 20 de Junio de 2026"
                     if ((!start || isNaN(start.getTime())) && end && !isNaN(end.getTime())) {
                         const dayMatch = parts[0].trim().match(/^(?:del\s+)?(\d+)$/i);
@@ -455,7 +455,7 @@ const DocumentosComponent = {
                             start = new Date(end.getFullYear(), end.getMonth(), day);
                         }
                     }
-                    
+
                     if (start && end && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
                         return { start, end };
                     }
@@ -796,6 +796,10 @@ const DocumentosComponent = {
                     }
                 ];
             }
+        }
+        const selectPoliticas = document.getElementById('politicas_template_select');
+        if (selectPoliticas) {
+            selectPoliticas.value = '';
         }
     },
 
@@ -1262,6 +1266,9 @@ const DocumentosComponent = {
                                 ${c.descripcion ? c.descripcion.trim() : ''}
                             </p>
                         `).join('')}
+                        <p style="margin: 8px 0 0 0; font-weight: 700; color: ${c1}; text-align: center; font-size: 8.5px;">
+                            Para validar la información completa de las políticas de cancelación, tratamiento de datos y condiciones, visite nuestra página web <a href="https://vivetravelcol.com" target="_blank" style="color: ${c1}; text-decoration: underline;">vivetravelcol.com</a>
+                        </p>
                     </div>
                 `;
             }
@@ -1493,7 +1500,7 @@ const DocumentosComponent = {
         // Plan: seleccionar el plan actual del selector si coincide
         const planSelector = document.getElementById('crm_plan_select');
         const planId = planSelector ? planSelector.value : '';
-        
+
         const qcfPlanSelect = document.getElementById('qcf_plan_id');
         if (qcfPlanSelect) {
             qcfPlanSelect.innerHTML = '<option value="">-- Conectar a Plan --</option>';
@@ -1504,7 +1511,7 @@ const DocumentosComponent = {
         }
 
         setVal('qcf_pax', parseInt(getVal('doc_pax_count')) || 1);
-        
+
         const pacoteVal = UI.parseCurrency(document.getElementById('doc_paquete_valor')?.value) || 0;
         const paxVal = parseInt(getVal('doc_pax_count')) || 1;
         const totalPlanVal = pacoteVal * paxVal;
@@ -1581,7 +1588,7 @@ const DocumentosComponent = {
             if (res) {
                 UI.showToast("Cliente registrado y sincronizado en el CRM.", "success");
                 UI.closeModal('modal-quick-client', 'mqc-bg', 'mqc-content');
-                
+
                 // Actualizar cotización activa con este cliente
                 this.activeDoc.data.crm_cliente_id = res.id;
                 this.activeDoc.data.cliente_nombre = `${res.nombre} ${res.apellido || ''}`.trim();
@@ -1610,7 +1617,7 @@ const DocumentosComponent = {
 
     linkToExistingClient: function (existingClient) {
         UI.closeModal('modal-quick-client', 'mqc-bg', 'mqc-content');
-        
+
         // Llenar cotización con datos del cliente existente
         this.activeDoc.data.crm_cliente_id = existingClient.id;
         this.activeDoc.data.cliente_nombre = `${existingClient.nombre} ${existingClient.apellido || ''}`.trim();
@@ -1624,7 +1631,7 @@ const DocumentosComponent = {
         if (plan) {
             this.activeDoc.data.destino = plan.destino || plan.nombre;
             this.activeDoc.data.duracion = plan.duracion || '';
-            
+
             const paxNum = Number(existingClient.pax) || 1;
             if (existingClient.precio_total) {
                 this.activeDoc.data.paquete_valor = Math.round(Number(existingClient.precio_total) / paxNum);
@@ -1648,12 +1655,112 @@ const DocumentosComponent = {
         section.classList.toggle('collapsed');
     },
 
+    loadPoliticasTemplate: function (templateName, force = false) {
+        if (!templateName) return;
+
+        const templates = {
+            cotizacion: [
+                {
+                    titulo: 'Validez de la Oferta',
+                    descripcion: 'Las tarifas y cupos presentados están sujetos a disponibilidad y cambios por parte de los proveedores finales sin previo aviso. La confirmación definitiva se realiza únicamente con el pago del depósito inicial.'
+                },
+                {
+                    titulo: 'Proceso de Pagos',
+                    descripcion: 'Vive Travel acepta transferencias bancarias (Bancolombia, Davivienda, BBVA), PSE, tarjetas de crédito y efectivo. Para planes mayores a $1.000.000 COP, aplica nuestro plan de pagos flex (40% de cuota inicial, 30% a los 15 días y 30% de saldo 7 días antes del viaje).'
+                },
+                {
+                    titulo: 'Políticas de Cancelación',
+                    descripcion: 'Para planes de más de 1 día (con vuelos o alojamiento), no aplica reembolso por concepto de tiquetes aéreos o reserva hotelera. Para pasadías, aplica reembolso parcial únicamente notificando con más de 15 días de anticipación al viaje; cancelaciones con 15 días o menos de antelación no tienen devolución.'
+                }
+            ],
+            soporte: [
+                {
+                    titulo: 'Registro de Pago',
+                    descripcion: 'Este documento constituye el soporte formal de recibo de pago para la reserva de los servicios turísticos intermediados por Vive Travel (VIVES GROUP S.A.S.).'
+                },
+                {
+                    titulo: 'Políticas de Cancelación',
+                    descripcion: 'Para planes de más de 1 día (con vuelos o alojamiento), no aplica reembolso por concepto de tiquetes aéreos o reserva hotelera. Para pasadías, aplica reembolso parcial únicamente notificando con más de 15 días de anticipación al viaje; cancelaciones con 15 días o menos de antelación no tienen devolución.'
+                },
+                {
+                    titulo: 'Tratamiento de Datos Personales',
+                    descripcion: 'De acuerdo con la Ley 1581 de 2012 de Protección de Datos en Colombia, el cliente autoriza expresamente a Vive Travel (VIVES GROUP S.A.S.) a tratar sus datos personales para la emisión de pólizas de asistencia médica y reservas.'
+                }
+            ],
+            abono: [
+                {
+                    titulo: 'Reserva Provisional y Siguiente Pago',
+                    descripcion: 'Este soporte formaliza el recibo de abono parcial para la reserva. La reserva provisional se mantendrá activa siempre que se cumpla con el plan de pagos pactado. El no pago oportuno de las cuotas liberará los cupos y generará penalidades.'
+                },
+                {
+                    titulo: 'Políticas de Cancelación',
+                    descripcion: 'Para planes de más de 1 día (con vuelos o alojamiento), no aplica reembolso por concepto de tiquetes aéreos o reserva hotelera. Para pasadías, aplica reembolso parcial únicamente notificando con más de 15 días de anticipación al viaje; cancelaciones con 15 días o menos de antelación no tienen devolución.'
+                },
+                {
+                    titulo: 'Datos Personales y Pólizas',
+                    descripcion: 'El cliente autoriza la recolección de datos personales de los viajeros para la emisión de pólizas de asistencia y seguros de cancelación requeridos para garantizar los servicios.'
+                }
+            ]
+        };
+
+        const currentConds = this.activeDoc.data.condiciones || [];
+        let isModified = false;
+        if (currentConds.length > 0) {
+            if (currentConds.length !== 2) {
+                isModified = true;
+            } else {
+                const c1 = currentConds[0];
+                const c2 = currentConds[1];
+
+                const isDefaultSoporte = c1.titulo === 'Registro de Pago' &&
+                    c1.descripcion.startsWith('Este documento constituye el soporte formal') &&
+                    c2.titulo === 'Políticas de Cancelación / Penalidades' &&
+                    c2.descripcion.startsWith('Cambios o cancelaciones están sujetos');
+
+                const isDefaultValidez = c1.titulo === 'Validez y Condiciones Comerciales' &&
+                    c1.descripcion.startsWith('Este documento constituye el soporte formal') &&
+                    c2.titulo === 'Políticas de Cancelación / Penalidades' &&
+                    c2.descripcion.startsWith('Cambios o cancelaciones están sujetos');
+
+                if (!isDefaultSoporte && !isDefaultValidez) {
+                    isModified = true;
+                }
+            }
+        }
+
+        if (isModified && !force) {
+            const confirmChange = confirm("¿Deseas reemplazar las condiciones y políticas actuales con la plantilla seleccionada?");
+            if (!confirmChange) {
+                const select = document.getElementById('politicas_template_select');
+                if (select) select.value = '';
+                return;
+            }
+        }
+
+        this.activeDoc.data.condiciones = JSON.parse(JSON.stringify(templates[templateName]));
+        this.renderEditorLists();
+        this.recalculate();
+        this.renderPreview();
+
+        const select = document.getElementById('politicas_template_select');
+        if (select) select.value = templateName;
+
+        UI.showToast(`Plantilla de "${templateName}" cargada exitosamente.`, "success");
+    },
+
     updateDefaultTitleFromType: function () {
         const docType = document.getElementById('doc_type')?.value;
         const titleEl = document.getElementById('doc_titulo_documento');
         if (titleEl) {
             titleEl.value = docType === 'cotizacion' ? 'COTIZACIÓN PREMIUM' : 'SOPORTE DE PAGO';
         }
+
+        const selectPoliticas = document.getElementById('politicas_template_select');
+        if (selectPoliticas) {
+            selectPoliticas.value = docType === 'cotizacion' ? 'cotizacion' : 'soporte';
+            this.loadPoliticasTemplate(selectPoliticas.value, true);
+        }
+
         this.onInputChanged();
     }
 };
