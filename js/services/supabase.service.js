@@ -558,5 +558,66 @@ export const DataService = {
         } catch (e) {
             return { error: e };
         }
+    },
+
+    async checkProveedorEnUso(id) {
+        try {
+            const { data, error } = await supabaseClient.rpc('proveedor_en_uso', { p_id: id });
+            if (error) throw error;
+            return !!data;
+        } catch (e) {
+            console.error("Error checking if supplier is in use:", e);
+            return false;
+        }
+    },
+
+    async crearSolicitudCambio(solicitud) {
+        try {
+            const { error } = await supabaseClient.from('solicitudes_cambio_proveedores').insert([solicitud]);
+            if (error) throw error;
+        } catch (e) { throw e; }
+    },
+
+    async loadSolicitudesPendientes() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('solicitudes_cambio_proveedores')
+                .select('*, proveedores(*)')
+                .eq('estado', 'PENDIENTE')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        } catch (e) { throw e; }
+    },
+
+    async resolverSolicitudCambio(solId, estado_aprobacion, adminEmail) {
+        try {
+            const { data: reqs, error: fetchErr } = await supabaseClient.from('solicitudes_cambio_proveedores').select('*').eq('id', solId);
+            if (fetchErr || !reqs || reqs.length === 0) throw fetchErr || new Error("Request not found");
+            const req = reqs[0];
+
+            if (estado_aprobacion === 'APROBADO') {
+                if (req.tipo_operacion === 'MODIFICACION') {
+                    const { error: updateErr } = await supabaseClient.from('proveedores').update(req.datos_nuevos).eq('id', req.proveedor_id);
+                    if (updateErr) throw updateErr;
+                } else if (req.tipo_operacion === 'ELIMINACION') {
+                    const { error: deleteErr } = await supabaseClient.from('proveedores').update({
+                        deleted_at: new Date().toISOString(),
+                        deleted_by: adminEmail
+                    }).eq('id', req.proveedor_id);
+                    if (deleteErr) throw deleteErr;
+                }
+            }
+
+            const { error: statusErr } = await supabaseClient.from('solicitudes_cambio_proveedores').update({
+                estado: estado_aprobacion,
+                resolved_at: new Date().toISOString(),
+                resolved_by: adminEmail
+            }).eq('id', solId);
+            if (statusErr) throw statusErr;
+
+            await this.loadAll();
+        } catch (e) { throw e; }
     }
 };
+

@@ -271,11 +271,38 @@ export const SuppliersComponent = {
                 productos: [...this.tempProducts]
             };
 
+            if (obj.id) {
+                const enUso = await DataService.checkProveedorEnUso(obj.id);
+                const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
+                
+                if (enUso && !isAdminPrincipal) {
+                    const motivo = window.prompt("Este proveedor está vinculado a operaciones reales. Ingresa la justificación/motivo de esta modificación para que sea aprobada por el administrador:");
+                    if (!motivo) {
+                        UI.showToast("Operación cancelada. Se requiere justificación para modificar un proveedor activo.", "error");
+                        this.closeFormModal();
+                        return;
+                    }
+                    
+                    const prev = Store.getState().proveedores.find(x => x.id === obj.id);
+                    const requestObj = {
+                        proveedor_id: obj.id,
+                        solicitante_email: window.AuthModule?.currentUser?.email || 'Desconocido',
+                        tipo_operacion: 'MODIFICACION',
+                        estado: 'PENDIENTE',
+                        motivo: motivo,
+                        datos_anteriores: prev,
+                        datos_nuevos: obj
+                    };
+                    
+                    await DataService.crearSolicitudCambio(requestObj);
+                    UI.showToast("Solicitud de modificación registrada para aprobación del administrador.", "info");
+                    this.closeFormModal();
+                    return;
+                }
+            }
+
             await DataService.saveProveedor(obj);
             
-            // Ya no es necesario llamar populateFiltersAndCategories y renderGrid porque al llamar
-            // loadAll dentro de saveProveedor, el Store emitirá cambios y se renderizará automáticamente.
-
             this.closeFormModal();
             UI.showToast("Proveedor guardado correctamente.", "success");
         } catch (e) {
@@ -314,10 +341,43 @@ export const SuppliersComponent = {
 
         try {
             const newProducts = [...(p.productos || []), { name, costo: cost }];
+            
+            const enUso = await DataService.checkProveedorEnUso(id);
+            const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
+            
+            if (enUso && !isAdminPrincipal) {
+                const motivo = window.prompt("Este proveedor está vinculado a operaciones reales. Ingresa la justificación/motivo de agregar este nuevo servicio para aprobación administrativa:");
+                if (!motivo) {
+                    UI.showToast("Operación cancelada. Se requiere justificación.", "error");
+                    UI.closeModal('quick-service-modal', 'qsm-bg', 'qsm-content');
+                    return;
+                }
+                
+                const obj = {
+                    ...p,
+                    productos: newProducts
+                };
+                
+                const requestObj = {
+                    proveedor_id: id,
+                    solicitante_email: window.AuthModule?.currentUser?.email || 'Desconocido',
+                    tipo_operacion: 'MODIFICACION',
+                    estado: 'PENDIENTE',
+                    motivo: motivo,
+                    datos_anteriores: p,
+                    datos_nuevos: obj
+                };
+                
+                await DataService.crearSolicitudCambio(requestObj);
+                UI.showToast("Solicitud para añadir servicio registrada para aprobación administrativa.", "info");
+                UI.closeModal('quick-service-modal', 'qsm-bg', 'qsm-content');
+                return;
+            }
+
             const res = await supabaseClient.from('proveedores').update({ productos: newProducts }).eq('id', id);
             if (res.error) throw res.error;
 
-            await DataService.loadAll(); // Esto dispara renderización vía reactividad
+            await DataService.loadAll(); 
             
             UI.closeModal('quick-service-modal', 'qsm-bg', 'qsm-content');
             UI.showToast("Nuevo servicio agregado a la red del proveedor.", "success");
