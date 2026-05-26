@@ -76,6 +76,15 @@ export const InternacionalesComponent = {
             }
         });
 
+        const intSoporteFile = document.getElementById('int-soporte-pago-file');
+        if (intSoporteFile) {
+            intSoporteFile.addEventListener('change', (e) => this.previewSoportePago(e.target));
+        }
+        const btnClearIntSoporte = document.getElementById('btn-clear-int-soporte-pago');
+        if (btnClearIntSoporte) {
+            btnClearIntSoporte.addEventListener('click', () => this.clearSoportePago());
+        }
+
         this.eventsBound = true;
     },
 
@@ -165,6 +174,10 @@ export const InternacionalesComponent = {
         if (document.getElementById('int-costo-total')) document.getElementById('int-costo-total').value = '';
         if (document.getElementById('int-notas-financieras')) document.getElementById('int-notas-financieras').value = '';
         if (document.getElementById('int-utilidad-display')) document.getElementById('int-utilidad-display').textContent = '$0';
+
+        this.clearSoportePago();
+        const currentSop = document.getElementById('int-soporte-pago-current');
+        if (currentSop) currentSop.classList.add('hidden');
         
         const planSelect = document.getElementById('int-plan-id');
         if (planSelect) {
@@ -198,6 +211,13 @@ export const InternacionalesComponent = {
         UI.setCurrencyValue('int-precio-total', cliente.precio_total);
         UI.setCurrencyValue('int-costo-total', cliente.costo_total);
         document.getElementById('int-notas-financieras').value = cliente.notas_financieras || '';
+
+        const currentSop = document.getElementById('int-soporte-pago-current');
+        const linkSop = document.getElementById('int-soporte-pago-link');
+        if (cliente.soporte_pago_url) {
+            if (linkSop) linkSop.href = cliente.soporte_pago_url;
+            if (currentSop) currentSop.classList.remove('hidden');
+        }
         
         this.calculateUtility();
 
@@ -216,6 +236,31 @@ export const InternacionalesComponent = {
 
     closeFormModal() {
         UI.closeModal('internacional-form-modal', 'internacional-form-bg', 'internacional-form-content');
+    },
+
+    previewSoportePago(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const label = document.getElementById('int-soporte-pago-label');
+        const preview = document.getElementById('int-soporte-pago-preview');
+        const thumb = document.getElementById('int-soporte-pago-thumb');
+        const current = document.getElementById('int-soporte-pago-current');
+        
+        label.textContent = file.name.length > 20 ? file.name.substring(0, 17) + '...' : file.name;
+        thumb.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+        if (current) current.classList.add('hidden');
+    },
+
+    clearSoportePago() {
+        const input = document.getElementById('int-soporte-pago-file');
+        if (input) input.value = '';
+        const label = document.getElementById('int-soporte-pago-label');
+        if (label) label.textContent = 'Seleccionar Imagen...';
+        const preview = document.getElementById('int-soporte-pago-preview');
+        if (preview) preview.classList.add('hidden');
+        const thumb = document.getElementById('int-soporte-pago-thumb');
+        if (thumb) thumb.src = '';
     },
 
     addPassengerRow(pax = null) {
@@ -360,10 +405,43 @@ export const InternacionalesComponent = {
 
         const btn = document.getElementById('btn-save-int');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Guardando...';
         btn.disabled = true;
+        btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Guardando...';
 
         try {
+            // Subir soporte de pago si se seleccionó uno nuevo
+            const fileInput = document.getElementById('int-soporte-pago-file');
+            const file = fileInput ? fileInput.files[0] : null;
+            let publicUrl = null;
+
+            if (file) {
+                btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Subiendo soporte...';
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+                const filePath = `soportes/${fileName}`;
+
+                const { data, error } = await supabaseClient.storage
+                    .from('soportes_pago')
+                    .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+                if (error) throw error;
+
+                const { data: urlData } = supabaseClient.storage
+                    .from('soportes_pago')
+                    .getPublicUrl(filePath);
+
+                publicUrl = urlData.publicUrl;
+            }
+
+            if (publicUrl) {
+                dataToSave.soporte_pago_url = publicUrl;
+            } else if (id) {
+                const cliExistente = DataService.clientes.find(x => x.id === id);
+                if (cliExistente) {
+                    dataToSave.soporte_pago_url = cliExistente.soporte_pago_url;
+                }
+            }
+
             const res = await DataService.saveCliente(dataToSave);
             const clienteId = id || (res ? res.id : null);
             

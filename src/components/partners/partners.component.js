@@ -1816,20 +1816,40 @@ export const PartnersComponent = {
             submitBtn.disabled = true;
         }
 
-        let comprobanteBase64 = '';
+        let comprobante = '';
         const file = fileInput.files[0];
-        try {
-            comprobanteBase64 = await this.compressFileToBase64(file);
-        } catch (err) {
-            console.error("Error compressing file:", err);
-            if (submitBtn) {
-                submitBtn.innerHTML = originalHtml;
-                submitBtn.disabled = false;
+
+        if (this.fallbackGastosActive) {
+            try {
+                comprobante = await this.compressFileToBase64(file);
+            } catch (err) {
+                console.error("Error compressing file:", err);
+                if (submitBtn) {
+                    submitBtn.innerHTML = originalHtml;
+                    submitBtn.disabled = false;
+                }
+                return UI.showToast("Error al procesar la imagen del comprobante.", "error");
             }
-            return UI.showToast("Error al procesar la imagen del comprobante.", "error");
+        } else {
+            try {
+                const blob = await this.compressFileToBlob(file);
+                comprobante = await this.uploadComprobanteStorage(blob, 'gastos_corp');
+            } catch (err) {
+                console.warn("Storage upload failed, falling back to Base64 database storage:", err);
+                try {
+                    comprobante = await this.compressFileToBase64(file);
+                } catch (b64Err) {
+                    console.error("Base64 compression fallback failed:", b64Err);
+                    if (submitBtn) {
+                        submitBtn.innerHTML = originalHtml;
+                        submitBtn.disabled = false;
+                    }
+                    return UI.showToast("Error al procesar la imagen del comprobante.", "error");
+                }
+            }
         }
 
-        const res = await this.saveCorporateExpense(concepto, categoria, monto, fecha, comprobanteBase64);
+        const res = await this.saveCorporateExpense(concepto, categoria, monto, fecha, comprobante);
         
         if (submitBtn) {
             submitBtn.innerHTML = originalHtml;
@@ -1898,6 +1918,65 @@ export const PartnersComponent = {
             };
             reader.onerror = (err) => reject(err);
         });
+    },
+
+    compressFileToBlob(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 800;
+                    if (width > height) {
+                        if (width > maxDim) {
+                            height *= maxDim / width;
+                            width = maxDim;
+                        }
+                    } else {
+                        if (height > maxDim) {
+                            width *= maxDim / height;
+                            height = maxDim;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(new Error("La compresión de la imagen falló."));
+                        }
+                    }, 'image/jpeg', 0.7);
+                };
+                img.onerror = (err) => reject(err);
+            };
+            reader.onerror = (err) => reject(err);
+        });
+    },
+
+    async uploadComprobanteStorage(blob, folder) {
+        const timestamp = Date.now();
+        const rand = Math.random().toString(36).substring(2, 7);
+        const filePath = `${folder}/${folder}_${timestamp}_${rand}.jpg`;
+
+        const { data, error } = await supabaseClient.storage
+            .from('comprobantes')
+            .upload(filePath, blob, { cacheControl: '3600', upsert: false });
+
+        if (error) throw error;
+
+        const { data: urlData } = supabaseClient.storage
+            .from('comprobantes')
+            .getPublicUrl(filePath);
+
+        return urlData.publicUrl;
     },
 
     clearGastoCorpPreview() {
@@ -2269,17 +2348,24 @@ export const PartnersComponent = {
             submitBtn.disabled = true;
         }
 
-        let comprobanteBase64 = '';
+        let comprobante = null;
         if (fileInput.files && fileInput.files.length > 0) {
+            const file = fileInput.files[0];
             try {
-                comprobanteBase64 = await this.compressFileToBase64(fileInput.files[0]);
+                const blob = await this.compressFileToBlob(file);
+                comprobante = await this.uploadComprobanteStorage(blob, 'adelantos');
             } catch (err) {
-                console.error("Error compressing receipt image:", err);
-                if (submitBtn) {
-                    submitBtn.innerHTML = originalHtml;
-                    submitBtn.disabled = false;
+                console.warn("Storage upload failed, falling back to Base64 database storage:", err);
+                try {
+                    comprobante = await this.compressFileToBase64(file);
+                } catch (b64Err) {
+                    console.error("Base64 compression fallback failed:", b64Err);
+                    if (submitBtn) {
+                        submitBtn.innerHTML = originalHtml;
+                        submitBtn.disabled = false;
+                    }
+                    return UI.showToast("Error al procesar la imagen del soporte.", "error");
                 }
-                return UI.showToast("Error al procesar la imagen del soporte.", "error");
             }
         }
 
@@ -2295,7 +2381,7 @@ export const PartnersComponent = {
             monto_recuperado: 0,
             fecha,
             metodo_pago: targetEstado === 'ejecutado' ? metodoPago : null,
-            comprobante: targetEstado === 'ejecutado' ? comprobanteBase64 : null,
+            comprobante: targetEstado === 'ejecutado' ? comprobante : null,
             estado: targetEstado,
             solicitado_por: userEmail,
             aprobado_por: targetEstado !== 'solicitado' ? userEmail : null,
@@ -2359,18 +2445,25 @@ export const PartnersComponent = {
         const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const today = new Date().toISOString().substring(0, 10);
 
-        let comprobanteBase64 = '';
+        let comprobante = '';
+        const file = fileInput.files[0];
         try {
-            comprobanteBase64 = await this.compressFileToBase64(fileInput.files[0]);
+            const blob = await this.compressFileToBlob(file);
+            comprobante = await this.uploadComprobanteStorage(blob, 'adelantos');
         } catch (err) {
-            console.error("Error compressing file:", err);
-            return UI.showToast("Error al procesar la imagen del soporte.", "error");
+            console.warn("Storage upload failed, falling back to Base64 database storage:", err);
+            try {
+                comprobante = await this.compressFileToBase64(file);
+            } catch (b64Err) {
+                console.error("Base64 compression fallback failed:", b64Err);
+                return UI.showToast("Error al procesar la imagen del soporte.", "error");
+            }
         }
 
         try {
             const { error } = await supabaseClient.from('adelantos_operativos').update({
                 metodo_pago: metodo,
-                comprobante: comprobanteBase64,
+                comprobante: comprobante,
                 estado: 'ejecutado',
                 aprobado_por: userEmail,
                 fecha_ejecucion: today
@@ -2385,7 +2478,7 @@ export const PartnersComponent = {
             const localAdv = DataService.adelantos_operativos.find(a => a.id === id);
             if (localAdv) {
                 localAdv.metodo_pago = metodo;
-                localAdv.comprobante = comprobanteBase64;
+                localAdv.comprobante = comprobante;
                 localAdv.estado = 'ejecutado';
                 localAdv.aprobado_por = userEmail;
                 localAdv.fecha_ejecucion = today;

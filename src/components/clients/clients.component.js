@@ -149,6 +149,14 @@ export const ClientsComponent = {
                 this.quickEtiquetaChange(target.dataset.clienteId, target.value, target);
             }
         });
+        const cfSoporteFile = document.getElementById('cf-soporte-pago-file');
+        if (cfSoporteFile) {
+            cfSoporteFile.addEventListener('change', (e) => this.previewSoportePago(e.target));
+        }
+        const btnClearCfSoporte = document.getElementById('btn-clear-soporte-pago');
+        if (btnClearCfSoporte) {
+            btnClearCfSoporte.addEventListener('click', () => this.clearSoportePago());
+        }
     },
 
     populateFilters() {
@@ -305,6 +313,10 @@ export const ClientsComponent = {
         document.getElementById('client-form').reset();
         document.getElementById('cf-id').value = "";
 
+        this.clearSoportePago();
+        const currentSop = document.getElementById('cf-soporte-pago-current');
+        if (currentSop) currentSop.classList.add('hidden');
+
         UI.switchTab('cliente', 'datosp');
 
         const pList = document.getElementById('cf-plan-id');
@@ -339,6 +351,12 @@ export const ClientsComponent = {
                 document.getElementById('cf-alergias').value = c.alergias || '';
                 document.getElementById('cf-requerimientos').value = c.requerimientos || '';
                 document.getElementById('cf-contacto').value = c.contacto_emergencia || '';
+
+                const linkSop = document.getElementById('cf-soporte-pago-link');
+                if (c.soporte_pago_url) {
+                    if (linkSop) linkSop.href = c.soporte_pago_url;
+                    if (currentSop) currentSop.classList.remove('hidden');
+                }
 
                 let selEtiqueta = document.getElementById('cf-etiqueta');
                 if (c.etiqueta && ![...selEtiqueta.options].some(o => o.value === c.etiqueta)) {
@@ -382,6 +400,31 @@ export const ClientsComponent = {
 
     closeFormModal() {
         UI.closeModal('client-form-modal', 'client-form-bg', 'client-form-content');
+    },
+
+    previewSoportePago(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const label = document.getElementById('cf-soporte-pago-label');
+        const preview = document.getElementById('cf-soporte-pago-preview');
+        const thumb = document.getElementById('cf-soporte-pago-thumb');
+        const current = document.getElementById('cf-soporte-pago-current');
+        
+        label.textContent = file.name.length > 20 ? file.name.substring(0, 17) + '...' : file.name;
+        thumb.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+        if (current) current.classList.add('hidden');
+    },
+
+    clearSoportePago() {
+        const input = document.getElementById('cf-soporte-pago-file');
+        if (input) input.value = '';
+        const label = document.getElementById('cf-soporte-pago-label');
+        if (label) label.textContent = 'Seleccionar Imagen...';
+        const preview = document.getElementById('cf-soporte-pago-preview');
+        if (preview) preview.classList.add('hidden');
+        const thumb = document.getElementById('cf-soporte-pago-thumb');
+        if (thumb) thumb.src = '';
     },
 
     toggleDevolucionInput(estado) {
@@ -828,6 +871,30 @@ export const ClientsComponent = {
                 ini = pTot;
             }
 
+            // Subir soporte de pago si se seleccionó uno nuevo
+            const fileInput = document.getElementById('cf-soporte-pago-file');
+            const file = fileInput ? fileInput.files[0] : null;
+            let publicUrl = null;
+
+            if (file) {
+                btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Subiendo soporte...';
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+                const filePath = `soportes/${fileName}`;
+
+                const { data, error } = await supabaseClient.storage
+                    .from('soportes_pago')
+                    .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+                if (error) throw error;
+
+                const { data: urlData } = supabaseClient.storage
+                    .from('soportes_pago')
+                    .getPublicUrl(filePath);
+
+                publicUrl = urlData.publicUrl;
+            }
+
             const contactoEl = document.getElementById('cf-contacto');
             const etiquetaEl = document.getElementById('cf-etiqueta');
 
@@ -850,6 +917,15 @@ export const ClientsComponent = {
                 contacto_emergencia: contactoEl ? contactoEl.value : '',
                 etiqueta: etiquetaEl ? etiquetaEl.value : 'normal'
             };
+
+            if (publicUrl) {
+                obj.soporte_pago_url = publicUrl;
+            } else if (!esNvo) {
+                const cliExistente = DataService.clientes.find(x => x.id === fId);
+                if (cliExistente) {
+                    obj.soporte_pago_url = cliExistente.soporte_pago_url;
+                }
+            }
 
             if (estadoEl === 'devolución') {
                 obj.monto_devuelto = montoDevuelto;
@@ -969,6 +1045,19 @@ export const ClientsComponent = {
             </div>
         ` : '';
 
+        const sopPagoUrl = c.soporte_pago_url;
+        const sopPagoHtml = sopPagoUrl ? `
+            <div class="bg-white border border-slate-100 p-4 rounded-2xl flex justify-between items-center shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                <div class="flex items-center gap-3">
+                    <img src="${sopPagoUrl}" alt="Soporte Pago" data-action="open-lightbox" data-url="${sopPagoUrl}" class="w-16 h-12 object-cover rounded-lg border border-slate-200/60 shadow-sm hover:scale-105 transition-all cursor-pointer">
+                    <div>
+                        <p class="text-[10px] font-black text-slate-800 uppercase tracking-wider">Soporte de Pago</p>
+                        <a href="${sopPagoUrl}" target="_blank" class="text-[10px] text-primary-600 font-bold hover:underline flex items-center mt-0.5"><i class="ph ph-arrow-square-out mr-1"></i> Abrir en pestaña</a>
+                    </div>
+                </div>
+            </div>
+        ` : '';
+
         document.getElementById('cdm-body').innerHTML = `
             <div class="p-6 space-y-6">
                 <div class="flex items-center space-x-4">
@@ -982,6 +1071,8 @@ export const ClientsComponent = {
                 </div>
                 
                 ${bannerAdelantoHtml}
+                
+                ${sopPagoHtml}
                 
                 <div class="bg-slate-50 border border-slate-100 p-5 rounded-2xl relative overflow-hidden text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
                     <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1">Plan Seleccionado</p>
