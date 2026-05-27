@@ -99,25 +99,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 4. Trigger en proveedores para bloquear cambios directos no autorizados
-CREATE OR REPLACE FUNCTION public.check_proveedor_modificacion()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Si el proveedor está en uso y el usuario NO es administrador, lanzar excepción y abortar
-    IF public.proveedor_en_uso(OLD.id) AND NOT public.es_administrador() THEN
-        RAISE EXCEPTION 'El proveedor está vinculado a operaciones reales en el sistema y no puede modificarse de forma directa. Debes crear una solicitud de cambio para la aprobación del administrador.';
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Eliminar trigger si ya existe para evitar errores
+-- 4. Asegurar que no exista el trigger en proveedores
 DROP TRIGGER IF EXISTS trigger_check_proveedor_modificacion ON public.proveedores;
-
-CREATE TRIGGER trigger_check_proveedor_modificacion
-BEFORE UPDATE OR DELETE ON public.proveedores
-FOR EACH ROW
-EXECUTE FUNCTION public.check_proveedor_modificacion();
+DROP FUNCTION IF EXISTS public.check_proveedor_modificacion();
 
 -- 5. Agregar columna motivo_eliminacion a las tablas para almacenar justificaciones
 ALTER TABLE public.abonos ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;

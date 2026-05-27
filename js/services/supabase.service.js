@@ -456,16 +456,47 @@ export const DataService = {
 
     async saveProveedor(datosParaGuardar) {
         try {
+            let resultadoDB;
             if (!datosParaGuardar.id) {
                 delete datosParaGuardar.id;
-                const result = await supabaseClient.from('proveedores').insert([datosParaGuardar]);
-                if (result.error) throw result.error;
+                resultadoDB = await supabaseClient.from('proveedores').insert([datosParaGuardar]).select();
+                if (resultadoDB.error) throw resultadoDB.error;
+                
+                if (resultadoDB.data && resultadoDB.data[0]) {
+                    await this.registrarHistorial(null, 'Creación de Proveedor', 'N/A', `Proveedor ${resultadoDB.data[0].nombre} creado`, 'CREACION', { proveedor_id: resultadoDB.data[0].id });
+                }
             } else {
                 const { id, ...datosMapeados } = datosParaGuardar;
-                const result = await supabaseClient.from('proveedores').update(datosMapeados).eq('id', id);
-                if (result.error) throw result.error;
+                const provActual = this.proveedores.find(p => p.id === id);
+                if (provActual) {
+                    const camposAComparar = ['nombre', 'telefono', 'ciudad', 'email', 'tipo'];
+                    for (const campo of camposAComparar) {
+                        if (datosMapeados[campo] !== undefined && String(datosMapeados[campo]) !== String(provActual[campo])) {
+                            await this.registrarHistorial(null, `Proveedor (${provActual.nombre}): ${campo}`, provActual[campo], datosMapeados[campo], 'MODIFICACION', { proveedor_id: id });
+                        }
+                    }
+                    
+                    // Comparar productos
+                    if (datosMapeados.productos !== undefined) {
+                        const jsonAnt = JSON.stringify(provActual.productos || []);
+                        const jsonNue = JSON.stringify(datosMapeados.productos || []);
+                        if (jsonAnt !== jsonNue) {
+                            await this.registrarHistorial(
+                                null,
+                                `Proveedor (${provActual.nombre}): Catálogo de Productos Modificado`,
+                                `${(provActual.productos || []).length} servicios`,
+                                `${(datosMapeados.productos || []).length} servicios`,
+                                'MODIFICACION',
+                                { proveedor_id: id, productos_previos: provActual.productos, productos_nuevos: datosMapeados.productos }
+                            );
+                        }
+                    }
+                }
+                resultadoDB = await supabaseClient.from('proveedores').update(datosMapeados).eq('id', id).select();
+                if (resultadoDB.error) throw resultadoDB.error;
             }
             await this.loadAll();
+            return resultadoDB.data ? resultadoDB.data[0] : null;
         } catch (e) { throw e; }
     },
 

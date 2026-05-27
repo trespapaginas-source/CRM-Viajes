@@ -505,42 +505,7 @@ export const SuppliersComponent = {
                 return;
             }
 
-            if (obj.id) {
-                const enUso = await DataService.checkProveedorEnUso(obj.id);
-                const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
-                
-                if (enUso && !isAdminPrincipal) {
-                    const prev = Store.getState().proveedores.find(x => x.id === obj.id);
-                    
-                    // Determinar si hay servicios eliminados
-                    const deletedServiceNames = Object.keys(this.deletedProductsReasons);
-                    let motivo = '';
-                    
-                    if (deletedServiceNames.length > 0) {
-                        // Si se eliminaron servicios, armamos el motivo con las razones dadas
-                        const parts = deletedServiceNames.map(name => `Eliminado servicio: "${name}". Motivo: ${this.deletedProductsReasons[name]}`);
-                        motivo = parts.join(" | ");
-                    } else {
-                        // Si no hay eliminaciones (solo ediciones de precio/nombre o adiciones), no requiere prompt
-                        motivo = "Actualización de catálogo de servicios y tarifas";
-                    }
-                    
-                    const requestObj = {
-                        proveedor_id: obj.id,
-                        solicitante_email: window.AuthModule?.currentUser?.email || 'Desconocido',
-                        tipo_operacion: 'MODIFICACION',
-                        estado: 'PENDIENTE',
-                        motivo: motivo,
-                        datos_anteriores: prev,
-                        datos_nuevos: obj
-                    };
-                    
-                    await DataService.crearSolicitudCambio(requestObj);
-                    UI.showToast("Solicitud de modificación registrada para aprobación del administrador.", "info");
-                    this.closeFormModal();
-                    return;
-                }
-            }
+
 
             await DataService.saveProveedor(obj);
             
@@ -582,34 +547,7 @@ export const SuppliersComponent = {
 
         try {
             const newProducts = [...(p.productos || []), { name, costo: cost, activo: true, version: 1 }];
-            
-            const enUso = await DataService.checkProveedorEnUso(id);
-            const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
-            
-            if (enUso && !isAdminPrincipal) {
-                // Al agregar servicio por Quick Add, es una adición (no eliminación), por lo que no pide justificación.
-                const motivo = `Adición de servicio rápido: "${name}" con costo ${formatCOP(cost)}`;
-                
-                const obj = {
-                    ...p,
-                    productos: newProducts
-                };
-                
-                const requestObj = {
-                    proveedor_id: id,
-                    solicitante_email: window.AuthModule?.currentUser?.email || 'Desconocido',
-                    tipo_operacion: 'MODIFICACION',
-                    estado: 'PENDIENTE',
-                    motivo: motivo,
-                    datos_anteriores: p,
-                    datos_nuevos: obj
-                };
-                
-                await DataService.crearSolicitudCambio(requestObj);
-                UI.showToast("Solicitud para añadir servicio registrada para aprobación administrativa.", "info");
-                UI.closeModal('quick-service-modal', 'qsm-bg', 'qsm-content');
-                return;
-            }
+
 
             const res = await supabaseClient.from('proveedores').update({ productos: newProducts }).eq('id', id);
             if (res.error) throw res.error;

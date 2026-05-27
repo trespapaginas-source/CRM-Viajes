@@ -216,26 +216,6 @@ export async function executeGlobalDelete() {
             }
             UI.showToast("Reserva y abonos del cliente eliminados.", "success");
         } else if (type === 'proveedor') {
-            const enUso = await window.DataService.checkProveedorEnUso(id);
-            const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
-            
-            if (enUso && !isAdminPrincipal) {
-                const prev = window.Store.getState().proveedores.find(x => x.id === id);
-                const requestObj = {
-                    proveedor_id: id,
-                    solicitante_email: window.AuthModule?.currentUser?.email || 'Desconocido',
-                    tipo_operacion: 'ELIMINACION',
-                    estado: 'PENDIENTE',
-                    motivo: motivo,
-                    datos_anteriores: prev,
-                    datos_nuevos: null
-                };
-                
-                await window.DataService.crearSolicitudCambio(requestObj);
-                UI.showToast("Solicitud de eliminación registrada para aprobación administrativa.", "info");
-                UI.closeModal('universal-delete-modal', 'udm-bg', 'udm-content');
-                return;
-            }
 
             await window.DataService.deleteProveedor(id, motivo);
             UI.showToast("Proveedor eliminado correctamente.", "success");
