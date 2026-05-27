@@ -211,8 +211,15 @@ export const RentabilidadComponent = {
                 if (g.tipo_valor === 'fijo') costoTotal += parseFloat(g.valor);
                 else costoTotal += data.ingreso_bruto * (parseFloat(g.valor) / 100);
             });
-            const plan = DataService.planes.find(p => p.id === data.plan_id);
-            const costoOperativoBase = parseFloat(plan.costo_base || 0) * data.pax_servicio;
+            const plan = DataService.planes.find(p => p.id === data.plan_id) || { costo_base: 0 };
+            let costoOperativoBase = 0;
+            data.clientes.forEach(c => {
+                const st = c.estado ? c.estado.toLowerCase() : '';
+                if (st !== 'en caja') {
+                    const cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+                    costoOperativoBase += cCost * parseInt(c.pax || 1);
+                }
+            });
             costoTotal += costoOperativoBase;
             const margen = data.ingreso_bruto - costoTotal;
             const isRentable = margen >= 0;
@@ -442,8 +449,6 @@ export const RentabilidadComponent = {
     },
 
     async deleteGasto(id) {
-        if (!confirm("¿Eliminar este gasto?")) return;
-
         const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador';
         const gasto = DataService.gastos.find(g => g.id === id);
         if (gasto) {
@@ -452,12 +457,9 @@ export const RentabilidadComponent = {
                 return UI.showToast("Acción denegada: Gasto congelado por antigüedad contable.", "error");
             }
         }
-        try {
-            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
-            await supabaseClient.from('gastos_salidas').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
-            await DataService.loadAll();
-            UI.showToast("Gasto eliminado.", "success");
-        } catch (e) { UI.showToast("Error eliminando.", "error"); }
+
+        const name = gasto ? `Costo Operativo: ${gasto.concepto} (${formatCOP(gasto.costo)})` : 'Costo Operativo';
+        window.promptGlobalDelete(id, 'gasto_salida', name);
     },
 
     async renderGastos(plan, paxServicio, ingresoBruto) {
@@ -466,13 +468,42 @@ export const RentabilidadComponent = {
         list.innerHTML = '';
         let costoTotal = 0;
 
-        const costoOperativoBase = parseFloat(plan.costo_base || 0) * paxServicio;
+        let costoOperativoBase = 0;
+        let desgloseCostosHtml = '';
+
+        const clientesSalida = DataService.clientes.filter(c => {
+            const st = c.estado ? c.estado.toLowerCase() : '';
+            const isInt = c.tipo_reserva === 'Internacional';
+            if (this.currentTab === 'internacionales' && !isInt) return false;
+            if (this.currentTab !== 'internacionales' && isInt) return false;
+            return c.plan_id === this.currentPlanId && c.fecha_viaje === this.currentFecha && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st);
+        });
+
+        clientesSalida.forEach(c => {
+            const st = c.estado ? c.estado.toLowerCase() : '';
+            if (st !== 'en caja') {
+                const cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+                costoOperativoBase += cCost * parseInt(c.pax || 1);
+            }
+        });
         costoTotal += costoOperativoBase;
+
+        // Construir un texto descriptivo o desglose si hay tarifas distintas
+        const distinctCosts = [...new Set(clientesSalida.map(c => (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0)))];
+        if (distinctCosts.length > 1) {
+            desgloseCostosHtml = `<span class="text-[9px] text-slate-500 block mt-0.5">Tarifas mixtas: ${distinctCosts.map(co => formatCOP(co)).join(' / ')}</span>`;
+        } else {
+            const unicoCosto = distinctCosts[0] !== undefined ? distinctCosts[0] : (parseFloat(plan.costo_base) || 0);
+            desgloseCostosHtml = `<span class="text-[9px] text-slate-500 block mt-0.5">${formatCOP(unicoCosto)} x ${paxServicio} Pax (servicio)</span>`;
+        }
 
         list.innerHTML += `
             <tr class="bg-slate-50">
                 <td class="py-3 px-4"><span class="bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2 py-0.5 rounded">Matriz Base</span></td>
-                <td class="py-3 px-4"><p class="text-xs font-bold text-slate-700">Costos Operativos (Proveedores)</p><p class="text-[9px] text-slate-500">${formatCOP(plan.costo_base)} x ${paxServicio} Pax (servicio)</p></td>
+                <td class="py-3 px-4">
+                    <p class="text-xs font-bold text-slate-700">Costos Operativos (Proveedores)</p>
+                    ${desgloseCostosHtml}
+                </td>
                 <td class="py-3 px-4 text-right font-black text-slate-800">${formatCOP(costoOperativoBase)}</td>
                 <td class="py-3 px-4 text-center"><i class="ph ph-lock-key text-slate-300"></i></td>
             </tr>`;

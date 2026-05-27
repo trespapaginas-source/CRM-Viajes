@@ -118,3 +118,12 @@ CREATE TRIGGER trigger_check_proveedor_modificacion
 BEFORE UPDATE OR DELETE ON public.proveedores
 FOR EACH ROW
 EXECUTE FUNCTION public.check_proveedor_modificacion();
+
+-- 5. Agregar columna motivo_eliminacion a las tablas para almacenar justificaciones
+ALTER TABLE public.abonos ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;
+ALTER TABLE public.gastos_corporativos ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;
+ALTER TABLE public.socios_movimientos ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;
+ALTER TABLE public.gastos_salidas ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;
+ALTER TABLE public.clientes ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;
+ALTER TABLE public.planes ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;
+ALTER TABLE public.proveedores ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT;

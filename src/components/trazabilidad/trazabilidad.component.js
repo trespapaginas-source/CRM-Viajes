@@ -60,6 +60,12 @@ export const TrazabilidadComponent = {
                 // Capturar destrucción de la tabla de la papelera en trazabilidad
                 e.stopPropagation();
                 await this.hardDeleteRecord(target.dataset.table, target.dataset.id);
+            } else if (action === 'aprobacion-approve' && this.isInTrazabilidadView()) {
+                e.stopPropagation();
+                await this.resolverAprobacion(target.dataset.id, 'APROBADO');
+            } else if (action === 'aprobacion-reject' && this.isInTrazabilidadView()) {
+                e.stopPropagation();
+                await this.resolverAprobacion(target.dataset.id, 'RECHAZADO');
             }
         });
 
@@ -113,11 +119,18 @@ export const TrazabilidadComponent = {
         if (tabId === 'logs') {
             document.getElementById('trazabilidad-panel-logs').classList.remove('hidden');
             document.getElementById('trazabilidad-panel-papelera').classList.add('hidden');
+            document.getElementById('trazabilidad-panel-aprobaciones')?.classList.add('hidden');
             this.loadLogs();
-        } else {
+        } else if (tabId === 'papelera') {
             document.getElementById('trazabilidad-panel-logs').classList.add('hidden');
             document.getElementById('trazabilidad-panel-papelera').classList.remove('hidden');
+            document.getElementById('trazabilidad-panel-aprobaciones')?.classList.add('hidden');
             this.loadDeletedRecords();
+        } else if (tabId === 'aprobaciones') {
+            document.getElementById('trazabilidad-panel-logs').classList.add('hidden');
+            document.getElementById('trazabilidad-panel-papelera').classList.add('hidden');
+            document.getElementById('trazabilidad-panel-aprobaciones')?.classList.remove('hidden');
+            this.loadAprobaciones();
         }
     },
 
@@ -382,28 +395,28 @@ export const TrazabilidadComponent = {
         const emptyState = document.getElementById('trazabilidad-papelera-empty');
         if (!tbody) return;
 
-        tbody.innerHTML = `<tr><td colspan="5" class="py-16 text-center"><i class="ph ph-circle-notch animate-spin text-4xl text-indigo-500"></i><p class="text-[10px] text-slate-400 mt-3 font-black uppercase tracking-widest">Buscando registros en la papelera...</p></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="py-16 text-center"><i class="ph ph-circle-notch animate-spin text-4xl text-indigo-500"></i><p class="text-[10px] text-slate-400 mt-3 font-black uppercase tracking-widest">Buscando registros en la papelera...</p></td></tr>`;
 
         try {
             const [clientes, abonos, proveedores, planes, gastosCorp, movimientos, gastosSalidas] = await Promise.all([
-                supabaseClient.from('clientes').select('id, nombre, apellido, deleted_at, deleted_by').not('deleted_at', 'is', null),
-                supabaseClient.from('abonos').select('id, monto, metodo, cliente_id, deleted_at, deleted_by').not('deleted_at', 'is', null),
-                supabaseClient.from('proveedores').select('id, razon_social, deleted_at, deleted_by').not('deleted_at', 'is', null),
-                supabaseClient.from('planes').select('id, nombre, deleted_at, deleted_by').not('deleted_at', 'is', null),
-                supabaseClient.from('gastos_corporativos').select('id, concepto, monto, deleted_at, deleted_by').not('deleted_at', 'is', null),
-                supabaseClient.from('socios_movimientos').select('id, concepto, monto, tipo, socio_email, deleted_at, deleted_by').not('deleted_at', 'is', null),
-                supabaseClient.from('gastos_salidas').select('id, concepto, costo, deleted_at, deleted_by').not('deleted_at', 'is', null)
+                supabaseClient.from('clientes').select('id, nombre, apellido, deleted_at, deleted_by, motivo_eliminacion').not('deleted_at', 'is', null),
+                supabaseClient.from('abonos').select('id, monto, metodo, cliente_id, deleted_at, deleted_by, motivo_eliminacion').not('deleted_at', 'is', null),
+                supabaseClient.from('proveedores').select('id, nombre, deleted_at, deleted_by, motivo_eliminacion').not('deleted_at', 'is', null),
+                supabaseClient.from('planes').select('id, nombre, deleted_at, deleted_by, motivo_eliminacion').not('deleted_at', 'is', null),
+                supabaseClient.from('gastos_corporativos').select('id, concepto, monto, deleted_at, deleted_by, motivo_eliminacion').not('deleted_at', 'is', null),
+                supabaseClient.from('socios_movimientos').select('id, concepto, monto, tipo, socio_email, deleted_at, deleted_by, motivo_eliminacion').not('deleted_at', 'is', null),
+                supabaseClient.from('gastos_salidas').select('id, concepto, valor, deleted_at, deleted_by, motivo_eliminacion').not('deleted_at', 'is', null)
             ]);
 
             const allDeleted = [];
 
-            if (clientes.data) clientes.data.forEach(x => allDeleted.push({ table: 'clientes', id: x.id, desc: `Reserva: ${x.nombre} ${x.apellido}`, date: x.deleted_at, by: x.deleted_by }));
-            if (abonos.data) abonos.data.forEach(x => allDeleted.push({ table: 'abonos', id: x.id, desc: `Abono de ${formatCOP(x.monto)} por ${x.metodo}`, date: x.deleted_at, by: x.deleted_by }));
-            if (proveedores.data) proveedores.data.forEach(x => allDeleted.push({ table: 'proveedores', id: x.id, desc: `Proveedor: ${x.razon_social}`, date: x.deleted_at, by: x.deleted_by }));
-            if (planes.data) planes.data.forEach(x => allDeleted.push({ table: 'planes', id: x.id, desc: `Plan: ${x.nombre}`, date: x.deleted_at, by: x.deleted_by }));
-            if (gastosCorp.data) gastosCorp.data.forEach(x => allDeleted.push({ table: 'gastos_corporativos', id: x.id, desc: `Gasto Corporativo: ${x.concepto} (${formatCOP(x.monto)})`, date: x.deleted_at, by: x.deleted_by }));
-            if (movimientos.data) movimientos.data.forEach(x => allDeleted.push({ table: 'socios_movimientos', id: x.id, desc: `${x.tipo === 'retiro' ? 'Retiro' : 'Corte'} de Socio: ${x.concepto} (${formatCOP(x.monto)}) [${x.socio_email}]`, date: x.deleted_at, by: x.deleted_by }));
-            if (gastosSalidas.data) gastosSalidas.data.forEach(x => allDeleted.push({ table: 'gastos_salidas', id: x.id, desc: `Gasto Operativo: ${x.concepto} (${formatCOP(x.costo)})`, date: x.deleted_at, by: x.deleted_by }));
+            if (clientes.data) clientes.data.forEach(x => allDeleted.push({ table: 'clientes', id: x.id, desc: `Reserva: ${x.nombre} ${x.apellido}`, date: x.deleted_at, by: x.deleted_by, motivo: x.motivo_eliminacion }));
+            if (abonos.data) abonos.data.forEach(x => allDeleted.push({ table: 'abonos', id: x.id, desc: `Abono de ${formatCOP(x.monto)} por ${x.metodo}`, date: x.deleted_at, by: x.deleted_by, motivo: x.motivo_eliminacion }));
+            if (proveedores.data) proveedores.data.forEach(x => allDeleted.push({ table: 'proveedores', id: x.id, desc: `Proveedor: ${x.nombre}`, date: x.deleted_at, by: x.deleted_by, motivo: x.motivo_eliminacion }));
+            if (planes.data) planes.data.forEach(x => allDeleted.push({ table: 'planes', id: x.id, desc: `Plan: ${x.nombre}`, date: x.deleted_at, by: x.deleted_by, motivo: x.motivo_eliminacion }));
+            if (gastosCorp.data) gastosCorp.data.forEach(x => allDeleted.push({ table: 'gastos_corporativos', id: x.id, desc: `Gasto Corporativo: ${x.concepto} (${formatCOP(x.monto)})`, date: x.deleted_at, by: x.deleted_by, motivo: x.motivo_eliminacion }));
+            if (movimientos.data) movimientos.data.forEach(x => allDeleted.push({ table: 'socios_movimientos', id: x.id, desc: `${x.tipo === 'retiro' ? 'Retiro' : 'Corte'} de Socio: ${x.concepto} (${formatCOP(x.monto)}) [${x.socio_email}]`, date: x.deleted_at, by: x.deleted_by, motivo: x.motivo_eliminacion }));
+            if (gastosSalidas.data) gastosSalidas.data.forEach(x => allDeleted.push({ table: 'gastos_salidas', id: x.id, desc: `Gasto Operativo: ${x.concepto} (${formatCOP(x.valor)})`, date: x.deleted_at, by: x.deleted_by, motivo: x.motivo_eliminacion }));
 
             allDeleted.sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -433,6 +446,7 @@ export const TrazabilidadComponent = {
                             <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full text-[9px] font-medium border border-indigo-100/50">${r.table}</span>
                         </td>
                         <td class="py-3 px-4 text-xs text-slate-600 max-w-xs truncate" title="${UI.sanitize(r.desc)}">${UI.sanitize(r.desc)}</td>
+                        <td class="py-3 px-4 text-xs text-slate-500 max-w-xs truncate italic" title="${UI.sanitize(r.motivo || 'Sin motivo especificado')}">${UI.sanitize(r.motivo || 'Sin motivo')}</td>
                         <td class="py-3 px-4 whitespace-nowrap text-right">
                             <button data-action="restore-record" data-table="${r.table}" data-id="${r.id}" class="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100/60 px-2.5 py-1 rounded-lg border border-emerald-100/50 text-[10px] font-medium transition-all cursor-pointer mr-1"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar</button>
                             <button data-action="hard-delete-record" data-table="${r.table}" data-id="${r.id}" class="inline-flex items-center gap-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100/60 px-2.5 py-1 rounded-lg border border-rose-100/50 text-[10px] font-medium transition-all cursor-pointer"><i class="ph ph-trash"></i> Destruir</button>
@@ -444,7 +458,7 @@ export const TrazabilidadComponent = {
 
         } catch (e) {
             console.error("Error cargando papelera integrada:", e);
-            tbody.innerHTML = `<tr><td colspan="5" class="py-10 text-center text-red-500 font-bold">Error cargando papelera</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-red-500 font-bold">Error cargando papelera</td></tr>`;
         }
     },
 
@@ -507,6 +521,201 @@ export const TrazabilidadComponent = {
             console.error(e);
             window.UI.showToast("Error al destruir.", "error");
         }
+    },
+
+    async loadAprobaciones() {
+        const tbody = document.getElementById('trazabilidad-aprobaciones-tbody');
+        const emptyState = document.getElementById('trazabilidad-aprobaciones-empty');
+        if (!tbody) return;
+
+        tbody.innerHTML = `<tr><td colspan="8" class="py-16 text-center"><i class="ph ph-circle-notch animate-spin text-4xl text-indigo-500"></i><p class="text-[10px] text-slate-400 mt-3 font-black uppercase tracking-widest">Cargando solicitudes de aprobación...</p></td></tr>`;
+
+        try {
+            const data = await DataService.loadSolicitudesPendientes();
+
+            if (data.length === 0) {
+                tbody.innerHTML = '';
+                if (emptyState) emptyState.classList.remove('hidden');
+                return;
+            }
+
+            if (emptyState) emptyState.classList.add('hidden');
+
+            let html = '';
+            data.forEach(r => {
+                const dateObj = new Date(r.created_at);
+                const dateStr = dateObj.toLocaleDateString('es-CO') + ' ' + dateObj.toLocaleTimeString('es-CO', {hour: '2-digit', minute:'2-digit'});
+                const provName = r.proveedores?.nombre || r.proveedores?.razon_social || 'Proveedor Desconocido';
+                
+                const badgeClass = r.tipo_operacion === 'ELIMINACION' 
+                    ? 'bg-rose-50 text-rose-700 border border-rose-100/50 px-2 py-0.5 rounded-full text-[9px] font-bold'
+                    : 'bg-amber-50 text-amber-700 border border-amber-100/50 px-2 py-0.5 rounded-full text-[9px] font-bold';
+
+                const diffsView = this.renderDiff(r.datos_anteriores, r.datos_nuevos, r.tipo_operacion);
+                const impactoView = this.getImpactoProveedor(r.proveedor_id);
+
+                html += `
+                    <tr class="hover:bg-slate-50/70 border-b border-slate-100 transition-all">
+                        <td class="py-3.5 px-6 whitespace-nowrap text-xs text-slate-500 font-medium">${dateStr}</td>
+                        <td class="py-3.5 px-6 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1.5 bg-slate-50 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-medium border border-slate-100">
+                                <i class="ph ph-user text-[11px] opacity-70"></i>
+                                ${UI.sanitize(r.solicitante_email)}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-6 whitespace-nowrap text-xs text-slate-800 font-bold">${UI.sanitize(provName)}</td>
+                        <td class="py-3.5 px-6 whitespace-nowrap">
+                            <span class="${badgeClass}">${r.tipo_operacion}</span>
+                        </td>
+                        <td class="py-3.5 px-6 text-xs text-slate-600 max-w-xs break-words font-medium" title="${UI.sanitize(r.motivo)}">${UI.sanitize(r.motivo)}</td>
+                        <td class="py-3.5 px-6 text-xs text-slate-700 font-medium">${diffsView}</td>
+                        <td class="py-3.5 px-6 text-xs text-slate-700 font-medium">${impactoView}</td>
+                        <td class="py-3.5 px-6 whitespace-nowrap text-right">
+                            <button data-action="aprobacion-approve" data-id="${r.id}" class="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100/60 px-3 py-1.5 rounded-xl border border-emerald-100/50 text-xs font-bold transition-all cursor-pointer mr-1.5 shadow-sm"><i class="ph ph-check-bold text-sm"></i> Aprobar</button>
+                            <button data-action="aprobacion-reject" data-id="${r.id}" class="inline-flex items-center gap-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100/60 px-3 py-1.5 rounded-xl border border-rose-100/50 text-xs font-bold transition-all cursor-pointer shadow-sm"><i class="ph ph-x-bold text-sm"></i> Rechazar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+
+        } catch (e) {
+            console.error("Error cargando aprobaciones:", e);
+            tbody.innerHTML = `<tr><td colspan="8" class="py-10 text-center text-red-500 font-bold">Error al cargar solicitudes de aprobación.</td></tr>`;
+        }
+    },
+
+    getImpactoProveedor(proveedorId) {
+        const planes = DataService.planes || [];
+        const clientes = DataService.clientes || [];
+        
+        // Buscar planes vinculados
+        const planesVinculados = planes.filter(p => {
+            if (!p.proveedores_vinculados || !Array.isArray(p.proveedores_vinculados)) return false;
+            return p.proveedores_vinculados.some(pv => pv.id_proveedor === proveedorId || pv.id_provider === proveedorId);
+        });
+        
+        if (planesVinculados.length === 0) {
+            return `<span class="text-slate-400 font-medium text-xs">Ninguno (Proveedor sin uso activo)</span>`;
+        }
+        
+        let totalReservas = 0;
+        const nombresPlanes = [];
+        
+        planesVinculados.forEach(p => {
+            const reservasPlan = clientes.filter(c => c.plan_id === p.id && !c.deleted_at).length;
+            totalReservas += reservasPlan;
+            nombresPlanes.push(`${p.nombre} (${reservasPlan} res.)`);
+        });
+        
+        let colorClass = totalReservas > 0 ? 'text-rose-600 bg-rose-50 border-rose-100/50' : 'text-amber-600 bg-amber-50 border-amber-100/50';
+        
+        return `
+            <div class="px-2.5 py-1.5 rounded-xl border ${colorClass} text-[11px] leading-tight font-medium">
+                <span class="font-bold uppercase tracking-wider block mb-0.5">${totalReservas} reservas afectadas</span>
+                <span class="opacity-80 block max-w-[180px] truncate" title="${UI.sanitize(nombresPlanes.join(', '))}">${UI.sanitize(nombresPlanes.join(', '))}</span>
+            </div>
+        `;
+    },
+
+    async resolverAprobacion(solId, estado) {
+        const adminEmail = window.AuthModule?.currentUser?.email;
+        if (adminEmail !== 'trespa.paginas@gmail.com') {
+            window.UI.showToast("Acción denegada: Solo el administrador principal puede resolver solicitudes de cambio.", "error");
+            return;
+        }
+
+        const confirmMsg = estado === 'APROBADO' 
+            ? "¿Estás seguro de que deseas APROBAR esta solicitud? Los cambios se aplicarán inmediatamente en la base de datos."
+            : "¿Estás seguro de que deseas RECHAZAR esta solicitud? Los cambios propuestos serán descartados.";
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            await DataService.resolverSolicitudCambio(solId, estado, adminEmail);
+            window.UI.showToast(`Solicitud de cambio ${estado === 'APROBADO' ? 'aprobada y aplicada' : 'rechazada y descartada'} correctamente.`, "success");
+            await this.loadAprobaciones();
+        } catch (e) {
+            console.error("Error resolviendo aprobación:", e);
+            window.UI.showToast("Error al resolver la solicitud de cambio.", "error");
+        }
+    },
+
+    renderDiff(prev, newD, tipoOperacion) {
+        if (tipoOperacion === 'ELIMINACION') {
+            return `<span class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded border border-rose-100/50 text-[10px] font-bold">ELIMINACIÓN DE REGISTRO COMPLETO</span>`;
+        }
+        if (!prev || !newD) return '';
+        
+        let diffs = [];
+        const fieldsToCompare = [
+            { key: 'nombre', label: 'Razón Social / Nombre' },
+            { key: 'telefono', label: 'Teléfono' },
+            { key: 'ciudad', label: 'Ciudad' },
+            { key: 'email', label: 'Correo Electrónico' },
+            { key: 'tipo', label: 'Categoría' }
+        ];
+        
+        fieldsToCompare.forEach(f => {
+            const v1 = prev[f.key] || '';
+            const v2 = newD[f.key] || '';
+            if (v1 !== v2) {
+                diffs.push(`
+                    <div class="mb-1 text-xs">
+                        <span class="font-bold text-slate-500">${f.label}:</span>
+                        <span class="line-through text-rose-600 bg-rose-50 px-1 rounded">${UI.sanitize(v1)}</span>
+                        <i class="ph ph-caret-right text-[10px] text-slate-400"></i>
+                        <span class="text-emerald-700 bg-emerald-50 px-1 rounded font-semibold">${UI.sanitize(v2)}</span>
+                    </div>
+                `);
+            }
+        });
+        
+        // Comparar productos
+        const prod1 = prev.productos || [];
+        const prod2 = newD.productos || [];
+        
+        // Buscar productos agregados o con costo cambiado
+        prod2.forEach(p2 => {
+            const p1 = prod1.find(x => x.name === p2.name);
+            if (!p1) {
+                // Nuevo producto
+                diffs.push(`
+                    <div class="mb-1 text-xs">
+                        <span class="font-bold text-slate-500">Nuevo servicio:</span>
+                        <span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold">${UI.sanitize(p2.name)} (${formatCOP(p2.costo)})</span>
+                    </div>
+                `);
+            } else if (Number(p1.costo) !== Number(p2.costo)) {
+                // Costo cambiado
+                diffs.push(`
+                    <div class="mb-1 text-xs">
+                        <span class="font-bold text-slate-500">Costo modificado (${UI.sanitize(p2.name)}):</span>
+                        <span class="line-through text-rose-600 bg-rose-50 px-1 rounded">${formatCOP(p1.costo)}</span>
+                        <i class="ph ph-caret-right text-[10px] text-slate-400"></i>
+                        <span class="text-emerald-700 bg-emerald-50 px-1 rounded font-semibold">${formatCOP(p2.costo)}</span>
+                    </div>
+                `);
+            }
+        });
+        
+        // Buscar productos eliminados
+        prod1.forEach(p1 => {
+            const p2 = prod2.find(x => x.name === p1.name);
+            if (!p2) {
+                diffs.push(`
+                    <div class="mb-1 text-xs">
+                        <span class="font-bold text-slate-500">Servicio eliminado:</span>
+                        <span class="line-through text-rose-600 bg-rose-50 px-1 rounded">${UI.sanitize(p1.name)} (${formatCOP(p1.costo)})</span>
+                    </div>
+                `);
+            }
+        });
+        
+        if (diffs.length === 0) {
+            return `<span class="text-slate-400 italic text-xs">Sin cambios detectados en campos principales</span>`;
+        }
+        return diffs.join('');
     }
 };
 

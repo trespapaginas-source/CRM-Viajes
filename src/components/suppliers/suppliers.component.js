@@ -6,8 +6,42 @@ import { DataService, supabaseClient } from '../../../js/services/supabase.servi
 import { UI } from '../../../js/utils/ui.utils.js';
 import { formatCOP } from '../../../js/utils/format.utils.js';
 
+function isProductInUse(supplierId, productName) {
+    if (!supplierId || !productName) return false;
+    
+    // Check in plans
+    const inPlan = DataService.planes.some(p => 
+        p.proveedores_vinculados && p.proveedores_vinculados.some(pv => {
+            const pvId = pv.id_proveedor || pv.id_provider;
+            return String(pvId) === String(supplierId) && pv.incluye === productName;
+        })
+    );
+    if (inPlan) return true;
+
+    // Check in client reservations
+    const inClient = DataService.clientes.some(c => 
+        c.proveedores_vinculados && c.proveedores_vinculados.some(pv => {
+            const pvId = pv.id_proveedor || pv.id_provider;
+            return String(pvId) === String(supplierId) && pv.incluye === productName;
+        })
+    );
+    return inClient;
+}
+
+function getNextVersionName(name) {
+    const match = name.match(/\s\(v(\d+)\)$/i);
+    if (match) {
+        const nextVer = parseInt(match[1]) + 1;
+        return name.replace(/\s\(v(\d+)\)$/i, ` (v${nextVer})`);
+    }
+    return `${name} (v2)`;
+}
+
 export const SuppliersComponent = {
     tempProducts: [],
+    initialProducts: [],
+    deletedProductsReasons: {},
+    editingIndex: null,
 
     init() {
         this.bindEvents();
@@ -77,7 +111,30 @@ export const SuppliersComponent = {
         if (prodList) {
             prodList.addEventListener('click', (e) => {
                 const btnDel = e.target.closest('.btn-remove-temp-product');
-                if (btnDel) this.removeTempProduct(parseInt(btnDel.dataset.index));
+                if (btnDel) {
+                    this.removeTempProduct(parseInt(btnDel.dataset.index));
+                    return;
+                }
+
+                const btnEdit = e.target.closest('.btn-edit-temp-product');
+                if (btnEdit) {
+                    this.editingIndex = parseInt(btnEdit.dataset.index);
+                    this.renderTempProducts();
+                    return;
+                }
+
+                const btnSave = e.target.closest('.btn-save-edit-product');
+                if (btnSave) {
+                    this.saveEditedProduct(parseInt(btnSave.dataset.index));
+                    return;
+                }
+
+                const btnCancel = e.target.closest('.btn-cancel-edit-product');
+                if (btnCancel) {
+                    this.editingIndex = null;
+                    this.renderTempProducts();
+                    return;
+                }
             });
         }
     },
@@ -176,6 +233,9 @@ export const SuppliersComponent = {
     openFormModal(id = null) {
         document.getElementById('supplier-form').reset();
         this.tempProducts = [];
+        this.initialProducts = [];
+        this.deletedProductsReasons = {};
+        this.editingIndex = null;
         this.toggleCustomCategory();
 
         if (id) {
@@ -196,7 +256,8 @@ export const SuppliersComponent = {
                     cb.innerHTML += `<option value="${p.tipo}">${p.tipo}</option>`;
                 }
                 cb.value = p.tipo;
-                this.tempProducts = [...(p.productos || [])];
+                this.tempProducts = JSON.parse(JSON.stringify(p.productos || []));
+                this.initialProducts = JSON.parse(JSON.stringify(p.productos || []));
             }
         } else {
             document.getElementById('supplier-form-title').innerHTML = '<i class="ph ph-buildings text-primary-600 mr-2 text-2xl"></i> Nuevo Proveedor';
@@ -231,9 +292,28 @@ export const SuppliersComponent = {
         }
     },
 
-    removeTempProduct(i) { 
-        this.tempProducts.splice(i, 1); 
-        this.renderTempProducts(); 
+    removeTempProduct(i) {
+        const prod = this.tempProducts[i];
+        if (!prod) return;
+
+        // Verificar si estaba en los productos iniciales guardados en la BD
+        const existia = this.initialProducts.some(p => p.name === prod.name);
+        if (existia) {
+            const motivo = window.prompt(`El servicio "${prod.name}" ya está guardado en la base de datos. Ingresa la justificación/motivo para eliminar este servicio:`);
+            if (motivo === null) {
+                // Canceló el prompt, no hacemos nada
+                return;
+            }
+            const motivoTrimmed = motivo.trim();
+            if (!motivoTrimmed) {
+                UI.showToast("La justificación es obligatoria para eliminar un servicio existente.", "error");
+                return;
+            }
+            this.deletedProductsReasons[prod.name] = motivoTrimmed;
+        }
+
+        this.tempProducts.splice(i, 1);
+        this.renderTempProducts();
     },
 
     renderTempProducts() {
@@ -241,12 +321,69 @@ export const SuppliersComponent = {
         if (!u) return;
         u.innerHTML = '';
         this.tempProducts.forEach((p, i) => {
-            u.innerHTML += `
-            <li class="flex justify-between items-center bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md">
-                <div><span class="text-sm font-black text-slate-800">${UI.sanitize(p.name)}</span><br><span class="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-100 shadow-sm">${formatCOP(p.costo)}</span></div>
-                <button type="button" class="btn-remove-temp-product text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 p-2 rounded-lg transition-colors border border-slate-100" data-index="${i}"><i class="ph ph-trash text-lg"></i></button>
-            </li>`;
+            const isEditing = this.editingIndex === i;
+            const isArchived = p.activo === false;
+            
+            if (isEditing) {
+                u.innerHTML += `
+                <li class="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 px-4 py-3 rounded-xl border border-indigo-200 shadow-sm transition">
+                    <div class="flex-1 min-w-0">
+                        <input type="text" id="edit-prod-name-${i}" class="w-full bg-white border border-slate-200/60 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-slate-800 outline-none focus:ring-1 focus:ring-slate-900 transition-all shadow-sm" value="${UI.sanitize(p.name)}" placeholder="Nombre del servicio">
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div class="relative w-32">
+                            <span class="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-emerald-500 font-bold text-xs">$</span>
+                            <input type="number" id="edit-prod-cost-${i}" class="w-full pl-6 pr-2 py-1.5 border border-slate-200/60 rounded-lg text-xs font-black text-emerald-700 bg-white outline-none focus:ring-1 focus:ring-emerald-500 transition-all shadow-sm" value="${p.costo}" placeholder="Costo">
+                        </div>
+                        <button type="button" class="btn-save-edit-product text-emerald-600 hover:text-white bg-emerald-50 hover:bg-emerald-600 p-2 rounded-lg transition-colors border border-emerald-100 cursor-pointer" data-index="${i}" title="Guardar cambios"><i class="ph ph-check text-lg"></i></button>
+                        <button type="button" class="btn-cancel-edit-product text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 p-2 rounded-lg transition-colors border border-slate-100 cursor-pointer" data-index="${i}" title="Cancelar"><i class="ph ph-x text-lg"></i></button>
+                    </div>
+                </li>`;
+            } else {
+                let actionButtonsHtml = '';
+                let badgeHtml = '';
+                
+                if (isArchived) {
+                    badgeHtml = `<span class="text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded shadow-sm ml-2"><i class="ph ph-archive mr-0.5"></i> Histórico / Inactivo</span>`;
+                    actionButtonsHtml = `<span class="text-slate-400 text-xs font-semibold p-2 flex items-center gap-1"><i class="ph ph-lock mr-0.5"></i> Bloqueado</span>`;
+                } else {
+                    actionButtonsHtml = `
+                        <button type="button" class="btn-edit-temp-product text-slate-400 hover:text-primary-600 bg-slate-50 hover:bg-primary-50 p-2 rounded-lg transition-colors border border-slate-100 cursor-pointer" data-index="${i}" title="Editar servicio"><i class="ph ph-pencil-simple text-lg"></i></button>
+                        <button type="button" class="btn-remove-temp-product text-slate-400 hover:text-red-500 bg-slate-50 hover:bg-red-50 p-2 rounded-lg transition-colors border border-slate-100 cursor-pointer" data-index="${i}" title="Eliminar servicio"><i class="ph ph-trash text-lg"></i></button>
+                    `;
+                }
+
+                u.innerHTML += `
+                <li class="flex justify-between items-center ${isArchived ? 'bg-slate-50/50 opacity-75' : 'bg-white'} px-4 py-3 rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md">
+                    <div>
+                        <span class="text-sm font-black text-slate-800">${UI.sanitize(p.name)}${badgeHtml}</span><br>
+                        <span class="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-100 shadow-sm">${formatCOP(p.costo)}</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        ${actionButtonsHtml}
+                    </div>
+                </li>`;
+            }
         });
+    },
+
+    saveEditedProduct(idx) {
+        const nameInput = document.getElementById(`edit-prod-name-${idx}`);
+        const costInput = document.getElementById(`edit-prod-cost-${idx}`);
+        if (!nameInput || !costInput) return;
+
+        const name = nameInput.value.trim();
+        const cost = parseFloat(costInput.value) || 0;
+
+        if (!name || cost <= 0) {
+            UI.showToast("El servicio debe tener un nombre válido y un costo mayor a cero.", "error");
+            return;
+        }
+
+        this.tempProducts[idx].name = name;
+        this.tempProducts[idx].costo = cost;
+        this.editingIndex = null;
+        this.renderTempProducts();
     },
 
     async saveSupplier() {
@@ -261,29 +398,133 @@ export const SuppliersComponent = {
             let cat = document.getElementById('sf-tipo').value;
             if (cat === 'otra') { cat = document.getElementById('sf-tipo-nuevo').value.trim(); DataService.addCategory(cat); }
 
+            // Procesamiento de Versionado de Productos
+            const finalProducts = [];
+            const supplierId = document.getElementById('sf-id').value;
+
+            if (supplierId) {
+                // Proveedor existente, procesamos versionado e impedimos eliminaciones físicas de productos en uso
+                const editedProducts = [...this.tempProducts];
+                
+                for (let i = 0; i < editedProducts.length; i++) {
+                    const edited = editedProducts[i];
+                    
+                    // Si es un producto nuevo añadido en esta edición (no estaba en la carga inicial)
+                    if (i >= this.initialProducts.length) {
+                        edited.activo = edited.activo !== undefined ? edited.activo : true;
+                        edited.version = edited.version || 1;
+                        finalProducts.push(edited);
+                        continue;
+                    }
+
+                    const orig = this.initialProducts[i];
+                    const nameChanged = edited.name !== orig.name;
+                    const priceChanged = parseFloat(edited.costo) !== parseFloat(orig.costo);
+
+                    if (nameChanged || priceChanged) {
+                        const inUse = isProductInUse(supplierId, orig.name);
+                        if (inUse) {
+                            // Conservar el original como inactivo/histórico
+                            finalProducts.push({
+                                name: orig.name,
+                                costo: parseFloat(orig.costo),
+                                activo: false,
+                                version: orig.version || 1
+                            });
+
+                            // Crear la nueva versión
+                            const nextVer = (orig.version || 1) + 1;
+                            let newName = edited.name;
+                            if (!nameChanged) {
+                                newName = getNextVersionName(orig.name);
+                            }
+                            finalProducts.push({
+                                name: newName,
+                                costo: parseFloat(edited.costo),
+                                activo: true,
+                                version: nextVer
+                            });
+                        } else {
+                            // No está en uso, se modifica directamente
+                            edited.activo = edited.activo !== undefined ? edited.activo : true;
+                            edited.version = orig.version || 1;
+                            finalProducts.push(edited);
+                        }
+                    } else {
+                        // Sin cambios
+                        edited.activo = edited.activo !== undefined ? edited.activo : true;
+                        edited.version = orig.version || 1;
+                        finalProducts.push(edited);
+                    }
+                }
+
+                // Detectar si se eliminaron productos que estaban en uso
+                this.initialProducts.forEach(orig => {
+                    const stillExists = editedProducts.some(p => p.name === orig.name);
+                    if (!stillExists) {
+                        const inUse = isProductInUse(supplierId, orig.name);
+                        if (inUse) {
+                            // Si está en uso, lo reincorporamos como inactivo/histórico
+                            finalProducts.push({
+                                name: orig.name,
+                                costo: parseFloat(orig.costo),
+                                activo: false,
+                                version: orig.version || 1
+                            });
+                        }
+                    }
+                });
+            } else {
+                // Nuevo proveedor: todos los productos inician en activo: true, version: 1
+                this.tempProducts.forEach(p => {
+                    finalProducts.push({
+                        name: p.name,
+                        costo: parseFloat(p.costo),
+                        activo: true,
+                        version: 1
+                    });
+                });
+            }
+
             const obj = {
-                id: document.getElementById('sf-id').value,
+                id: supplierId,
                 nombre: document.getElementById('sf-nombre').value,
                 telefono: document.getElementById('sf-telefono').value,
                 ciudad: document.getElementById('sf-ciudad').value,
                 email: document.getElementById('sf-email').value,
                 tipo: cat,
-                productos: [...this.tempProducts]
+                productos: finalProducts
             };
+
+            // Validar que todos los servicios tengan nombre y un costo válido
+            const invalidProduct = obj.productos.find(p => !p.name.trim() || p.costo <= 0);
+            if (invalidProduct) {
+                UI.showToast("Todos los servicios deben tener un nombre válido y un costo mayor a cero.", "error");
+                b.disabled = false;
+                b.innerHTML = '<i class="ph ph-check mr-2 text-xl"></i> Finalizar Proveedor';
+                return;
+            }
 
             if (obj.id) {
                 const enUso = await DataService.checkProveedorEnUso(obj.id);
                 const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
                 
                 if (enUso && !isAdminPrincipal) {
-                    const motivo = window.prompt("Este proveedor está vinculado a operaciones reales. Ingresa la justificación/motivo de esta modificación para que sea aprobada por el administrador:");
-                    if (!motivo) {
-                        UI.showToast("Operación cancelada. Se requiere justificación para modificar un proveedor activo.", "error");
-                        this.closeFormModal();
-                        return;
+                    const prev = Store.getState().proveedores.find(x => x.id === obj.id);
+                    
+                    // Determinar si hay servicios eliminados
+                    const deletedServiceNames = Object.keys(this.deletedProductsReasons);
+                    let motivo = '';
+                    
+                    if (deletedServiceNames.length > 0) {
+                        // Si se eliminaron servicios, armamos el motivo con las razones dadas
+                        const parts = deletedServiceNames.map(name => `Eliminado servicio: "${name}". Motivo: ${this.deletedProductsReasons[name]}`);
+                        motivo = parts.join(" | ");
+                    } else {
+                        // Si no hay eliminaciones (solo ediciones de precio/nombre o adiciones), no requiere prompt
+                        motivo = "Actualización de catálogo de servicios y tarifas";
                     }
                     
-                    const prev = Store.getState().proveedores.find(x => x.id === obj.id);
                     const requestObj = {
                         proveedor_id: obj.id,
                         solicitante_email: window.AuthModule?.currentUser?.email || 'Desconocido',
@@ -340,18 +581,14 @@ export const SuppliersComponent = {
         btn.disabled = true;
 
         try {
-            const newProducts = [...(p.productos || []), { name, costo: cost }];
+            const newProducts = [...(p.productos || []), { name, costo: cost, activo: true, version: 1 }];
             
             const enUso = await DataService.checkProveedorEnUso(id);
             const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
             
             if (enUso && !isAdminPrincipal) {
-                const motivo = window.prompt("Este proveedor está vinculado a operaciones reales. Ingresa la justificación/motivo de agregar este nuevo servicio para aprobación administrativa:");
-                if (!motivo) {
-                    UI.showToast("Operación cancelada. Se requiere justificación.", "error");
-                    UI.closeModal('quick-service-modal', 'qsm-bg', 'qsm-content');
-                    return;
-                }
+                // Al agregar servicio por Quick Add, es una adición (no eliminación), por lo que no pide justificación.
+                const motivo = `Adición de servicio rápido: "${name}" con costo ${formatCOP(cost)}`;
                 
                 const obj = {
                     ...p,

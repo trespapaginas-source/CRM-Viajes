@@ -1781,13 +1781,9 @@ export const PartnersComponent = {
             return UI.showToast("No tienes permiso para eliminar movimientos.", "error");
         }
 
-        const res = await this.deleteMovement(id);
-        if (res.success) {
-            UI.showToast("Movimiento eliminado con éxito.", "success");
-            this.calculateDistribution();
-        } else {
-            UI.showToast("Error al eliminar movimiento.", "error");
-        }
+        const m = this.movements.find(x => x.id === id);
+        const name = m ? `Retiro de Socio: ${m.concepto} (${formatCOP(m.monto)})` : 'Retiro de Socio';
+        window.promptGlobalDelete(id, 'socio_movimiento', name);
     },
 
     async handleGastoCorpSubmit() {
@@ -1876,13 +1872,9 @@ export const PartnersComponent = {
             return UI.showToast("No tienes permiso para eliminar gastos corporativos.", "error");
         }
 
-        const res = await this.deleteCorporateExpense(id);
-        if (res.success) {
-            UI.showToast("Gasto corporativo eliminado con éxito.", "success");
-            this.calculateDistribution();
-        } else {
-            UI.showToast("Error al eliminar gasto corporativo.", "error");
-        }
+        const g = this.corporateExpenses.find(x => x.id === id);
+        const name = g ? `Gasto Corporativo: ${g.concepto} (${formatCOP(g.monto)})` : 'Gasto Corporativo';
+        window.promptGlobalDelete(id, 'gasto_corporativo', name);
     },
 
     compressFileToBase64(file) {

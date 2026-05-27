@@ -308,7 +308,7 @@ export const DataService = {
                 // Buscar cliente actual para comparar
                 const clienteActual = this.clientes.find(c => c.id === id);
                 if (clienteActual) {
-                    const camposAComparar = ['nombre', 'apellido', 'documento', 'telefono', 'email', 'pax', 'plan_id', 'fecha_viaje', 'precio_total', 'estado', 'etiqueta', 'dni', 'vendedor', 'costo_total', 'notas_financieras'];
+                    const camposAComparar = ['nombre', 'apellido', 'documento', 'telefono', 'email', 'pax', 'plan_id', 'fecha_viaje', 'precio_total', 'estado', 'etiqueta', 'dni', 'vendedor', 'costo_total', 'notas_financieras', 'costo_base'];
                     for (const campo of camposAComparar) {
                         if (datosMapeados[campo] !== undefined && String(datosMapeados[campo]) !== String(clienteActual[campo])) {
                             let valAnt = clienteActual[campo];
@@ -418,14 +418,14 @@ export const DataService = {
         } catch (e) { throw e; }
     },
 
-    async deleteAbono(abonoId, clienteId) {
+    async deleteAbono(abonoId, clienteId, motivo) {
         try {
             const user = window.AuthModule?.currentUser?.email || 'Desconocido';
             const abono = this.abonos.find(a => a.id === abonoId);
             if (abono) {
-                await this.registrarHistorial(clienteId, 'Abono Eliminado', `Abono de $${abono.monto} (${abono.metodo})`, 'Movido a la Papelera', 'ELIMINACION', { abono_id: abonoId });
+                await this.registrarHistorial(clienteId, 'Abono Eliminado', `Abono de $${abono.monto} (${abono.metodo})`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { abono_id: abonoId, motivo_eliminacion: motivo });
             }
-            const { error } = await supabaseClient.from('abonos').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', abonoId);
+            const { error } = await supabaseClient.from('abonos').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', abonoId);
             if (error) throw error;
             await this.loadAll();
             await this.recalculateClientBalances(clienteId);
@@ -469,32 +469,62 @@ export const DataService = {
         } catch (e) { throw e; }
     },
 
-    async deletePlan(id) {
+    async deletePlan(id, motivo) {
         const user = window.AuthModule?.currentUser?.email || 'Desconocido';
         const plan = this.planes.find(p => p.id === id);
         const nombrePlan = plan ? plan.nombre : id;
-        await this.registrarHistorial(null, 'Plan Eliminado (Soft Delete)', `Plan: ${nombrePlan}`, 'Movido a la Papelera', 'ELIMINACION', { plan_id: id });
-        const { error } = await supabaseClient.from('planes').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
+        await this.registrarHistorial(null, 'Plan Eliminado (Soft Delete)', `Plan: ${nombrePlan}`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { plan_id: id, motivo_eliminacion: motivo });
+        const { error } = await supabaseClient.from('planes').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
     },
-    async deleteCliente(id) {
+    async deleteCliente(id, motivo) {
         const user = window.AuthModule?.currentUser?.email || 'Desconocido';
         const clienteActual = this.clientes.find(c => c.id === id);
         const desc = clienteActual ? `${clienteActual.nombre} ${clienteActual.apellido}` : id;
-        await this.registrarHistorial(id, 'Eliminación (Soft Delete)', `Reserva de ${desc}`, 'Movida a la Papelera', 'ELIMINACION');
-        const { error } = await supabaseClient.from('clientes').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
+        await this.registrarHistorial(id, 'Eliminación (Soft Delete)', `Reserva de ${desc}`, `Movida a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { motivo_eliminacion: motivo });
+        const { error } = await supabaseClient.from('clientes').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
     },
-    async deleteProveedor(id) {
+    async deleteProveedor(id, motivo) {
         const user = window.AuthModule?.currentUser?.email || 'Desconocido';
         const prov = this.proveedores.find(p => p.id === id);
-        const razonSocial = prov ? prov.razon_social : id;
-        await this.registrarHistorial(null, 'Proveedor Eliminado (Soft Delete)', `Proveedor: ${razonSocial}`, 'Movido a la Papelera', 'ELIMINACION', { proveedor_id: id });
-        const { error } = await supabaseClient.from('proveedores').update({ deleted_at: new Date().toISOString(), deleted_by: user }).eq('id', id);
+        const razonSocial = prov ? prov.nombre || prov.razon_social : id;
+        await this.registrarHistorial(null, 'Proveedor Eliminado (Soft Delete)', `Proveedor: ${razonSocial}`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { proveedor_id: id, motivo_eliminacion: motivo });
+        const { error } = await supabaseClient.from('proveedores').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
         if (error) throw error;
         await this.loadAll();
+    },
+    async deleteGastoSalida(id, motivo) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            const gasto = this.gastos.find(g => g.id === id);
+            const concepto = gasto ? gasto.concepto : id;
+            const monto = gasto ? gasto.costo : 0;
+            await this.registrarHistorial(null, 'Gasto Operativo Eliminado (Soft Delete)', `Concepto: ${concepto} | Monto: ${monto}`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { gasto_salida_id: id, motivo_eliminacion: motivo });
+            const { error } = await supabaseClient.from('gastos_salidas').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
+            if (error) throw error;
+            await this.loadAll();
+        } catch (e) { throw e; }
+    },
+    async deleteGastoCorporativo(id, motivo) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            await this.registrarHistorial(null, 'Gasto Corporativo Eliminado (Soft Delete)', `Gasto ID: ${id}`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { gasto_corporativo_id: id, motivo_eliminacion: motivo });
+            const { error } = await supabaseClient.from('gastos_corporativos').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
+            if (error) throw error;
+            await this.loadAll();
+        } catch (e) { throw e; }
+    },
+    async deleteSocioMovimiento(id, motivo) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            await this.registrarHistorial(null, 'Movimiento de Socio Eliminado (Soft Delete)', `Movimiento ID: ${id}`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { socios_movimiento_id: id, motivo_eliminacion: motivo });
+            const { error } = await supabaseClient.from('socios_movimientos').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
+            if (error) throw error;
+            await this.loadAll();
+        } catch (e) { throw e; }
     },
 
     async getAgenciaConfig() {
@@ -575,6 +605,16 @@ export const DataService = {
         try {
             const { error } = await supabaseClient.from('solicitudes_cambio_proveedores').insert([solicitud]);
             if (error) throw error;
+            
+            // Log creation in audit logs
+            await this.registrarHistorial(
+                null,
+                `Solicitud de ${solicitud.tipo_operacion === 'ELIMINACION' ? 'Eliminación' : 'Modificación'} de Proveedor`,
+                'PENDIENTE',
+                `Solicitud creada por ${solicitud.solicitante_email} para el proveedor ${solicitud.proveedor_id}.`,
+                'SEGURIDAD',
+                { motivo: solicitud.motivo, proveedor_id: solicitud.proveedor_id }
+            );
         } catch (e) { throw e; }
     },
 
@@ -592,21 +632,53 @@ export const DataService = {
 
     async resolverSolicitudCambio(solId, estado_aprobacion, adminEmail) {
         try {
-            const { data: reqs, error: fetchErr } = await supabaseClient.from('solicitudes_cambio_proveedores').select('*').eq('id', solId);
+            const { data: reqs, error: fetchErr } = await supabaseClient.from('solicitudes_cambio_proveedores').select('*, proveedores(*)').eq('id', solId);
             if (fetchErr || !reqs || reqs.length === 0) throw fetchErr || new Error("Request not found");
             const req = reqs[0];
+            const provName = req.proveedores?.nombre || req.proveedores?.razon_social || req.proveedor_id;
 
             if (estado_aprobacion === 'APROBADO') {
                 if (req.tipo_operacion === 'MODIFICACION') {
-                    const { error: updateErr } = await supabaseClient.from('proveedores').update(req.datos_nuevos).eq('id', req.proveedor_id);
+                    const { id, ...datosMapeados } = req.datos_nuevos;
+                    const { error: updateErr } = await supabaseClient.from('proveedores').update(datosMapeados).eq('id', req.proveedor_id);
                     if (updateErr) throw updateErr;
+
+                    // Log execution in audit logs
+                    await this.registrarHistorial(
+                        null,
+                        'Solicitud de Modificación de Proveedor Aprobada',
+                        'PENDIENTE',
+                        `Cambio aplicado en proveedor ${provName}. Aprobado por ${adminEmail}.`,
+                        'SISTEMA',
+                        { resolved_by: adminEmail, tipo_operacion: 'MODIFICACION', datos_nuevos: datosMapeados }
+                    );
                 } else if (req.tipo_operacion === 'ELIMINACION') {
                     const { error: deleteErr } = await supabaseClient.from('proveedores').update({
                         deleted_at: new Date().toISOString(),
                         deleted_by: adminEmail
                     }).eq('id', req.proveedor_id);
                     if (deleteErr) throw deleteErr;
+
+                    // Log execution in audit logs
+                    await this.registrarHistorial(
+                        null,
+                        'Solicitud de Eliminación de Proveedor Aprobada',
+                        'PENDIENTE',
+                        `Proveedor ${provName} movido a la Papelera. Aprobado por ${adminEmail}.`,
+                        'ELIMINACION',
+                        { resolved_by: adminEmail, tipo_operacion: 'ELIMINACION' }
+                    );
                 }
+            } else {
+                // Log rejection in audit logs
+                await this.registrarHistorial(
+                    null,
+                    `Solicitud de ${req.tipo_operacion === 'ELIMINACION' ? 'Eliminación' : 'Modificación'} de Proveedor Rechazada`,
+                    'PENDIENTE',
+                    `Solicitud rechazada por ${adminEmail}. Ningún cambio fue aplicado a ${provName}.`,
+                    'SEGURIDAD',
+                    { resolved_by: adminEmail, tipo_operacion: req.tipo_operacion, motivo_solicitud: req.motivo }
+                );
             }
 
             const { error: statusErr } = await supabaseClient.from('solicitudes_cambio_proveedores').update({

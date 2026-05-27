@@ -160,15 +160,21 @@ export const UI = {
 // ─── ELIMINACIÓN GLOBAL ──────────────────────────────────────
 // Expuesta como función suelta para compatibilidad con onclick="promptGlobalDelete(...)"
 
-export function promptGlobalDelete(id, type, name) {
+export function promptGlobalDelete(id, type, name, extra = '') {
     document.getElementById('udm-id').value = id;
     document.getElementById('udm-type').value = type;
+    document.getElementById('udm-extra').value = extra;
     document.getElementById('udm-name').innerText = name;
+    document.getElementById('udm-motivo').value = '';
 
     let message = "";
     if (type === 'plan') message = "Se eliminará este plan. Asegúrate de que no haya reservas activas vinculadas a él.";
     if (type === 'cliente') message = "Se eliminará la reserva de este cliente y todo su historial de abonos. Esta acción es irreversible.";
     if (type === 'proveedor') message = "Se eliminará este proveedor y todo su catálogo de servicios de la base de datos.";
+    if (type === 'abono') message = "Se eliminará este abono registrado. El saldo del cliente se recalculará automáticamente.";
+    if (type === 'gasto_salida') message = "Se eliminará este gasto operativo. Los reportes de rentabilidad y costos se verán afectados.";
+    if (type === 'gasto_corporativo') message = "Se eliminará este gasto de la corporación / sociedad.";
+    if (type === 'socio_movimiento') message = "Se eliminará este movimiento o retiro de socio.";
 
     document.getElementById('udm-message').innerText = message;
     UI.openModal('universal-delete-modal', 'udm-bg', 'udm-content');
@@ -184,7 +190,14 @@ export async function executeGlobalDelete() {
 
     const id = document.getElementById('udm-id').value;
     const type = document.getElementById('udm-type').value;
+    const extra = document.getElementById('udm-extra').value;
+    const motivo = document.getElementById('udm-motivo').value.trim();
     const btn = document.getElementById('udm-confirm-btn');
+
+    if (!motivo) {
+        UI.showToast("La justificación es obligatoria para completar la eliminación.", "error");
+        return;
+    }
 
     const prevHtml = btn.innerHTML;
     btn.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i>';
@@ -192,10 +205,10 @@ export async function executeGlobalDelete() {
 
     try {
         if (type === 'plan') {
-            await window.DataService.deletePlan(id);
+            await window.DataService.deletePlan(id, motivo);
             UI.showToast("Plan eliminado del catálogo.", "success");
         } else if (type === 'cliente') {
-            await window.DataService.deleteCliente(id);
+            await window.DataService.deleteCliente(id, motivo);
             // DashboardComponent se actualiza automáticamente vía Store
             const detailModal = document.getElementById('client-detail-modal');
             if (document.getElementById('cdm-bg') && !document.getElementById('cdm-bg').classList.contains('hidden')) {
@@ -207,13 +220,6 @@ export async function executeGlobalDelete() {
             const isAdminPrincipal = window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com';
             
             if (enUso && !isAdminPrincipal) {
-                const motivo = window.prompt("Este proveedor está vinculado a operaciones reales. Ingresa la justificación/motivo de esta eliminación para aprobación administrativa:");
-                if (!motivo) {
-                    UI.showToast("Operación cancelada. Se requiere justificación para eliminar un proveedor activo.", "error");
-                    UI.closeModal('universal-delete-modal', 'udm-bg', 'udm-content');
-                    return;
-                }
-                
                 const prev = window.Store.getState().proveedores.find(x => x.id === id);
                 const requestObj = {
                     proveedor_id: id,
@@ -231,8 +237,20 @@ export async function executeGlobalDelete() {
                 return;
             }
 
-            await window.DataService.deleteProveedor(id);
+            await window.DataService.deleteProveedor(id, motivo);
             UI.showToast("Proveedor eliminado correctamente.", "success");
+        } else if (type === 'abono') {
+            await window.DataService.deleteAbono(id, extra, motivo);
+            UI.showToast("Abono eliminado correctamente.", "success");
+        } else if (type === 'gasto_salida') {
+            await window.DataService.deleteGastoSalida(id, motivo);
+            UI.showToast("Gasto operativo eliminado correctamente.", "success");
+        } else if (type === 'gasto_corporativo') {
+            await window.DataService.deleteGastoCorporativo(id, motivo);
+            UI.showToast("Gasto corporativo de socio eliminado correctamente.", "success");
+        } else if (type === 'socio_movimiento') {
+            await window.DataService.deleteSocioMovimiento(id, motivo);
+            UI.showToast("Movimiento de socio eliminado correctamente.", "success");
         }
         UI.closeModal('universal-delete-modal', 'udm-bg', 'udm-content');
     } catch (e) {

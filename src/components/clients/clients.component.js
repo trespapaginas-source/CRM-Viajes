@@ -493,9 +493,16 @@ export const ClientsComponent = {
                 }
             }
 
+            const fId = document.getElementById('cf-id').value;
+            const c = fId ? DataService.clientes.find(cli => cli.id === fId) : null;
+            
+            const provs = (bloqueo && c && c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
+                ? c.proveedores_vinculados
+                : (plan.proveedores_vinculados || []);
+
             trs.innerHTML = '';
-            if (plan.proveedores_vinculados && plan.proveedores_vinculados.length > 0) {
-                plan.proveedores_vinculados.forEach(pr => {
+            if (provs && provs.length > 0) {
+                provs.forEach(pr => {
                     trs.innerHTML += `
                     <tr>
                         <td class="p-3 font-bold text-xs uppercase border-b border-slate-100">${pr.nombre}</td>
@@ -627,19 +634,8 @@ export const ClientsComponent = {
             }
         }
 
-        document.getElementById('aam-abono-id').value = aId;
-        document.getElementById('aam-cliente-id').value = cId;
-        document.getElementById('aam-action-type').value = 'delete';
-
-        document.getElementById('aam-title').innerHTML = '<i class="ph ph-trash text-red-500 mr-2 text-2xl"></i> Eliminar Registro';
-        document.getElementById('aam-edit-body').classList.add('hidden');
-        document.getElementById('aam-delete-body').classList.remove('hidden');
-
-        const btn = document.getElementById('aam-confirm-btn');
-        btn.className = 'flex-1 px-4 py-3 rounded-xl font-black text-white bg-red-600 flex items-center justify-center hover:bg-red-700 hover:-translate-y-1 transition-all shadow-md';
-        btn.innerHTML = '<i class="ph ph-trash mr-2 text-lg"></i> Sí, Eliminar';
-
-        UI.openModal('abono-action-modal', 'aam-bg', 'aam-content');
+        const abonoDesc = `Abono de ${UI.formatMoney(abono.monto)} (${abono.metodo})`;
+        window.promptGlobalDelete(aId, 'abono', abonoDesc, cId);
     },
 
     promptEditAbono(aId, cId, monto, status) {
@@ -895,6 +891,22 @@ export const ClientsComponent = {
                 publicUrl = urlData.publicUrl;
             }
 
+            const cliExistente = esNvo ? null : DataService.clientes.find(x => x.id === fId);
+            const plan = DataService.planes.find(pl => pl.id === pId);
+
+            // Mantener datos históricos congelados si no cambió de plan en una edición
+            let costoBaseCongelado = plan ? (parseFloat(plan.costo_base) || 0) : 0;
+            let provsVinculadosCongelados = plan ? (plan.proveedores_vinculados || []) : [];
+
+            if (cliExistente && cliExistente.plan_id === pId) {
+                if (cliExistente.costo_base !== undefined && cliExistente.costo_base !== null) {
+                    costoBaseCongelado = parseFloat(cliExistente.costo_base) || 0;
+                }
+                if (cliExistente.proveedores_vinculados) {
+                    provsVinculadosCongelados = cliExistente.proveedores_vinculados;
+                }
+            }
+
             const contactoEl = document.getElementById('cf-contacto');
             const etiquetaEl = document.getElementById('cf-etiqueta');
 
@@ -915,16 +927,15 @@ export const ClientsComponent = {
                 alergias: document.getElementById('cf-alergias').value,
                 requerimientos: document.getElementById('cf-requerimientos').value,
                 contacto_emergencia: contactoEl ? contactoEl.value : '',
-                etiqueta: etiquetaEl ? etiquetaEl.value : 'normal'
+                etiqueta: etiquetaEl ? etiquetaEl.value : 'normal',
+                costo_base: costoBaseCongelado,
+                proveedores_vinculados: provsVinculadosCongelados
             };
 
             if (publicUrl) {
                 obj.soporte_pago_url = publicUrl;
-            } else if (!esNvo) {
-                const cliExistente = DataService.clientes.find(x => x.id === fId);
-                if (cliExistente) {
-                    obj.soporte_pago_url = cliExistente.soporte_pago_url;
-                }
+            } else if (cliExistente) {
+                obj.soporte_pago_url = cliExistente.soporte_pago_url;
             }
 
             if (estadoEl === 'devolución') {

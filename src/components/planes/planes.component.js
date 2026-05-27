@@ -345,6 +345,7 @@ export const PlanesComponent = {
         const prov = DataService.getSupplierById(pId);
         if (prov && prov.productos && prov.productos.length > 0) {
             prov.productos.forEach((p, i) => {
+                if (p.activo === false) return; // Filtrar productos inactivos/históricos
                 cbs.innerHTML += `
                     <label class="flex items-center p-3 border border-slate-200 bg-slate-50 cursor-pointer shadow-sm rounded-lg">
                         <input type="checkbox" value="${i}" class="w-5 h-5 rounded mr-3 catalog-checkbox" data-prov-id="${prov.id}" data-prod-name="${p.name}" data-prod-costo="${p.costo}">
