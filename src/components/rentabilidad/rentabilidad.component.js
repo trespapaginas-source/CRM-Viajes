@@ -214,6 +214,7 @@ export const RentabilidadComponent = {
                 else costoTotal += data.ingreso_bruto * (parseFloat(g.valor) / 100);
             });
             const plan = DataService.planes.find(p => p.id === data.plan_id) || { costo_base: 0 };
+            let costoOperativoBase = 0;
             data.clientes.forEach(c => {
                 const st = c.estado ? c.estado.toLowerCase() : '';
                 if (st !== 'en caja') {

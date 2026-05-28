@@ -137,7 +137,7 @@ export const UI = {
     parseCurrency(val) {
         if (val === undefined || val === null || val === '') return 0;
         if (typeof val === 'number') return val;
-        const clean = String(val).replace(/[^0-9.-]/g, '').replace(/\./g, '').trim();
+        const clean = String(val).replace(/[\$\s]/g, '').replace(/\./g, '').trim();
         return parseFloat(clean) || 0;
     },
 
