@@ -2688,6 +2688,22 @@
                         </div>
 
                         <div class="bg-white p-6 rounded-[2rem] border border-slate-200/60 shadow-soft">
+                            <!-- Selector de Ámbito de Costos -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 bg-slate-50 p-4 rounded-2xl border border-slate-200/50">
+                                <div class="min-w-0">
+                                    <label class="block text-[10px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">Seleccionar Fecha de Salida a Configurar</label>
+                                    <select id="pf-cost-scope-select" class="w-full border border-slate-200/60 rounded-xl px-3 py-2 text-xs font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer">
+                                        <!-- Se poblará dinámicamente con las fechas programadas del plan + la opción "Fecha Abierta / Tarifa Base" -->
+                                    </select>
+                                    <p class="text-[9px] text-slate-400 font-bold mt-1.5 uppercase tracking-wider"><i class="ph ph-info mr-1"></i> Los costos que agregues a continuación se aplicarán únicamente a la salida seleccionada.</p>
+                                </div>
+                                <div class="flex items-end justify-start sm:justify-end pb-1">
+                                    <button type="button" id="btn-copy-general-costs" class="hidden bg-white hover:bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border border-slate-200 shadow-sm flex items-center gap-1.5">
+                                        <i class="ph ph-copy"></i> Copiar Tarifa Base
+                                    </button>
+                                </div>
+                            </div>
+
                             <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">1.
                                 Selecciona un aliado registrado</label>
                             <select id="pf-prov-master-select" 
@@ -3635,9 +3651,16 @@
                     <p class="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-0.5" id="rdm-subtitle">
                         Plan - Fecha</p>
                 </div>
-                <button type="button" onclick="UI.closeModal('rentabilidad-detail-modal', 'rdm-bg', 'rdm-content')"
-                    class="text-slate-400 hover:text-slate-900 p-2 rounded-xl transition-all bg-slate-50 hover:bg-slate-100 border border-slate-200/60 shadow-sm"><i
-                        class="ph ph-x text-base"></i></button>
+                <div class="flex items-center gap-2">
+                    <!-- Botón de Sincronización -->
+                    <button type="button" id="btn-sync-rentabilidad-tarifas" data-action="sync-rentabilidad-tarifas"
+                        class="hidden bg-indigo-50 hover:bg-indigo-100 text-indigo-700 p-2.5 rounded-xl transition-all border border-indigo-100 shadow-sm flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider">
+                        <i class="ph ph-arrows-counter-clockwise text-xs animate-pulse"></i> Sincronizar Catálogo
+                    </button>
+                    <button type="button" onclick="UI.closeModal('rentabilidad-detail-modal', 'rdm-bg', 'rdm-content')"
+                        class="text-slate-400 hover:text-slate-900 p-2 rounded-xl transition-all bg-slate-50 hover:bg-slate-100 border border-slate-200/60 shadow-sm"><i
+                            class="ph ph-x text-base"></i></button>
+                </div>
             </div>
 
             <div class="flex-1 overflow-y-auto p-4 md:p-5 custom-scrollbar">

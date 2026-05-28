@@ -54,6 +54,8 @@ export const RentabilidadComponent = {
                 this.openPartnersVault();
             } else if (action === 'clear-soporte') {
                 this.clearSoporte();
+            } else if (action === 'sync-rentabilidad-tarifas') {
+                this.syncRatesWithCatalog();
             }
         });
 
@@ -212,11 +214,16 @@ export const RentabilidadComponent = {
                 else costoTotal += data.ingreso_bruto * (parseFloat(g.valor) / 100);
             });
             const plan = DataService.planes.find(p => p.id === data.plan_id) || { costo_base: 0 };
-            let costoOperativoBase = 0;
             data.clientes.forEach(c => {
                 const st = c.estado ? c.estado.toLowerCase() : '';
                 if (st !== 'en caja') {
-                    const cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+                    let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+                    if (cCost === 0) {
+                        const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
+                            ? c.proveedores_vinculados
+                            : (plan.proveedores_vinculados || []);
+                        cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+                    }
                     costoOperativoBase += cCost * parseInt(c.pax || 1);
                 }
             });
@@ -324,6 +331,14 @@ export const RentabilidadComponent = {
             } else {
                 retenidoContainer.classList.add('hidden');
             }
+        }
+
+        const rol = window.AuthModule?.userProfile?.rol;
+        const isAdmin = rol === 'administrador';
+        const syncBtn = document.getElementById('btn-sync-rentabilidad-tarifas');
+        if (syncBtn) {
+            if (isAdmin) syncBtn.classList.remove('hidden');
+            else syncBtn.classList.add('hidden');
         }
 
         this.renderGastos(plan, paxServicio, ingresoBruto);
@@ -482,18 +497,33 @@ export const RentabilidadComponent = {
         clientesSalida.forEach(c => {
             const st = c.estado ? c.estado.toLowerCase() : '';
             if (st !== 'en caja') {
-                const cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+                let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+                if (cCost === 0) {
+                    const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
+                        ? c.proveedores_vinculados
+                        : (plan.proveedores_vinculados || []);
+                    cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+                }
                 costoOperativoBase += cCost * parseInt(c.pax || 1);
             }
         });
         costoTotal += costoOperativoBase;
 
         // Construir un texto descriptivo o desglose si hay tarifas distintas
-        const distinctCosts = [...new Set(clientesSalida.map(c => (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0)))];
+        const distinctCosts = [...new Set(clientesSalida.map(c => {
+            let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+            if (cCost === 0) {
+                const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
+                    ? c.proveedores_vinculados
+                    : (plan.proveedores_vinculados || []);
+                cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+            }
+            return cCost;
+        }))];
         if (distinctCosts.length > 1) {
             desgloseCostosHtml = `<span class="text-[9px] text-slate-500 block mt-0.5">Tarifas mixtas: ${distinctCosts.map(co => formatCOP(co)).join(' / ')}</span>`;
         } else {
-            const unicoCosto = distinctCosts[0] !== undefined ? distinctCosts[0] : (parseFloat(plan.costo_base) || 0);
+            const unicoCosto = distinctCosts[0] !== undefined ? distinctCosts[0] : 0;
             desgloseCostosHtml = `<span class="text-[9px] text-slate-500 block mt-0.5">${formatCOP(unicoCosto)} x ${paxServicio} Pax (servicio)</span>`;
         }
 
@@ -578,5 +608,96 @@ export const RentabilidadComponent = {
             PartnersComponent.init();
         }
         UI.openModal('partners-vault-modal', 'pvm-bg', 'pvm-content');
+    },
+
+    async syncRatesWithCatalog() {
+        const planId = this.currentPlanId;
+        const fecha = this.currentFecha;
+        if (!planId || !fecha) return;
+
+        const plan = DataService.planes.find(p => p.id === planId);
+        if (!plan) return UI.showToast("No se encontró el plan original en el catálogo.", "error");
+
+        let targetCostoBase = parseFloat(plan.costo_base || 0);
+        let targetProvs = plan.proveedores_vinculados || [];
+
+        // Buscar si esta fecha tiene costos específicos en el catálogo
+        const dateConfig = (plan.fechas || []).find(f => {
+            const formattedDate = f.start === f.end
+                ? formatShortDate(f.start)
+                : `${formatShortDate(f.start)} al ${formatShortDate(f.end)}`;
+            return formattedDate === fecha;
+        });
+
+        if (dateConfig && dateConfig.proveedores_vinculados && dateConfig.proveedores_vinculados.length > 0) {
+            targetCostoBase = parseFloat(dateConfig.costo_base || 0);
+            targetProvs = dateConfig.proveedores_vinculados;
+        }
+
+        // Robust fallback: if targetCostoBase is 0 but targetProvs has items, sum them
+        if (targetCostoBase === 0 && targetProvs.length > 0) {
+            targetCostoBase = targetProvs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+        }
+
+        const confirmMsg = `¿Estás seguro de que deseas actualizar los costos de todos los pasajeros de esta salida ("${plan.nombre}") con las tarifas actuales del catálogo?\n\nEsto restablecerá el costo base a ${formatCOP(targetCostoBase)} por persona y actualizará los servicios vinculados. Las utilidades de esta salida se recalcularán de inmediato.`;
+        if (!confirm(confirmMsg)) return;
+
+        const syncBtn = document.getElementById('btn-sync-rentabilidad-tarifas');
+        const originalHtml = syncBtn.innerHTML;
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '<i class="ph ph-spinner animate-spin text-base"></i> Sincronizando...';
+
+        try {
+            // Actualizar en base de datos todos los clientes activos de este plan y fecha
+            const { error } = await supabaseClient
+                .from('clientes')
+                .update({
+                    costo_base: targetCostoBase,
+                    proveedores_vinculados: targetProvs
+                })
+                .eq('plan_id', planId)
+                .eq('fecha_viaje', fecha)
+                .is('deleted_at', null);
+
+            if (error) throw error;
+
+            // Registrar en el historial de reservas
+            try {
+                const userEmail = window.AuthModule?.currentUser?.email || 'Staff';
+                const clientesSalida = DataService.clientes.filter(c => {
+                    const st = c.estado ? c.estado.toLowerCase() : '';
+                    return c.plan_id === planId && c.fecha_viaje === fecha && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st);
+                });
+                
+                const logEntries = clientesSalida.map(c => ({
+                    cliente_id: c.id,
+                    campo: 'costo_base',
+                    valor_anterior: c.costo_base !== undefined ? String(c.costo_base) : '0',
+                    valor_nuevo: String(targetCostoBase),
+                    usuario_email: userEmail,
+                    tipo_evento: 'MODIFICACION',
+                    detalles: { motivo: 'Sincronización masiva de costos de salida con el catálogo' }
+                }));
+
+                if (logEntries.length > 0) {
+                    await supabaseClient.from('historial_reservas').insert(logEntries);
+                }
+            } catch (histError) {
+                console.warn('No se pudo asentar el log en el historial:', histError);
+            }
+
+            // Recargar datos en local
+            await DataService.loadAll();
+            UI.showToast("Costos de pasajeros sincronizados correctamente con el catálogo.", "success");
+
+            // Volver a renderizar modal
+            this.openFinancialModal(planId, fecha);
+        } catch (err) {
+            console.error('Error al sincronizar costos:', err);
+            UI.showToast("Error al sincronizar costos con el catálogo.", "error");
+        } finally {
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = originalHtml;
+        }
     }
 };

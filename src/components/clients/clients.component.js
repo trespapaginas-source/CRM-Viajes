@@ -895,8 +895,41 @@ export const ClientsComponent = {
             const plan = DataService.planes.find(pl => pl.id === pId);
 
             // Mantener datos históricos congelados si no cambió de plan en una edición
-            let costoBaseCongelado = plan ? (parseFloat(plan.costo_base) || 0) : 0;
-            let provsVinculadosCongelados = plan ? (plan.proveedores_vinculados || []) : [];
+            let costoBaseCongelado = 0;
+            let provsVinculadosCongelados = [];
+
+            if (plan) {
+                // 1. Costos generales por defecto
+                costoBaseCongelado = parseFloat(plan.costo_base) || 0;
+                provsVinculadosCongelados = plan.proveedores_vinculados || [];
+
+                // Fallback for general plan costs
+                if (costoBaseCongelado === 0 && provsVinculadosCongelados && provsVinculadosCongelados.length > 0) {
+                    costoBaseCongelado = provsVinculadosCongelados.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+                }
+
+                // 2. Buscar si la fecha de viaje seleccionada tiene costos específicos
+                const fechaSelect = document.getElementById('cf-fecha-viaje')?.value;
+                if (fechaSelect && plan.fechas) {
+                    const dateConfig = plan.fechas.find(f => {
+                        const formattedDate = f.start === f.end
+                            ? formatShortDate(f.start)
+                            : `${formatShortDate(f.start)} al ${formatShortDate(f.end)}`;
+                        return formattedDate === fechaSelect;
+                    });
+
+                    // Si la fecha tiene su propio desglose configurado, se usa
+                    if (dateConfig && dateConfig.proveedores_vinculados && dateConfig.proveedores_vinculados.length > 0) {
+                        costoBaseCongelado = parseFloat(dateConfig.costo_base) || 0;
+                        provsVinculadosCongelados = dateConfig.proveedores_vinculados;
+                    }
+
+                    // Fallback for specific date costs
+                    if (costoBaseCongelado === 0 && provsVinculadosCongelados && provsVinculadosCongelados.length > 0) {
+                        costoBaseCongelado = provsVinculadosCongelados.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+                    }
+                }
+            }
 
             if (cliExistente && cliExistente.plan_id === pId) {
                 if (cliExistente.costo_base !== undefined && cliExistente.costo_base !== null) {

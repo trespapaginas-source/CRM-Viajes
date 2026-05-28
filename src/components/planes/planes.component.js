@@ -9,6 +9,9 @@ export const PlanesComponent = {
     tempSelectedCatalog: [],
     tempFechas: [],
     tempServiciosIncluidos: [],
+    currentCostScope: 'general',
+    generalProveedoresBackup: [],
+    generalCostoBaseBackup: 0,
     eventsBound: false,
 
     init() {
@@ -80,6 +83,16 @@ export const PlanesComponent = {
         const selProvMaster = document.getElementById('pf-prov-master-select');
         if (selProvMaster) {
             selProvMaster.addEventListener('change', () => this.onProviderSelectForPlan());
+        }
+
+        const selCostScope = document.getElementById('pf-cost-scope-select');
+        if (selCostScope) {
+            selCostScope.addEventListener('change', (e) => this.onCostScopeChange(e.target.value));
+        }
+
+        const btnCopyCosts = document.getElementById('btn-copy-general-costs');
+        if (btnCopyCosts) {
+            btnCopyCosts.addEventListener('click', () => this.copyGeneralCostsToCurrentScope());
         }
 
         const inputPfPrecio = document.getElementById('pf-precio');
@@ -174,6 +187,7 @@ export const PlanesComponent = {
                 <button type="button" data-action="remove-temp-date" data-index="${idx}" class="text-slate-400 hover:text-red-500 bg-slate-50 p-1.5 rounded-lg transition-colors"><i class="ph ph-trash"></i></button>
             </li>`;
         });
+        this.populateCostScopeSelector();
     },
 
     populateFilters() {
@@ -262,6 +276,9 @@ export const PlanesComponent = {
         this.tempSelectedCatalog = [];
         this.tempFechas = [];
         this.tempServiciosIncluidos = [];
+        this.currentCostScope = 'general';
+        this.generalProveedoresBackup = [];
+        this.generalCostoBaseBackup = 0;
 
         UI.switchTab('plan', 'info');
 
@@ -285,7 +302,22 @@ export const PlanesComponent = {
                 document.getElementById('pf-categoria').value = catVal;
 
                 document.getElementById('pf-destino').value = pq.destino;
-                this.tempFechas = pq.fechas || [];
+                
+                // Migración automática de costos antiguos a cada fecha específica
+                this.tempFechas = (pq.fechas || []).map(f => {
+                    const provs = (f.proveedores_vinculados && f.proveedores_vinculados.length > 0)
+                        ? f.proveedores_vinculados
+                        : (pq.proveedores_vinculados || []);
+                    const cBase = (f.costo_base !== undefined && f.costo_base !== null && f.costo_base > 0)
+                        ? parseFloat(f.costo_base)
+                        : parseFloat(pq.costo_base || 0);
+                    return {
+                        ...f,
+                        proveedores_vinculados: JSON.parse(JSON.stringify(provs)),
+                        costo_base: cBase
+                    };
+                });
+                
                 UI.setCurrencyValue('pf-precio', pq.precio_persona);
                 UI.setCurrencyValue('pf-deposito', pq.deposito_requerido || 0);
                 document.getElementById('pf-condiciones').value = pq.condiciones_pago || '';
@@ -297,11 +329,17 @@ export const PlanesComponent = {
                     selTipo.innerHTML += `<option value="${pq.tipo}">${pq.tipo}</option>`;
                 }
                 selTipo.value = pq.tipo;
-                this.tempProveedores = pq.proveedores_vinculados || [];
+                
+                this.generalProveedoresBackup = JSON.parse(JSON.stringify(pq.proveedores_vinculados || []));
+                this.generalCostoBaseBackup = parseFloat(pq.costo_base || 0);
+                this.tempProveedores = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
                 this.tempServiciosIncluidos = pq.servicios_incluidos || [];
             }
         } else {
             document.getElementById('plan-form-title').innerText = "Nuevo Plan";
+            this.generalProveedoresBackup = [];
+            this.generalCostoBaseBackup = 0;
+            this.tempProveedores = [];
             this.tempServiciosIncluidos = [
                 { categoria: 'Transporte Aéreo', descripcion: 'Vuelos de ida y regreso con equipaje incluido.' },
                 { categoria: 'Alojamiento', descripcion: 'Estadía en hotel seleccionado con desayuno diario.' },
@@ -312,6 +350,7 @@ export const PlanesComponent = {
         this.renderTempDates();
         this.renderTempProveedores();
         this.renderTempServiciosIncluidos();
+        this.populateCostScopeSelector();
         UI.openModal('plan-form-modal', 'plan-form-bg', 'plan-form-content');
         this.syncSummary();
     },
@@ -380,6 +419,7 @@ export const PlanesComponent = {
             return UI.showToast("Marca las casillas de los servicios primero.", "error");
         }
         this.tempProveedores.push(...this.tempSelectedCatalog);
+        this.tempSelectedCatalog = [];
         document.getElementById('pf-prov-master-select').value = "";
         document.getElementById('pf-prov-catalog').classList.add('hidden');
         this.renderTempProveedores();
@@ -477,8 +517,7 @@ export const PlanesComponent = {
             btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Procesando...';
         }
 
-        let cst = 0;
-        this.tempProveedores.forEach(n => cst += parseFloat(n.costo));
+        this.saveCurrentTableToScope();
 
         const obj = {
             id: document.getElementById('pf-id').value || "",
@@ -492,8 +531,8 @@ export const PlanesComponent = {
             condiciones_pago: document.getElementById('pf-condiciones').value,
             notas: document.getElementById('pf-notas').value,
             copy_promocional: document.getElementById('plan-copy-promocional').value,
-            proveedores_vinculados: this.tempProveedores,
-            costo_base: cst,
+            proveedores_vinculados: this.generalProveedoresBackup,
+            costo_base: this.generalCostoBaseBackup,
             servicios_incluidos: this.tempServiciosIncluidos
         };
 
@@ -542,5 +581,83 @@ export const PlanesComponent = {
         }).catch(() => {
             UI.showToast("No se pudo copiar. Selecciona el texto manualmente.", "error");
         });
+    },
+
+    populateCostScopeSelector() {
+        const select = document.getElementById('pf-cost-scope-select');
+        if (!select) return;
+
+        select.innerHTML = '<option value="general">Fecha Abierta / Tarifa Base</option>';
+        this.tempFechas.forEach(f => {
+            const dateText = f.start === f.end
+                ? formatShortDate(f.start)
+                : `${formatShortDate(f.start)} al ${formatShortDate(f.end)}`;
+            select.innerHTML += `<option value="${f.id}">${UI.sanitize(dateText)}</option>`;
+        });
+
+        if (this.currentCostScope !== 'general' && !this.tempFechas.some(f => String(f.id) === String(this.currentCostScope))) {
+            this.currentCostScope = 'general';
+            this.tempProveedores = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
+            this.renderTempProveedores();
+        }
+
+        select.value = this.currentCostScope;
+        this.toggleCopyCostsButton();
+    },
+
+    toggleCopyCostsButton() {
+        const btn = document.getElementById('btn-copy-general-costs');
+        if (!btn) return;
+        if (this.currentCostScope === 'general') {
+            btn.classList.add('hidden');
+        } else {
+            btn.classList.remove('hidden');
+        }
+    },
+
+    onCostScopeChange(newScope) {
+        this.saveCurrentTableToScope();
+        this.currentCostScope = newScope;
+        this.loadCurrentScopeToTable();
+        this.toggleCopyCostsButton();
+    },
+
+    saveCurrentTableToScope() {
+        const cstTotal = UI.parseCurrency(document.getElementById('pf-costo-total')?.innerText) || 0;
+        const currentList = JSON.parse(JSON.stringify(this.tempProveedores));
+
+        if (this.currentCostScope === 'general') {
+            this.generalProveedoresBackup = currentList;
+            this.generalCostoBaseBackup = cstTotal;
+        } else {
+            const dateObj = this.tempFechas.find(f => String(f.id) === String(this.currentCostScope));
+            if (dateObj) {
+                dateObj.proveedores_vinculados = currentList;
+                dateObj.costo_base = cstTotal;
+            }
+        }
+    },
+
+    loadCurrentScopeToTable() {
+        if (this.currentCostScope === 'general') {
+            this.tempProveedores = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
+        } else {
+            const dateObj = this.tempFechas.find(f => String(f.id) === String(this.currentCostScope));
+            if (dateObj) {
+                this.tempProveedores = JSON.parse(JSON.stringify(dateObj.proveedores_vinculados || []));
+            } else {
+                this.tempProveedores = [];
+            }
+        }
+        this.renderTempProveedores();
+    },
+
+    copyGeneralCostsToCurrentScope() {
+        if (this.currentCostScope === 'general') return;
+        if (!confirm("¿Deseas copiar todos los costos e integrantes de la Tarifa Base a esta fecha de salida?")) return;
+
+        this.tempProveedores = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
+        this.renderTempProveedores();
+        UI.showToast("Tarifa base copiada a esta salida.", "success");
     }
 };
