@@ -4114,6 +4114,47 @@
                         </span>
                     </div>
 
+                    <!-- Flujo de Caja y Control de Liquidez -->
+                    <div class="space-y-2.5">
+                        <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
+                            <i class="ph ph-presentation-chart mr-1.5 text-sm"></i> Flujo de Caja y Control de Liquidez
+                        </h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm relative overflow-hidden group">
+                                <div class="flex justify-between items-start mb-2">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ingreso Neto (Realizado)</p>
+                                    <i class="ph ph-trend-up text-emerald-500 text-sm"></i>
+                                </div>
+                                <p class="text-base md:text-lg font-black text-slate-800 tracking-tight tabular-nums animate-fade-in" id="pvm-cash-ingreso-neto">$0</p>
+                                <span class="text-[8px] font-bold text-emerald-500/80 mt-1.5 flex items-center gap-1"><i class="ph ph-check-circle"></i> Viajes Ejecutados</span>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm relative overflow-hidden group">
+                                <div class="flex justify-between items-start mb-2">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Ingreso Proyectado</p>
+                                    <i class="ph ph-chart-line text-indigo-500 text-sm"></i>
+                                </div>
+                                <p class="text-base md:text-lg font-black text-slate-800 tracking-tight tabular-nums animate-fade-in" id="pvm-cash-proyectado">$0</p>
+                                <span class="text-[8px] font-bold text-indigo-500/80 mt-1.5 flex items-center gap-1"><i class="ph ph-calendar"></i> Reservas/Ventas</span>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm relative overflow-hidden group">
+                                <div class="flex justify-between items-start mb-2">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Efectivo Recaudado</p>
+                                    <i class="ph ph-hand-coins text-emerald-600 text-sm"></i>
+                                </div>
+                                <p class="text-base md:text-lg font-black text-emerald-600 tracking-tight tabular-nums animate-fade-in" id="pvm-cash-recaudado">$0</p>
+                                <span class="text-[8px] font-bold text-slate-500 mt-1.5 flex items-center gap-1"><i class="ph ph-money"></i> Abonos en Caja</span>
+                            </div>
+                            <div class="bg-white p-4 rounded-xl border border-slate-200/60 shadow-sm relative overflow-hidden group">
+                                <div class="flex justify-between items-start mb-2">
+                                    <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Adelantos y Préstamos</p>
+                                    <i class="ph ph-handshake text-rose-500 text-sm"></i>
+                                </div>
+                                <p class="text-base md:text-lg font-black text-rose-500 tracking-tight tabular-nums animate-fade-in" id="pvm-cash-adelantos">$0</p>
+                                <span class="text-[8px] font-bold text-slate-500 mt-1.5 flex items-center gap-1"><i class="ph ph-warning-circle"></i> Saldo en Tránsito</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
                             <i class="ph ph-users-three mr-1.5 text-sm"></i> Distribución de Socios (% Participación Fija)
@@ -4166,6 +4207,7 @@
                         </div>
                     </div>
 
+                    <div id="pvm-saldos-kpis-container" class="mb-4"></div>
                     <div>
                         <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
                             <i class="ph ph-hand-coins mr-1.5 text-sm"></i> Bóveda y Saldos Disponibles (Histórico Devengado Neto)
@@ -4261,6 +4303,8 @@
                                                 <th class="py-2 px-3 text-right">Vendido</th>
                                                 <th class="py-2 px-3 text-right">Costos</th>
                                                 <th class="py-2 px-3 text-right">Margen</th>
+                                                <th class="py-2 px-3 text-right">Préstamos/Adelantos</th>
+                                                <th class="py-2 px-3 text-right">Recaudado (Abonos)</th>
                                             </tr>
                                         </thead>
                                         <tbody id="pvm-detail-month-planes" class="divide-y divide-slate-100">
@@ -4383,6 +4427,11 @@
                                         <span id="pvm-gasto-corp-preview-name" class="text-[10px] font-bold text-slate-600 truncate flex-1 mx-2"></span>
                                         <button type="button" id="pvm-gasto-corp-preview-remove" class="text-slate-400 hover:text-red-500 p-1"><i class="ph ph-trash text-sm"></i></button>
                                     </div>
+                                </div>
+
+                                <div class="bg-amber-50 border border-amber-200/50 p-2.5 rounded-lg text-[9px] font-medium text-amber-700 flex items-start gap-1.5 shadow-sm">
+                                    <i class="ph ph-warning-circle text-amber-600 text-sm shrink-0"></i>
+                                    <span><strong>Nota:</strong> Los adelantos operativos declarados como "Perdido" se deducen automáticamente en las utilidades. No los registres aquí manualmente para evitar la doble contabilidad.</span>
                                 </div>
 
                                 <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5">

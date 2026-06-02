@@ -1,7 +1,7 @@
 import { DataService, supabaseClient } from '../../../js/services/supabase.service.js';
 import { Store } from '../../core/store.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, formatShortDate, formatDoubleDate } from '../../../js/utils/format.utils.js';
+import { formatCOP, formatShortDate, formatDoubleDate, parseSpanishDate } from '../../../js/utils/format.utils.js';
 
 export const PartnersComponent = {
     sociosConfig: [],
@@ -13,6 +13,11 @@ export const PartnersComponent = {
     fallbackActive: false,
     fallbackGastosActive: false,
     porcentajeRetencion: 10,
+
+    getClientRealPax(c) {
+        const companionsCount = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at).length;
+        return companionsCount > 0 ? 1 : parseInt(c.pax || 1);
+    },
 
     async loadAgencyConfig() {
         try {
@@ -86,11 +91,22 @@ export const PartnersComponent = {
     async init() {
         this.bindEvents();
         await this.loadConfig();
+
+        const rol = window.AuthModule?.userProfile?.rol;
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+        const isPartner = this.sociosConfig.some(s => s.email.toLowerCase() === currentUserEmail);
+
+        if (!isAdmin && !isPartner) {
+            UI.closeModal('partners-vault-modal', 'pvm-bg', 'pvm-content');
+            UI.showToast("Acceso Denegado: Este módulo es exclusivo para socios y administradores.", "error");
+            return false;
+        }
+
         await this.loadMovements();
         await this.loadCorporateExpenses();
         await this.loadAgencyConfig();
         
-        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const adminSettings = document.getElementById('pvm-admin-settings');
         if (currentUserEmail === 'trespa.paginas@gmail.com') {
             if (adminSettings) adminSettings.classList.remove('hidden');
@@ -121,6 +137,7 @@ export const PartnersComponent = {
                 }
             }
         });
+        return true;
     },
 
     bindEvents() {
@@ -154,6 +171,8 @@ export const PartnersComponent = {
                 UI.closeModal('pvm-movimiento-modal', 'pvm-mov-bg', 'pvm-mov-content');
             } else if (action === 'pvm-switch-tab') {
                 this.switchTab(target.dataset.tab);
+            } else if (action === 'filter-partner-withdrawals') {
+                this.filterPartnerWithdrawals(target.dataset.email);
             } else if (action === 'pvm-open-movimiento') {
                 this.openMovimientoModal(target.dataset.email, target.dataset.tipo);
             } else if (action === 'close-pvm-movimiento' || e.target.id === 'pvm-mov-bg') {
@@ -539,25 +558,6 @@ export const PartnersComponent = {
     },
 
     getAllTrips() {
-        const parseDateText = (dateStr) => {
-            if (!dateStr || dateStr.includes("Abierta")) return new Date();
-            if (dateStr.includes('-') && !dateStr.includes(' de ')) {
-                const parts = dateStr.split('-');
-                if (parts.length >= 3) return new Date(parts[0], parts[1] - 1, parts[2].substring(0, 2));
-            }
-            const match = dateStr.match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+del?\s+(\d{4})/i);
-            if (match) {
-                const day = parseInt(match[1]);
-                const mStr = match[2].toLowerCase().substring(0, 3).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                const year = parseInt(match[3]);
-                const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-                const mIndex = meses.indexOf(mStr);
-                if (mIndex !== -1) return new Date(year, mIndex, day);
-            }
-            const fb = new Date(dateStr);
-            return isNaN(fb.getTime()) ? new Date() : fb;
-        };
-
         const salidasUnicas = new Map();
 
         DataService.clientes.forEach(c => {
@@ -572,7 +572,8 @@ export const PartnersComponent = {
                     const objF = p.fechas.find(f => formatShortDate(f.start) === c.fecha_viaje || `${formatShortDate(f.start)} al ${formatShortDate(f.end)}` === c.fecha_viaje);
                     if (objF && objF.end) parseStr = formatShortDate(objF.end);
                 }
-                const d = parseDateText(parseStr);
+                let d = parseSpanishDate(parseStr);
+                if (!d || isNaN(d.getTime())) d = new Date();
                 salidasUnicas.set(k, { planId: c.plan_id, planName: p ? p.nombre : 'Plan Genérico', fechaFormat: c.fecha_viaje, dateObj: d });
             }
         });
@@ -584,10 +585,12 @@ export const PartnersComponent = {
                 return c.plan_id === sal.planId && c.fecha_viaje === sal.fechaFormat && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st);
             });
             const plan = DataService.planes.find(p => p.id === sal.planId);
-            let paxTotal = 0, paxAsistentes = 0, paxRetenidos = 0, paxServicio = 0, ingresoBruto = 0;
+            
+            let paxTotal = 0, paxAsistentes = 0, paxRetenidos = 0, ingresoBruto = 0;
+            let costoOperativoBase = 0;
             
             clientesSalida.forEach(c => {
-                const paxNum = parseInt(c.pax || 1);
+                const paxNum = this.getClientRealPax(c);
                 paxTotal += paxNum;
                 const st = c.estado ? c.estado.toLowerCase() : '';
                 
@@ -601,19 +604,31 @@ export const PartnersComponent = {
                     const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                     const devuelto = parseFloat(c.monto_devuelto || 0);
                     ingresoBruto += Math.max(0, totalAbo - devuelto);
-                    paxServicio += paxNum;
                 } else if (st === 'en caja') {
                     const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                     ingresoBruto += totalAbo;
                 } else {
                     ingresoBruto += parseFloat(c.precio_total || 0);
-                    paxServicio += paxNum;
+                }
+
+                if (st !== 'en caja') {
+                    let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan?.costo_base || 0);
+                    if (cCost === 0) {
+                        const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
+                            ? c.proveedores_vinculados
+                            : (plan?.proveedores_vinculados || []);
+                        cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+                    }
+                    costoOperativoBase += cCost * paxNum;
                 }
             });
             
             const gastosSalida = DataService.gastos.filter(g => g.plan_id === sal.planId && g.fecha_viaje === sal.fechaFormat);
-            let costoTotal = parseFloat(plan?.costo_base || 0) * paxServicio;
-            gastosSalida.forEach(g => { if (g.tipo_valor === 'fijo') costoTotal += parseFloat(g.valor); else costoTotal += ingresoBruto * (parseFloat(g.valor) / 100); });
+            let costoTotal = costoOperativoBase;
+            gastosSalida.forEach(g => { 
+                if (g.tipo_valor === 'fijo') costoTotal += parseFloat(g.valor); 
+                else costoTotal += ingresoBruto * (parseFloat(g.valor) / 100); 
+            });
             
             const margen = ingresoBruto - costoTotal;
             if (ingresoBruto > 0) { 
@@ -683,11 +698,27 @@ export const PartnersComponent = {
 
         const filteredAllTrips = filteredRealizedTrips.concat(filteredFutureTrips);
 
+        // 3. Flujo de caja real del periodo: efectivo recaudado y adelantos activos en tránsito
+        const rangeAbonos = DataService.abonos.filter(a => {
+            if (a.estado_pago === 'pending' || a.estado_pago === 'refunded' || a.deleted_at) return false;
+            const d = new Date(a.created_at || a.fecha);
+            return d >= dateStart && d <= dateEnd;
+        });
+        const totalRecaudadoRango = rangeAbonos.reduce((sum, a) => sum + (Number(a.monto) || 0), 0);
+
+        const rangeAdelantos = (DataService.adelantos_operativos || []).filter(a => {
+            if (a.deleted_at) return false;
+            const d = new Date(`${a.fecha}T00:00:00`);
+            return d >= dateStart && d <= dateEnd;
+        });
+        const activeAdelantosRango = rangeAdelantos.filter(a => a.estado === 'ejecutado' || a.estado === 'solicitado' || a.estado === 'aprobado' || a.estado === 'credito_proveedor');
+        const totalAdelantadoActivoRango = activeAdelantosRango.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
+
         // Let's pass these to render distribution
-        this.renderDistributionUI(filteredAllTrips, filteredIngresos, filteredCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo, isDeficit, deficitAmount);
+        this.renderDistributionUI(filteredAllTrips, filteredIngresos, filteredCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo, isDeficit, deficitAmount, totalRecaudadoRango, totalAdelantadoActivoRango);
     },
 
-    renderDistributionUI(viajes, gIngresos, gCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo = 0, isDeficit = false, deficitAmount = 0) {
+    renderDistributionUI(viajes, gIngresos, gCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo = 0, isDeficit = false, deficitAmount = 0, totalRecaudadoRango = 0, totalAdelantadoActivoRango = 0) {
         const rol = window.AuthModule?.userProfile?.rol;
         const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
@@ -717,6 +748,20 @@ export const PartnersComponent = {
         }
         if (document.getElementById('pvm-proyectada-total')) {
             document.getElementById('pvm-proyectada-total').innerText = isAdmin ? formatCOP(filteredUP) : '***';
+        }
+
+        // Flujo de caja y control de liquidez
+        if (document.getElementById('pvm-cash-ingreso-neto')) {
+            document.getElementById('pvm-cash-ingreso-neto').innerText = isAdmin ? formatCOP(filteredUN) : '***';
+        }
+        if (document.getElementById('pvm-cash-proyectado')) {
+            document.getElementById('pvm-cash-proyectado').innerText = isAdmin ? formatCOP(filteredUP) : '***';
+        }
+        if (document.getElementById('pvm-cash-recaudado')) {
+            document.getElementById('pvm-cash-recaudado').innerText = isAdmin ? formatCOP(totalRecaudadoRango) : '***';
+        }
+        if (document.getElementById('pvm-cash-adelantos')) {
+            document.getElementById('pvm-cash-adelantos').innerText = isAdmin ? formatCOP(totalAdelantadoActivoRango) : '***';
         }
 
         // Deficit alert
@@ -1155,6 +1200,36 @@ export const PartnersComponent = {
             else fallbackBanner.classList.add('hidden');
         }
 
+        // Render global historical KPIs at the top
+        const kpisContainer = document.getElementById('pvm-saldos-kpis-container');
+        if (kpisContainer) {
+            kpisContainer.innerHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                        <div>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Utilidad Bruta Histórica (Realizada)</span>
+                            <span class="text-sm font-black text-slate-800 mt-0.5 tracking-tight">${formatCOP(histUB)}</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-500"><i class="ph ph-chart-line-up text-base"></i></div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                        <div>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Gastos Corporativos Totales</span>
+                            <span class="text-sm font-black text-rose-500 mt-0.5 tracking-tight">${formatCOP(histGC)}</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500"><i class="ph ph-trend-down text-base"></i></div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                        <div>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Utilidad Neta Distribuible a Socios</span>
+                            <span class="text-sm font-black text-emerald-600 mt-0.5 tracking-tight">${formatCOP(histUN)}</span>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><i class="ph ph-hand-coins text-base"></i></div>
+                    </div>
+                </div>
+            `;
+        }
+
         const grid = document.getElementById('pvm-saldos-grid');
         if (grid) {
             grid.innerHTML = '';
@@ -1200,6 +1275,59 @@ export const PartnersComponent = {
                     `;
                 }
 
+                // Generar Tooltip descriptivo de la fórmula
+                const tooltipTitle = `Fórmula de Cálculo:\n(Utilidad Bruta Histórica: ${formatCOP(histUB)} - Gastos Corporativos: ${formatCOP(histGC)}) * 90% (Neta Distribuible) * ${soc.porcentaje}% (Socio Share) = ${formatCOP(ganadoHistorico)}`;
+
+                // Generar HTML de la barra de progreso visual de retiros vs ganado
+                let progressHtml = '';
+                if (puedeVerDinero) {
+                    if (ganadoHistorico > 0) {
+                        const pct = Math.min(100, Math.round((totalRetirado / ganadoHistorico) * 100));
+                        const isExceeded = totalRetirado > ganadoHistorico;
+                        const barColor = isExceeded ? 'bg-rose-500' : 'bg-indigo-500';
+                        const textLabel = isExceeded 
+                            ? `Sobre-retirado: ${Math.round((totalRetirado / ganadoHistorico) * 100)}%` 
+                            : `Retirado: ${pct}%`;
+                        progressHtml = `
+                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
+                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                    <span>Progreso de Retiros</span>
+                                    <span class="${isExceeded ? 'text-rose-500 font-black' : 'text-slate-500'}">${textLabel}</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1">
+                                    <div class="${barColor} h-1 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        const hasWithdrawn = totalRetirado > 0;
+                        progressHtml = `
+                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
+                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                    <span>Progreso de Retiros</span>
+                                    <span class="${hasWithdrawn ? 'text-rose-500 font-black' : 'text-slate-500'}">${hasWithdrawn ? 'Excedido (Sin Utilidades)' : 'Sin Retiros'}</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1">
+                                    <div class="${hasWithdrawn ? 'bg-rose-500 w-full' : 'bg-slate-300 w-0'} h-1 rounded-full transition-all duration-500"></div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                // Generar insignias de estado del saldo disponible
+                let statusBadgeHtml = '';
+                if (puedeVerDinero) {
+                    if (disponible > 0) {
+                        statusBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 uppercase tracking-wider ml-1.5">Superávit</span>`;
+                    } else if (disponible < 0) {
+                        statusBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-rose-50 text-rose-600 border border-rose-100 uppercase tracking-wider ml-1.5">Déficit</span>`;
+                    } else {
+                        statusBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-slate-50 text-slate-500 border border-slate-200 uppercase tracking-wider ml-1.5">Al Día</span>`;
+                    }
+                }
+                const disponibleColor = disponible >= 0 ? 'text-emerald-600' : 'text-rose-500';
+
                 grid.innerHTML += `
                     <div class="rounded-xl p-4 shadow-sm flex flex-col justify-between ${cardClass}">
                         <div>
@@ -1216,22 +1344,27 @@ export const PartnersComponent = {
                             
                             <div class="space-y-1.5 mt-3">
                                 <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium">Ganado Histórico:</span>
+                                    <span class="text-slate-500 font-medium flex items-center">
+                                        Ganado Histórico:
+                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${tooltipTitle}"></i>` : ''}
+                                    </span>
                                     <span class="text-slate-800 font-bold">${ganadoFormat}</span>
                                 </div>
-                                <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium">Total Retirado/Corte:</span>
-                                    <span class="text-slate-600 font-bold">${retiradoFormat}</span>
+                                <div class="flex justify-between text-[10px] hover:bg-slate-100/50 cursor-pointer p-0.5 -mx-0.5 rounded transition-colors" 
+                                     data-action="filter-partner-withdrawals" data-email="${soc.email}" title="Hacer clic para ver desglose de transacciones abajo">
+                                    <span class="text-slate-500 font-medium flex items-center gap-0.5">Total Retirado/Corte: <i class="ph ph-magnifying-glass text-[10px] text-indigo-400"></i></span>
+                                    <span class="text-slate-600 font-bold underline decoration-dotted decoration-indigo-400">${retiradoFormat}</span>
                                 </div>
-                                <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-100">
-                                    <span class="text-slate-700 font-black">Disponible:</span>
-                                    <span class="text-emerald-600 font-black">${disponibleFormat}</span>
+                                <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-100 items-center">
+                                    <span class="text-slate-700 font-black flex items-center">Disponible: ${statusBadgeHtml}</span>
+                                    <span class="${disponibleColor} font-black">${disponibleFormat}</span>
                                 </div>
                                 <div class="flex justify-between text-[10px] pt-1.5 border-t border-slate-100">
                                     <span class="text-slate-500 font-medium">Proyectado Futuro:</span>
                                     <span class="text-indigo-600 font-black">${proyectadoFormat}</span>
                                 </div>
                             </div>
+                            ${progressHtml}
                         </div>
                         ${buttonsHtml}
                     </div>
@@ -1239,7 +1372,7 @@ export const PartnersComponent = {
             });
 
             if (isAdmin) {
-                const fondoDisponible = histRetenidoFondo - histGC;
+                const fondoDisponible = histUB > histGC ? histRetenidoFondo : -(histGC - histUB);
                 const balanceColorClass = fondoDisponible >= 0 ? 'text-emerald-600' : 'text-rose-500';
                 grid.innerHTML += `
                     <div class="rounded-xl p-4 shadow-sm flex flex-col justify-between border border-dashed border-slate-300 bg-slate-50/50">
@@ -1257,16 +1390,19 @@ export const PartnersComponent = {
                             
                             <div class="space-y-1.5 mt-3">
                                 <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium">Total Retenido (Ingreso):</span>
+                                    <span class="text-slate-500 font-medium">Retención Acumulada:</span>
                                     <span class="text-slate-800 font-bold">${formatCOP(histRetenidoFondo)}</span>
                                 </div>
                                 <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium">Total Gastado (Gastos Corp):</span>
-                                    <span class="text-rose-500 font-bold">${formatCOP(histGC)}</span>
+                                    <span class="text-slate-500 font-medium">Gastos Corp. Pagados:</span>
+                                    <span class="text-slate-600 font-bold">${formatCOP(histGC)}</span>
                                 </div>
                                 <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-200">
                                     <span class="text-slate-700 font-black">Saldo Disponible:</span>
                                     <span class="${balanceColorClass} font-black">${formatCOP(fondoDisponible)}</span>
+                                </div>
+                                <div class="text-[8px] text-slate-400 italic font-semibold leading-tight pt-1.5 border-t border-slate-100 mt-1">
+                                    Nota: Los gastos fijos se cubren con la utilidad bruta mensual antes de realizar la retención del fondo.
                                 </div>
                             </div>
                         </div>
@@ -1355,6 +1491,29 @@ export const PartnersComponent = {
         }
     },
 
+    filterPartnerWithdrawals(email) {
+        // Set partner filter dropdown
+        const histFilter = document.getElementById('pvm-history-filter-partner');
+        if (histFilter) {
+            histFilter.value = email || 'todos';
+        }
+
+        // Force date filters to historico range to show all withdrawals
+        const quickFilters = document.getElementById('pvm-quick-filters');
+        if (quickFilters) {
+            quickFilters.value = 'historico';
+            this.applyQuickDates();
+        } else {
+            this.renderHistoryList();
+        }
+
+        // Scroll smoothly to the history ledger card
+        const historyContainer = document.getElementById('pvm-history-filter-partner')?.closest('.border');
+        if (historyContainer) {
+            historyContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    },
+
     renderRentabilidadAnalisis() {
         const rol = window.AuthModule?.userProfile?.rol;
         const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
@@ -1363,14 +1522,15 @@ export const PartnersComponent = {
         const allTrips = this.getAllTrips();
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
-        const realizedTrips = allTrips.filter(t => t.dateObj <= hoy);
 
-        // Group by month
+        // Group by month (using all trips: realized & future)
         const monthsSet = new Set();
-        realizedTrips.forEach(t => {
-            const y = t.dateObj.getFullYear();
-            const m = String(t.dateObj.getMonth() + 1).padStart(2, '0');
-            monthsSet.add(`${y}-${m}`);
+        allTrips.forEach(t => {
+            if (t.dateObj) {
+                const y = t.dateObj.getFullYear();
+                const m = String(t.dateObj.getMonth() + 1).padStart(2, '0');
+                monthsSet.add(`${y}-${m}`);
+            }
         });
         this.corporateExpenses.forEach(g => {
             if (g.fecha) {
@@ -1388,12 +1548,20 @@ export const PartnersComponent = {
                 }
             }
         });
+        (DataService.adelantos_operativos || []).forEach(a => {
+            if (a.fecha && !a.deleted_at) {
+                const parts = a.fecha.split('-');
+                if (parts.length >= 2) {
+                    monthsSet.add(`${parts[0]}-${parts[1]}`);
+                }
+            }
+        });
 
         const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
 
         const monthlyData = sortedMonths.map(month => {
             // Trips in this month
-            const monthTrips = realizedTrips.filter(t => {
+            const monthTrips = allTrips.filter(t => {
                 const y = t.dateObj.getFullYear();
                 const m = String(t.dateObj.getMonth() + 1).padStart(2, '0');
                 return `${y}-${m}` === month;
@@ -1410,6 +1578,14 @@ export const PartnersComponent = {
                 return `${parts[0]}-${parts[1]}` === month;
             });
             const gastosCorp = monthGastos.reduce((acc, g) => acc + g.monto, 0);
+
+            // Adelantos en este mes
+            const monthAdelantosList = (DataService.adelantos_operativos || []).filter(a => {
+                if (a.deleted_at || !a.fecha) return false;
+                const parts = a.fecha.split('-');
+                return `${parts[0]}-${parts[1]}` === month;
+            });
+            const monthAdelantos = monthAdelantosList.reduce((acc, a) => acc + (Number(a.monto_adelantado) || 0), 0);
 
             // Prioridad Financiera (Opción B)
             let neta = 0;
@@ -1441,7 +1617,8 @@ export const PartnersComponent = {
                 gastosCorp,
                 retencionFondo,
                 neta,
-                retiros
+                retiros,
+                adelantos: monthAdelantos
             };
         });
 
@@ -1465,6 +1642,7 @@ export const PartnersComponent = {
                     <th class="py-2.5 px-4 text-right">Retención Fondo</th>
                     <th class="py-2.5 px-4 text-right">Neta Distribuible</th>
                     ${partnerCols}
+                    <th class="py-2.5 px-4 text-right">Adelantos/Préstamos</th>
                     <th class="py-2.5 px-4 text-right">Retiros</th>
                     <th class="py-2.5 px-4 text-right">Rentabilidad %</th>
                 </tr>
@@ -1475,7 +1653,7 @@ export const PartnersComponent = {
         if (mList) {
             mList.innerHTML = '';
             if (monthlyData.length === 0) {
-                const colspan = 6 + this.sociosConfig.length;
+                const colspan = 7 + this.sociosConfig.length;
                 mList.innerHTML = `<tr><td colspan="${colspan}" class="py-4 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">Sin datos disponibles</td></tr>`;
             } else {
                 monthlyData.forEach(row => {
@@ -1508,14 +1686,25 @@ export const PartnersComponent = {
                     const rentabilidadDisplay = isAdmin ? `${rentabilidad}%` : '***';
                     const retirosDisplay = (isAdmin || retirosVal > 0) ? formatCOP(retirosVal) : '***';
 
+                    const currentYearMonth = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+                    let statusBadge = '';
+                    if (row.month > currentYearMonth) {
+                        statusBadge = `<span class="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-[8px] font-black bg-slate-100 text-slate-600 uppercase tracking-widest border border-slate-200">Proyectado</span>`;
+                    } else if (row.month === currentYearMonth) {
+                        statusBadge = `<span class="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-[8px] font-black bg-indigo-50 text-indigo-600 uppercase tracking-widest border border-indigo-100">En Curso</span>`;
+                    } else {
+                        statusBadge = `<span class="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-50 text-emerald-600 uppercase tracking-widest border border-emerald-100">Realizado</span>`;
+                    }
+
                     mList.innerHTML += `
                         <tr class="pvm-monthly-row hover:bg-slate-100/70 transition-colors cursor-pointer" data-month="${row.month}">
-                            <td class="py-2.5 px-4 whitespace-nowrap text-xs font-black text-slate-800 flex items-center gap-1.5"><i class="ph ph-caret-right text-[10px] text-slate-400"></i> ${formatMonthYear(row.month)}</td>
+                            <td class="py-2.5 px-4 whitespace-nowrap text-xs font-black text-slate-800 flex items-center gap-1.5"><i class="ph ph-caret-right text-[10px] text-slate-400"></i> ${formatMonthYear(row.month)} ${statusBadge}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-slate-600">${isAdmin ? formatCOP(row.bruta) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-rose-500/80">${isAdmin ? formatCOP(row.gastosCorp) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-amber-500">${isAdmin ? formatCOP(row.retencionFondo) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-black ${netaColor}">${isAdmin ? formatCOP(row.neta) : '***'}</td>
                             ${partnerCells}
+                            <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-amber-600">${isAdmin ? formatCOP(row.adelantos) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-slate-600">${retirosDisplay}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap"><span class="px-1.5 py-0.5 rounded shadow-sm text-[9px] font-black ${rentabilidadClass}">${rentabilidadDisplay}</span></td>
                         </tr>
@@ -1589,10 +1778,9 @@ export const PartnersComponent = {
         const allTrips = this.getAllTrips();
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
-        const realizedTrips = allTrips.filter(t => t.dateObj <= hoy);
 
-        // Trips in this month
-        const monthTrips = realizedTrips.filter(t => {
+        // Trips in this month (both realized and projected)
+        const monthTrips = allTrips.filter(t => {
             const y = t.dateObj.getFullYear();
             const m = String(t.dateObj.getMonth() + 1).padStart(2, '0');
             return `${y}-${m}` === month;
@@ -1618,10 +1806,44 @@ export const PartnersComponent = {
         if (tbodyPlanes) {
             tbodyPlanes.innerHTML = '';
             if (monthTrips.length === 0) {
-                tbodyPlanes.innerHTML = `<tr><td colspan="6" class="py-3 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">Sin planes realizados</td></tr>`;
+                tbodyPlanes.innerHTML = `<tr><td colspan="8" class="py-3 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">Sin viajes programados ni realizados</td></tr>`;
             } else {
                 monthTrips.forEach(v => {
                     const colorMargen = v.margen >= 0 ? 'text-emerald-600' : 'text-red-500';
+
+                    // Clientes de esta salida
+                    const clientesSalida = DataService.clientes.filter(c => {
+                        const st = c.estado ? c.estado.toLowerCase() : '';
+                        return c.plan_id === v.planId && c.fecha_viaje === v.fechaFormat && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st);
+                    });
+
+                    // Abonos Recaudados
+                    let totalRecaudado = 0;
+                    clientesSalida.forEach(c => {
+                        const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded' && !a.deleted_at).reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                        const st = c.estado ? c.estado.toLowerCase() : '';
+                        if (st === 'devolución') {
+                            const devuelto = parseFloat(c.monto_devuelto || 0);
+                            totalRecaudado += Math.max(0, totalAbo - devuelto);
+                        } else {
+                            totalRecaudado += totalAbo;
+                        }
+                    });
+
+                    // Adelantos / Préstamos
+                    const planAdvances = (DataService.adelantos_operativos || []).filter(a => {
+                        if (a.deleted_at) return false;
+                        if (a.plan_id === v.planId && a.fecha_viaje === v.fechaFormat) return true;
+                        if (a.cliente_id) {
+                            return clientesSalida.some(c => c.id === a.cliente_id);
+                        }
+                        return false;
+                    });
+                    const totalAdelantos = planAdvances.reduce((sum, a) => sum + (Number(a.monto_adelantado) || 0), 0);
+
+                    const adelantosDisplay = totalAdelantos > 0 ? formatCOP(totalAdelantos) : '$0';
+                    const recaudadoDisplay = formatCOP(totalRecaudado);
+
                     tbodyPlanes.innerHTML += `
                         <tr class="hover:bg-slate-50 transition-colors">
                             <td class="py-2 px-3 text-xs font-black text-slate-800">${UI.sanitize(v.planName)}</td>
@@ -1630,6 +1852,8 @@ export const PartnersComponent = {
                             <td class="py-2 px-3 text-right text-xs font-medium text-slate-600">${isAdmin ? formatCOP(v.ingresoBruto) : '***'}</td>
                             <td class="py-2 px-3 text-right text-xs font-medium text-rose-500/80">${isAdmin ? formatCOP(v.costoTotal) : '***'}</td>
                             <td class="py-2 px-3 text-right text-xs font-black ${colorMargen}">${isAdmin ? formatCOP(v.margen) : '***'}</td>
+                            <td class="py-2 px-3 text-right text-xs font-medium text-amber-600">${isAdmin ? adelantosDisplay : '***'}</td>
+                            <td class="py-2 px-3 text-right text-xs font-black text-emerald-600">${isAdmin ? recaudadoDisplay : '***'}</td>
                         </tr>
                     `;
                 });
@@ -2112,7 +2336,7 @@ export const PartnersComponent = {
                 .reduce((acc, m) => acc + m.monto, 0);
             totalSociosDisponible += (ganadoHistorico - totalRetirado);
         });
-        const balanceFondo = histRetenidoFondo - histGC;
+        const balanceFondo = histUB > histGC ? histRetenidoFondo : -(histGC - histUB);
         const cajaTeorica = balanceFondo + totalSociosDisponible;
         const liquidezLibre = cajaTeorica - totalTransito - totalVouchers;
 

@@ -146,6 +146,31 @@ export const RentabilidadComponent = {
         if (!grid) return;
         grid.innerHTML = '';
 
+        // Hide/Show partners vault button based on roles/partner status
+        const controlVaultButton = async () => {
+            try {
+                if (PartnersComponent) {
+                    await PartnersComponent.loadConfig();
+                    const rol = window.AuthModule?.userProfile?.rol;
+                    const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+                    const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+                    const isPartner = PartnersComponent.sociosConfig.some(s => s.email.toLowerCase() === currentUserEmail);
+                    
+                    const vaultBtn = document.querySelector('[data-action="open-partners-vault"]');
+                    if (vaultBtn) {
+                        if (isAdmin || isPartner) {
+                            vaultBtn.classList.remove('hidden');
+                        } else {
+                            vaultBtn.classList.add('hidden');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Error controlling Partners Vault button visibility:", e);
+            }
+        };
+        controlVaultButton();
+
         const filterPlan = document.getElementById('filter-rentabilidad-plan')?.value || "";
         const salidasMap = new Map();
 
@@ -609,11 +634,13 @@ export const RentabilidadComponent = {
         }
     },
 
-    openPartnersVault() {
+    async openPartnersVault() {
         if (PartnersComponent) {
-            PartnersComponent.init();
+            const hasAccess = await PartnersComponent.init();
+            if (hasAccess) {
+                UI.openModal('partners-vault-modal', 'pvm-bg', 'pvm-content');
+            }
         }
-        UI.openModal('partners-vault-modal', 'pvm-bg', 'pvm-content');
     },
 
     async syncRatesWithCatalog() {
