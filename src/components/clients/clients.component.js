@@ -1371,14 +1371,16 @@ export const ClientsComponent = {
             const comps = DataService.clientes.filter(x => x.parent_id === titularId && !x.deleted_at);
             
             qaDestinatarioHtml = `
-                <select id="qa-abono-destinatario" class="border border-slate-200 bg-white rounded-lg px-3 py-2 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
-                    <option value="grupo">Todo el grupo (Dividir)</option>
-                    <option value="${titularId}">${titular.nombre} ${titular.apellido} (Titular)</option>
+                <div>
+                    <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-0.5">Destinatario</label>
+                    <select id="qa-abono-destinatario" class="w-full border border-slate-200 bg-white rounded-lg px-3 py-2 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
+                        <option value="grupo">Todo el grupo (Dividir)</option>
+                        <option value="${titularId}">${titular.nombre} ${titular.apellido} (Titular)</option>
             `;
             comps.forEach(comp => {
                 qaDestinatarioHtml += `<option value="${comp.id}">${comp.nombre} ${comp.apellido}</option>`;
             });
-            qaDestinatarioHtml += `</select>`;
+            qaDestinatarioHtml += `</select></div>`;
         }
 
         document.getElementById('cdm-body').innerHTML = `
@@ -1471,22 +1473,35 @@ export const ClientsComponent = {
                         </div>
                     </div>
                     
-                    <div id="quick-abono-panel" class="hidden bg-slate-50/60 p-4 border-b border-slate-100 shadow-inner">
-                        <div class="flex flex-col sm:flex-row gap-2">
-                            <div class="relative flex-1">
-                                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">$</span>
-                                <input type="text" id="qa-monto" placeholder="Ej: 100.000" min="1" inputmode="numeric" class="currency-input w-full pl-8 pr-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-semibold outline-none shadow-sm focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all text-slate-800">
+                    <div id="quick-abono-panel" class="hidden bg-slate-50/60 p-4 border-b border-slate-100 shadow-inner space-y-4">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="col-span-2">
+                                <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-0.5">Monto del Abono *</label>
+                                <div class="relative">
+                                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">$</span>
+                                    <input type="text" id="qa-monto" placeholder="Ej: 100.000" min="1" inputmode="numeric" class="currency-input w-full pl-8 pr-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-semibold outline-none shadow-sm focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all text-slate-800">
+                                </div>
                             </div>
-                            ${qaDestinatarioHtml}
-                            <select id="qa-metodo" class="border border-slate-200 bg-white rounded-lg px-4 py-2 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
-                                <option value="Transferencia">Transferencia</option>
-                                <option value="Efectivo">Efectivo</option>
-                                <option value="Nequi/Daviplata">Nequi/Daviplata</option>
-                            </select>
-                            <button type="button" data-action="quick-abono" data-cliente-id="${id}" id="btn-quick-abono" class="bg-slate-900 text-white font-semibold px-4 py-2 rounded-lg shadow-sm text-xs hover:bg-slate-800 transition-colors flex items-center justify-center min-w-[100px] cursor-pointer">
-                                Guardar
-                            </button>
+                            
+                            ${qaDestinatarioHtml ? `
+                            <div class="col-span-1">
+                                ${qaDestinatarioHtml}
+                            </div>
+                            ` : ''}
+                            
+                            <div class="${qaDestinatarioHtml ? 'col-span-1' : 'col-span-2'}">
+                                <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-0.5">Método de Pago</label>
+                                <select id="qa-metodo" class="w-full border border-slate-200 bg-white rounded-lg px-3 py-2.5 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Nequi/Daviplata">Nequi/Daviplata</option>
+                                </select>
+                            </div>
                         </div>
+                        
+                        <button type="button" data-action="quick-abono" data-cliente-id="${id}" id="btn-quick-abono" class="w-full bg-slate-900 text-white font-black py-2.5 rounded-lg shadow-sm text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer">
+                            Registrar Abono Rápido
+                        </button>
                     </div>
                     
                     <div class="p-3 divide-y divide-slate-100/60">
