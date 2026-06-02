@@ -85,7 +85,8 @@ export const ClientsComponent = {
 
         const paxInput = document.getElementById('cf-pax');
         if (paxInput) {
-            paxInput.addEventListener('input', () => this.calculateTotals());
+            paxInput.addEventListener('input', () => this.onPaxChange());
+            paxInput.addEventListener('change', () => this.onPaxChange());
         }
 
         const tipoPagoSelect = document.getElementById('cf-tipo-pago');
@@ -107,6 +108,20 @@ export const ClientsComponent = {
         if (estadoSelect) {
             estadoSelect.addEventListener('change', (e) => this.toggleDevolucionInput(e.target.value));
         }
+
+        const companionContainer = document.getElementById('cf-acompanantes-container');
+        if (companionContainer) {
+            companionContainer.addEventListener('input', (e) => {
+                if (e.target.classList.contains('comp-nombre') || e.target.classList.contains('comp-apellido')) {
+                    this.populateNewClientAbonoDestinatario();
+                }
+            });
+        }
+
+        const cfNombre = document.getElementById('cf-nombre');
+        const cfApellido = document.getElementById('cf-apellido');
+        if (cfNombre) cfNombre.addEventListener('input', () => this.populateNewClientAbonoDestinatario());
+        if (cfApellido) cfApellido.addEventListener('input', () => this.populateNewClientAbonoDestinatario());
 
         const btnSaveClient = document.getElementById('btn-save-client');
         if (btnSaveClient) {
@@ -140,6 +155,16 @@ export const ClientsComponent = {
                 this.closeFormModal();
             } else if (target.dataset.action === 'close-client-detail' || target.id === 'cdm-bg') {
                 this.closeDetailModal();
+            } else if (target.dataset.action === 'close-client-transfer' || target.id === 'ctm-bg') {
+                this.closeTransferModal();
+            } else if (target.id === 'ctm-confirm-btn') {
+                this.executeTransfer();
+            } else if (target.dataset.action === 'close-client-merge' || target.id === 'cmg-bg') {
+                this.closeMergeModal();
+            } else if (target.id === 'btn-bulk-merge-groups') {
+                this.openMergeModal();
+            } else if (target.id === 'btn-execute-merge') {
+                this.executeMerge();
             }
         });
 
@@ -221,8 +246,21 @@ export const ClientsComponent = {
             if (stLower === 'registro pendiente') cls = 'bg-indigo-50 text-indigo-700 border-indigo-100/50';
             if (stLower === 'reprogramado') cls = 'bg-orange-50 text-orange-700 border-orange-100/50';
 
-            const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
-            const fin = calcularFinanzas(totalAbo, cli.precio_total);
+            let totalAbo = 0;
+            let targetPrice = cli.precio_total || 0;
+
+            if (!cli.parent_id && (cli.pax || 1) > 1) {
+                // Titular: consolidate prices and abonos
+                const comps = DataService.clientes.filter(c => c.parent_id === cli.id && !c.deleted_at);
+                const groupIds = [cli.id, ...comps.map(c => c.id)];
+                totalAbo = DataService.abonos.filter(a => groupIds.includes(a.cliente_id) && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                targetPrice = (cli.precio_total || 0) * (cli.pax || 1);
+            } else {
+                // Companion or individual
+                totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                targetPrice = cli.precio_total || 0;
+            }
+            const fin = calcularFinanzas(totalAbo, targetPrice);
 
             const tr = document.createElement('tr');
             tr.className = `client-row hover:bg-slate-50/70 transition-all border-b border-slate-100 cursor-pointer`;
@@ -263,6 +301,14 @@ export const ClientsComponent = {
                 ? `<span class="text-[9px] font-semibold bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded border border-purple-100/50 mb-1 inline-block">${UI.sanitize(cli.etiqueta)}</span>`
                 : '';
 
+            let groupBadge = '';
+            if (cli.parent_id) {
+                const titular = DataService.clientes.find(c => c.id === cli.parent_id);
+                if (titular) {
+                    groupBadge = `<span class="text-[9px] font-semibold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200/60 mb-1 inline-block mr-1">Acompañante de ${UI.sanitize(titular.nombre)}</span>`;
+                }
+            }
+
             let fechaLimpia = cli.fecha_viaje ? UI.sanitize(cli.fecha_viaje) : 'S/F';
             fechaLimpia = fechaLimpia.replace(/20\d{2}/g, '').replace(/ al /g, ' - ').replace(' (Histórico)', '');
             fechaLimpia = fechaLimpia.replace(/ , /g, ' ').replace(/,\s*-/g, ' -').replace(/,\s*$/, '').trim();
@@ -274,8 +320,11 @@ export const ClientsComponent = {
                     <input type="checkbox" value="${cli.id}" onchange="window.DispatchModule.toggleClientSelection('${cli.id}')" class="client-checkbox w-4 h-4 rounded border-slate-200 text-slate-900 focus:ring-slate-900 cursor-pointer">
                 </td>
                 <td class="py-3 px-4">
-                    ${tagHtml}
-                    <p class="font-semibold text-slate-900 text-sm leading-none flex items-center">${UI.sanitize(cli.nombre)} ${UI.sanitize(cli.apellido)} ${glowingDot}</p>
+                    <div class="flex flex-wrap gap-1">
+                        ${groupBadge}
+                        ${tagHtml}
+                    </div>
+                    <p class="font-semibold text-slate-900 text-sm leading-none flex items-center mt-1">${UI.sanitize(cli.nombre)} ${UI.sanitize(cli.apellido)} ${glowingDot}</p>
                     <p class="text-[10px] text-slate-400 font-mono mt-1">${UI.sanitize(cli.documento)}</p>
                 </td>
                 <td class="py-3 px-4">
@@ -334,6 +383,14 @@ export const ClientsComponent = {
         if (forceId) {
             const c = DataService.clientes.find(cli => cli.id === forceId);
             if (c) {
+                // Redirigir si es acompañante
+                if (c.parent_id) {
+                    UI.showToast("Redirigiendo al titular del grupo...", "info");
+                    this.closeFormModal();
+                    setTimeout(() => this.openFormModal(c.parent_id), 300);
+                    return;
+                }
+
                 document.getElementById('client-form-title').innerText = "Editor Maestro de Reserva";
                 document.getElementById('cf-id').value = c.id;
                 document.getElementById('cf-nombre').value = c.nombre;
@@ -346,11 +403,22 @@ export const ClientsComponent = {
                 document.getElementById('cf-eps').value = c.eps || '';
                 document.getElementById('cf-plan-id').value = c.plan_id;
                 document.getElementById('cf-pax').value = c.pax || 1;
-                UI.setCurrencyValue('cf-precio-total', c.precio_total);
+                
+                // Mostrar precio consolidado para el titular
+                const consolidatedPrice = Math.floor((c.precio_total || 0) * (c.pax || 1));
+                UI.setCurrencyValue('cf-precio-total', consolidatedPrice);
+                
                 document.getElementById('cf-estado').value = c.estado;
                 document.getElementById('cf-alergias').value = c.alergias || '';
                 document.getElementById('cf-requerimientos').value = c.requerimientos || '';
                 document.getElementById('cf-contacto').value = c.contacto_emergencia || '';
+
+                // Cargar acompañantes
+                const companions = DataService.clientes.filter(comp => comp.parent_id === c.id && !comp.deleted_at);
+                this.renderCompanionsInputs(companions);
+
+                // Poblar destinatarios abono live
+                this.populateAbonoDestinatarios(c.id);
 
                 const linkSop = document.getElementById('cf-soporte-pago-link');
                 if (c.soporte_pago_url) {
@@ -391,6 +459,11 @@ export const ClientsComponent = {
             
             document.getElementById('cf-monto-devuelto').value = '';
             this.toggleDevolucionInput('pendiente de pago');
+
+            // Reset tab button and container for companions
+            document.getElementById('tab-btn-acompanantes').classList.add('hidden');
+            document.getElementById('cf-acompanantes-container').innerHTML = '';
+            document.getElementById('div-abono-destinatario-new').classList.add('hidden');
 
             this.onTipoPagoChange();
             this.calculateTotals();
@@ -594,9 +667,12 @@ export const ClientsComponent = {
             // Lógica de congelamiento financiero (Audit Trail: 48 horas)
             const hoursSinceCreated = (new Date() - new Date(mov.created_at)) / (1000 * 60 * 60);
             const isFrozen = !IS_ADMIN && hoursSinceCreated > 48;
+            const isChildAbono = mov.parent_abono_id !== undefined && mov.parent_abono_id !== null;
             
             let actionButtons = '';
-            if (isFrozen) {
+            if (isChildAbono) {
+                actionButtons = '<span class="text-[9px] text-indigo-500 font-black bg-indigo-50 px-2.5 py-1.5 rounded-lg border border-indigo-100/50 flex items-center shadow-sm"><i class="ph ph-users mr-1"></i> Pago Grupal</span>';
+            } else if (isFrozen) {
                 actionButtons = '<span class="text-[9px] text-slate-500 font-black bg-slate-200/60 px-2.5 py-1.5 rounded-lg border border-slate-300 shadow-inner flex items-center"><i class="ph ph-lock-key mr-1.5 text-sm"></i> Congelado (48h)</span>';
             } else {
                 actionButtons = `
@@ -748,12 +824,16 @@ export const ClientsComponent = {
         btn.disabled = true;
 
         try {
+            const destSelect = document.getElementById('cf-abono-live-destinatario');
+            const destId = destSelect && !destSelect.classList.contains('hidden') ? destSelect.value : cId;
+
             await DataService.saveAbono({
                 cliente_id: cId,
                 monto: val,
                 metodo: met,
                 estado_pago: sts,
-                usuario_email: window.AuthModule.currentUser?.email || 'Staff'
+                usuario_email: window.AuthModule.currentUser?.email || 'Staff',
+                destinatario_id: destId
             });
 
             document.getElementById('cf-abono-live-monto').value = '';
@@ -784,6 +864,9 @@ export const ClientsComponent = {
             UI.showToast(`Atención: Estás ingresando un monto mayor a la deuda.`, "info");
         }
 
+        const destSelect = document.getElementById('qa-abono-destinatario');
+        const destId = destSelect ? destSelect.value : cId;
+
         const btn = document.getElementById('btn-quick-abono');
         const pT = btn.innerHTML;
         btn.innerHTML = '<i class="ph ph-spinner animate-spin"></i>';
@@ -796,7 +879,8 @@ export const ClientsComponent = {
                 monto: val,
                 metodo: met,
                 estado_pago: 'confirmed',
-                usuario_email: window.AuthModule.currentUser?.email || 'Staff'
+                usuario_email: window.AuthModule.currentUser?.email || 'Staff',
+                destinatario_id: destId
             });
 
             UI.showToast("Abono rápido registrado correctamente en el sistema.", "success");
@@ -899,16 +983,13 @@ export const ClientsComponent = {
             let provsVinculadosCongelados = [];
 
             if (plan) {
-                // 1. Costos generales por defecto
                 costoBaseCongelado = parseFloat(plan.costo_base) || 0;
                 provsVinculadosCongelados = plan.proveedores_vinculados || [];
 
-                // Fallback for general plan costs
                 if (costoBaseCongelado === 0 && provsVinculadosCongelados && provsVinculadosCongelados.length > 0) {
                     costoBaseCongelado = provsVinculadosCongelados.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
                 }
 
-                // 2. Buscar si la fecha de viaje seleccionada tiene costos específicos
                 const fechaSelect = document.getElementById('cf-fecha-viaje')?.value;
                 if (fechaSelect && plan.fechas) {
                     const dateConfig = plan.fechas.find(f => {
@@ -918,13 +999,11 @@ export const ClientsComponent = {
                         return formattedDate === fechaSelect;
                     });
 
-                    // Si la fecha tiene su propio desglose configurado, se usa
                     if (dateConfig && dateConfig.proveedores_vinculados && dateConfig.proveedores_vinculados.length > 0) {
                         costoBaseCongelado = parseFloat(dateConfig.costo_base) || 0;
                         provsVinculadosCongelados = dateConfig.proveedores_vinculados;
                     }
 
-                    // Fallback for specific date costs
                     if (costoBaseCongelado === 0 && provsVinculadosCongelados && provsVinculadosCongelados.length > 0) {
                         costoBaseCongelado = provsVinculadosCongelados.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
                     }
@@ -942,6 +1021,10 @@ export const ClientsComponent = {
 
             const contactoEl = document.getElementById('cf-contacto');
             const etiquetaEl = document.getElementById('cf-etiqueta');
+            const paxVal = parseInt(document.getElementById('cf-pax').value) || 1;
+
+            // División equitativa del precio total del grupo
+            const splitPrice = Math.floor(pTot / paxVal);
 
             const obj = {
                 nombre: document.getElementById('cf-nombre').value,
@@ -953,9 +1036,9 @@ export const ClientsComponent = {
                 edad: document.getElementById('cf-edad').value,
                 eps: document.getElementById('cf-eps').value,
                 plan_id: pId,
-                pax: parseInt(document.getElementById('cf-pax').value) || 1,
+                pax: paxVal,
                 estado: estadoEl,
-                precio_total: pTot,
+                precio_total: splitPrice, // Guardar precio individual dividido
                 fecha_viaje: document.getElementById('cf-fecha-viaje')?.value || 'Fecha Abierta',
                 alergias: document.getElementById('cf-alergias').value,
                 requerimientos: document.getElementById('cf-requerimientos').value,
@@ -978,17 +1061,102 @@ export const ClientsComponent = {
             if (!esNvo) obj.id = fId;
             if (esNvo) {
                 obj.abono_acumulado = 0;
-                obj.saldo_restante = pTot;
+                obj.saldo_restante = splitPrice;
             }
 
-            // 1. Guardar cliente en BD
+            // 1. Guardar cliente titular en BD
             const res = await DataService.saveCliente(obj);
 
-            // 2. Si es cliente nuevo y hay dinero de entrada, insertar abono obligatoriamente
+            // 2. Guardar/actualizar acompañantes activos y gestionar removidos
+            const companionsData = this.gatherCompanionsData();
+            const savedCompanions = [];
+
+            if (res) {
+                // A. Identificar y borrar acompañantes removidos
+                const activeCompIds = companionsData.map(comp => comp.id).filter(Boolean);
+                const existingComps = DataService.clientes.filter(c => c.parent_id === res.id && !c.deleted_at);
+                const removedComps = existingComps.filter(c => !activeCompIds.includes(c.id));
+
+                if (removedComps.length > 0) {
+                    const removedIds = removedComps.map(c => c.id);
+                    const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+                    const { error: errorDelComps } = await supabaseClient.from('clientes')
+                        .update({ 
+                            deleted_at: new Date().toISOString(), 
+                            deleted_by: user, 
+                            motivo_eliminacion: "Retirado del grupo por reducción de Pax" 
+                        })
+                        .in('id', removedIds);
+                    
+                    if (errorDelComps) console.warn("Error eliminando acompañantes removidos:", errorDelComps);
+
+                    for (const comp of removedComps) {
+                        await DataService.registrarHistorial(
+                            comp.id, 
+                            'Retirado del Grupo', 
+                            'N/A', 
+                            'Retirado del grupo por reducción de Pax', 
+                            'ELIMINACION', 
+                            { motivo_eliminacion: 'Reducción de Pax' }
+                        );
+                    }
+                }
+
+                // B. Guardar/actualizar acompañantes activos
+                for (const comp of companionsData) {
+                    const compObj = {
+                        nombre: comp.nombre,
+                        apellido: comp.apellido,
+                        documento: comp.documento,
+                        telefono: obj.telefono,
+                        email: obj.email,
+                        ciudad: obj.ciudad,
+                        edad: comp.edad,
+                        eps: comp.eps,
+                        plan_id: obj.plan_id,
+                        pax: 1,
+                        estado: obj.estado,
+                        precio_total: splitPrice,
+                        fecha_viaje: obj.fecha_viaje,
+                        alergias: comp.alergias,
+                        requerimientos: comp.requerimientos,
+                        contacto_emergencia: comp.contacto_emergencia || obj.contacto_emergencia,
+                        etiqueta: obj.etiqueta,
+                        costo_base: obj.costo_base,
+                        proveedores_vinculados: obj.proveedores_vinculados,
+                        parent_id: res.id
+                    };
+                    if (comp.id) {
+                        compObj.id = comp.id;
+                    } else {
+                        compObj.abono_acumulado = 0;
+                        compObj.saldo_restante = splitPrice;
+                    }
+                    const savedComp = await DataService.saveCliente(compObj);
+                    if (savedComp) {
+                        savedCompanions.push(savedComp);
+                    }
+                }
+            }
+
+            // 3. Si es cliente nuevo y hay dinero de entrada, insertar abono obligatoriamente
             if (esNvo && ini > 0 && res) {
                 let mF = document.getElementById('cf-abono-metodo').value || 'Ingreso Manual';
                 if (mPgo === 'contado') {
                     mF = 'Pago de Contado (Vía ' + mF + ')';
+                }
+
+                // Resolver destinatario_id
+                const destVal = document.getElementById('cf-abono-destinatario')?.value || 'grupo';
+                let finalDestId = 'grupo';
+
+                if (destVal === 'titular') {
+                    finalDestId = res.id;
+                } else if (destVal.startsWith('comp-')) {
+                    const idx = parseInt(destVal.replace('comp-', ''));
+                    if (savedCompanions[idx]) {
+                        finalDestId = savedCompanions[idx].id;
+                    }
                 }
 
                 await DataService.saveAbono({
@@ -996,24 +1164,25 @@ export const ClientsComponent = {
                     monto: ini,
                     metodo: mF,
                     estado_pago: 'confirmed',
-                    usuario_email: window.AuthModule.currentUser?.email || 'Admin / Creador'
+                    usuario_email: window.AuthModule.currentUser?.email || 'Admin / Creador',
+                    destinatario_id: finalDestId
                 });
             }
 
-            // 3. Recalcular contabilidad estricta
+            // 4. Recalcular contabilidad estricta
             if (res) {
                 await DataService.recalculateClientBalances(res.id);
+                for (const comp of savedCompanions) {
+                    await DataService.recalculateClientBalances(comp.id);
+                }
             }
 
             this.populateFilters();
-            // Ejecutar la cascada para refrescar la UI correctamente
             if (res && res.id) {
-                // Ensure DataService is updated before refresh
                 await DataService.loadAll(); 
                 this.refreshUIAfterAbonoChange(res.id);
             } else {
                 this.renderTable();
-                // DashboardComponent se actualiza automáticamente vía Store
             }
             
             this.closeFormModal();
@@ -1034,7 +1203,30 @@ export const ClientsComponent = {
 
         const p = DataService.planes.find(x => x.id === c.plan_id);
         const pNom = p ? p.nombre : 'Plan Retirado del Sistema';
-        const abs = DataService.abonos.filter(a => a.cliente_id === id);
+        
+        // Find companions
+        const companions = DataService.clientes.filter(comp => comp.parent_id === c.id && !comp.deleted_at);
+        const belongsToGroup = c.parent_id || companions.length > 0;
+
+        // Group financial calculation if titular
+        let totalAbo = 0;
+        let targetPrice = c.precio_total || 0;
+        let abs = [];
+
+        if (!c.parent_id && companions.length > 0) {
+            // Titular with group: show group abonos and prices consolidated
+            const groupClientIds = [c.id, ...companions.map(comp => comp.id)];
+            abs = DataService.abonos.filter(a => groupClientIds.includes(a.cliente_id));
+            totalAbo = abs.filter(a => a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            targetPrice = (c.precio_total || 0) * (c.pax || 1);
+        } else {
+            // Companion or individual
+            abs = DataService.abonos.filter(a => a.cliente_id === id);
+            totalAbo = abs.filter(a => a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            targetPrice = c.precio_total || 0;
+        }
+
+        const fn = calcularFinanzas(totalAbo, targetPrice);
 
         let h = '';
         if (abs.length === 0) {
@@ -1046,10 +1238,19 @@ export const ClientsComponent = {
                 else if (a.estado_pago === 'refunded') st = '<span class="text-red-700 bg-rose-50 px-1.5 py-0.5 rounded-full border border-rose-100/50 text-[9px] font-medium">Reembolso</span>';
                 else st = '<span class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-100/50 text-[9px] font-medium">Ok</span>';
 
+                // Display whom the payment belongs to if viewing group consolidated history
+                let targetMemberName = '';
+                if (!c.parent_id && companions.length > 0) {
+                    const member = DataService.clientes.find(x => x.id === a.cliente_id);
+                    if (member) {
+                        targetMemberName = ` <span class="text-[8px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded border border-slate-200/50 font-normal">Para: ${member.nombre}</span>`;
+                    }
+                }
+
                 h += `
                 <div class="flex justify-between items-center text-sm py-3 border-b border-slate-100 hover:bg-slate-50/50 px-3 rounded-lg transition-colors">
                     <div>
-                        <span class="font-semibold text-slate-900 text-base">${formatCOP(a.monto)}</span><br>
+                        <span class="font-semibold text-slate-900 text-base">${formatCOP(a.monto)}</span>${targetMemberName}<br>
                         <span class="text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 inline-block mt-1">${a.metodo} - ${st}</span>
                     </div>
                     <div class="text-xs text-slate-400 text-right font-medium">
@@ -1060,10 +1261,6 @@ export const ClientsComponent = {
             });
         }
 
-        const tAb = abs.filter(a => a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
-        const fn = calcularFinanzas(tAb, c.precio_total);
-
-        // PARCHE DE SEGURIDAD (VACUNA XSS): Sanitizamos todas las variables del cliente antes de imprimirlas
         const safeNombre = UI.sanitize(c.nombre || '');
         const safeApellido = UI.sanitize(c.apellido || '');
         const safeDoc = UI.sanitize(c.documento || '');
@@ -1071,14 +1268,78 @@ export const ClientsComponent = {
         const safePlan = UI.sanitize(pNom);
         const safeEtiqueta = UI.sanitize(c.etiqueta || '');
 
-        // Calcular si hay adelantos operativos activos para este cliente
+        // Render titular information banner if companion
+        let titularAlertHtml = '';
+        if (c.parent_id) {
+            const titular = DataService.clientes.find(x => x.id === c.parent_id);
+            if (titular) {
+                titularAlertHtml = `
+                    <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl flex items-start gap-3 shadow-[0_1px_2px_rgba(99,102,241,0.05)] mb-4">
+                        <i class="ph ph-info text-indigo-600 text-lg shrink-0 mt-0.5"></i>
+                        <div class="flex-1">
+                            <p class="text-[10px] font-black text-indigo-800 uppercase tracking-wider">Acompañante de Grupo</p>
+                            <p class="text-xs font-semibold text-slate-800 mt-0.5">
+                                Este viajero pertenece al grupo de <strong>${UI.sanitize(titular.nombre)} ${UI.sanitize(titular.apellido)}</strong>.
+                            </p>
+                            <div class="flex gap-4 mt-2">
+                                <button onclick="ClientsComponent.closeDetailModal(); setTimeout(() => ClientsComponent.openDetailModal('${titular.id}'), 300)" class="text-[10px] text-indigo-600 font-bold hover:underline flex items-center">
+                                    <i class="ph ph-arrow-square-out mr-1"></i> Ir al Titular
+                                </button>
+                                <button onclick="ClientsComponent.desagruparCliente('${c.id}')" class="text-[10px] text-rose-600 font-bold hover:underline flex items-center">
+                                    <i class="ph ph-user-minus mr-1"></i> Desagrupar / Separar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Render companions list if titular
+        let companionsHtml = '';
+        if (!c.parent_id && companions.length > 0) {
+            companionsHtml = `
+                <div class="border border-slate-100 rounded-2xl bg-white overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
+                    <div class="bg-slate-50/50 p-4 border-b border-slate-100">
+                        <h4 class="font-medium text-xs text-slate-500 flex items-center"><i class="ph ph-users-three mr-2 text-base"></i> Acompañantes del Viaje</h4>
+                    </div>
+                    <div class="p-3 divide-y divide-slate-100/60 bg-white">
+            `;
+            companionsHtml += companions.map(comp => {
+                const compAbo = DataService.abonos.filter(a => a.cliente_id === comp.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                const compFin = calcularFinanzas(compAbo, comp.precio_total);
+                return `
+                    <div class="flex justify-between items-center py-2.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors" onclick="ClientsComponent.closeDetailModal(); setTimeout(() => ClientsComponent.openDetailModal('${comp.id}'), 300)">
+                        <div>
+                            <p class="font-semibold text-slate-800 text-xs">${UI.sanitize(comp.nombre)} ${UI.sanitize(comp.apellido)}</p>
+                            <p class="text-[9px] text-slate-400">${UI.sanitize(comp.documento)}</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="text-right">
+                                <p class="text-xs font-semibold text-slate-700">${formatCOP(compAbo)} / ${formatCOP(comp.precio_total)}</p>
+                                <p class="text-[9px] text-slate-400">Saldo: ${formatCOP(compFin.saldo)}</p>
+                            </div>
+                            <button onclick="event.stopPropagation(); ClientsComponent.desagruparCliente('${comp.id}')" class="text-rose-600 hover:text-rose-800 p-1.5 rounded-lg hover:bg-rose-50 transition-all cursor-pointer" title="Desagrupar de este grupo">
+                                <i class="ph ph-user-minus text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            companionsHtml += `
+                    </div>
+                </div>
+            `;
+        }
+
+        // Calculate if there are active operability advances
         const clientAdelantos = (DataService.adelantos_operativos || [])
             .filter(a => a.cliente_id === id && !a.deleted_at && ['aprobado', 'ejecutado'].includes(a.estado));
         const totalAdelantado = clientAdelantos.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
 
         const bannerAdelantoHtml = totalAdelantado > 0 ? `
             <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 shadow-[0_1px_2px_rgba(245,158,11,0.05)]">
-                <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5 animate-pulse"></i>
+                <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5 auto-pulse"></i>
                 <div>
                     <p class="text-[10px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">Adelanto Operativo Activo</p>
                     <p class="text-xs font-semibold text-amber-900 mt-0.5">
@@ -1102,6 +1363,24 @@ export const ClientsComponent = {
             </div>
         ` : '';
 
+        // Dynamic recipient select for quick abono panel
+        let qaDestinatarioHtml = '';
+        if (belongsToGroup) {
+            const titularId = c.parent_id || c.id;
+            const titular = DataService.clientes.find(x => x.id === titularId);
+            const comps = DataService.clientes.filter(x => x.parent_id === titularId && !x.deleted_at);
+            
+            qaDestinatarioHtml = `
+                <select id="qa-abono-destinatario" class="border border-slate-200 bg-white rounded-lg px-3 py-2 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
+                    <option value="grupo">Todo el grupo (Dividir)</option>
+                    <option value="${titularId}">${titular.nombre} ${titular.apellido} (Titular)</option>
+            `;
+            comps.forEach(comp => {
+                qaDestinatarioHtml += `<option value="${comp.id}">${comp.nombre} ${comp.apellido}</option>`;
+            });
+            qaDestinatarioHtml += `</select>`;
+        }
+
         document.getElementById('cdm-body').innerHTML = `
             <div class="p-6 space-y-6">
                 <div class="flex items-center space-x-4">
@@ -1114,9 +1393,13 @@ export const ClientsComponent = {
                     </div>
                 </div>
                 
+                ${titularAlertHtml}
+
                 ${bannerAdelantoHtml}
                 
                 ${sopPagoHtml}
+
+                ${companionsHtml}
                 
                 <div class="bg-slate-50 border border-slate-100 p-5 rounded-2xl relative overflow-hidden text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
                     <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider mb-1">Plan Seleccionado</p>
@@ -1128,15 +1411,15 @@ export const ClientsComponent = {
                     <div class="grid grid-cols-2 gap-4 border-t border-slate-200/40 pt-4 mt-4 text-xs font-mono">
                         <div>
                             <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">Total Venta</p>
-                            <p class="text-sm font-semibold text-slate-900">${formatCOP(c.precio_total)}</p>
+                            <p class="text-sm font-semibold text-slate-900">${formatCOP(targetPrice)}</p>
                         </div>
                         <div class="text-right border-l border-slate-200/40 pl-4">
                             <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">Abonado</p>
-                            <p class="text-sm font-semibold text-slate-900">${formatCOP(fn.abonado)}</p>
+                            <p class="text-sm font-semibold text-slate-900">${formatCOP(totalAbo)}</p>
                         </div>
                         <div>
                             <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">Saldo Pendiente</p>
-                            <p class="text-sm font-semibold ${fn.saldo <= 0 ? 'text-slate-900' : 'text-slate-900'}">${formatCOP(fn.saldo)}</p>
+                            <p class="text-sm font-semibold text-slate-900">${formatCOP(fn.saldo)}</p>
                         </div>
                         <div class="text-right border-l border-slate-200/40 pl-4 flex flex-col justify-end">
                             <p class="text-[10px] font-sans font-medium text-slate-400 mb-0.5">% Pagado</p>
@@ -1176,9 +1459,16 @@ export const ClientsComponent = {
                 <div class="border border-slate-100 rounded-2xl bg-white overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
                     <div class="bg-slate-50/50 p-4 border-b border-slate-100 flex justify-between items-center">
                         <h4 class="font-medium text-xs text-slate-500 flex items-center"><i class="ph ph-receipt mr-2 text-base"></i> Flujo de Caja</h4>
-                        <button onclick="document.getElementById('quick-abono-panel').classList.toggle('hidden')" class="bg-white border border-slate-200 text-slate-700 px-3 py-1 rounded-lg text-[10px] font-semibold transition-all hover:bg-slate-50 flex items-center cursor-pointer">
-                            <i class="ph ph-plus mr-1"></i> Abono Rápido
-                        </button>
+                        <div class="flex gap-2">
+                            ${belongsToGroup ? `
+                            <button onclick="ClientsComponent.openTransferModal('${id}')" class="bg-white border border-slate-200 text-slate-700 px-3 py-1 rounded-lg text-[10px] font-semibold transition-all hover:bg-slate-50 flex items-center cursor-pointer">
+                                <i class="ph ph-arrows-left-right mr-1"></i> Transferir Saldo
+                            </button>
+                            ` : ''}
+                            <button onclick="document.getElementById('quick-abono-panel').classList.toggle('hidden')" class="bg-white border border-slate-200 text-slate-700 px-3 py-1 rounded-lg text-[10px] font-semibold transition-all hover:bg-slate-50 flex items-center cursor-pointer">
+                                <i class="ph ph-plus mr-1"></i> Abono Rápido
+                            </button>
+                        </div>
                     </div>
                     
                     <div id="quick-abono-panel" class="hidden bg-slate-50/60 p-4 border-b border-slate-100 shadow-inner">
@@ -1187,6 +1477,7 @@ export const ClientsComponent = {
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">$</span>
                                 <input type="text" id="qa-monto" placeholder="Ej: 100.000" min="1" inputmode="numeric" class="currency-input w-full pl-8 pr-4 py-2 border border-slate-200 bg-white rounded-lg text-sm font-semibold outline-none shadow-sm focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all text-slate-800">
                             </div>
+                            ${qaDestinatarioHtml}
                             <select id="qa-metodo" class="border border-slate-200 bg-white rounded-lg px-4 py-2 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
                                 <option value="Transferencia">Transferencia</option>
                                 <option value="Efectivo">Efectivo</option>
@@ -1412,6 +1703,370 @@ export const ClientsComponent = {
         URL.revokeObjectURL(url);
 
         UI.showToast(`${visibleRows.length} reservas exportadas exitosamente.`, "success");
+    },
+
+    // ── RESERVAS GRUPALES Y ACOMPAÑANTES ──────────────────────────────
+    onPaxChange() {
+        const currentData = this.gatherCompanionsData();
+        this.renderCompanionsInputs(currentData);
+        this.populateNewClientAbonoDestinatario();
+        this.calculateTotals();
+    },
+
+    gatherCompanionsData() {
+        const rows = document.querySelectorAll('.companion-row');
+        const data = [];
+        rows.forEach(row => {
+            data.push({
+                id: row.querySelector('.comp-id')?.value || '',
+                nombre: row.querySelector('.comp-nombre')?.value || '',
+                apellido: row.querySelector('.comp-apellido')?.value || '',
+                documento: row.querySelector('.comp-documento')?.value || '',
+                edad: row.querySelector('.comp-edad')?.value || '',
+                eps: row.querySelector('.comp-eps')?.value || '',
+                alergias: row.querySelector('.comp-alergias')?.value || 'Ninguna',
+                requerimientos: row.querySelector('.comp-requerimientos')?.value || 'Ninguno',
+                contacto_emergencia: row.querySelector('.comp-contacto')?.value || ''
+            });
+        });
+        return data;
+    },
+
+    renderCompanionsInputs(companionsData = []) {
+        const paxStr = document.getElementById('cf-pax').value;
+        const pax = Math.max(1, parseInt(paxStr) || 1);
+        const container = document.getElementById('cf-acompanantes-container');
+        const tabBtn = document.getElementById('tab-btn-acompanantes');
+
+        if (!container) return;
+
+        if (pax > 1) {
+            tabBtn.classList.remove('hidden');
+        } else {
+            tabBtn.classList.add('hidden');
+            const activeTab = document.querySelector('.tab-btn.active');
+            if (activeTab && activeTab.id === 'tab-btn-acompanantes') {
+                UI.switchTab('cliente', 'datosp');
+            }
+        }
+
+        container.innerHTML = '';
+        const count = pax - 1;
+
+        for (let i = 0; i < count; i++) {
+            const comp = companionsData[i] || {};
+            const html = `
+                <div class="companion-row border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-3" data-index="${i}">
+                    <h5 class="text-xs font-bold text-slate-700 flex justify-between items-center">
+                        <span>Acompañante #${i + 1}</span>
+                    </h5>
+                    <input type="hidden" class="comp-id" value="${comp.id || ''}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Nombres *</label>
+                            <input type="text" required class="comp-nombre w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.nombre || ''}">
+                        </div>
+                        <div>
+                            <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Apellidos *</label>
+                            <input type="text" required class="comp-apellido w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.apellido || ''}">
+                        </div>
+                        <div>
+                            <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Documento Identidad *</label>
+                            <input type="text" required class="comp-documento w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.documento || ''}">
+                        </div>
+                        <div>
+                            <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Edad e EPS</label>
+                            <div class="flex gap-2">
+                                <input type="number" min="0" placeholder="Edad" class="comp-edad w-1/3 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.edad || ''}">
+                                <input type="text" placeholder="EPS" class="comp-eps w-2/3 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.eps || ''}">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Alergias</label>
+                            <input type="text" class="comp-alergias w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.alergias || 'Ninguna'}">
+                        </div>
+                        <div>
+                            <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Requerimientos</label>
+                            <input type="text" class="comp-requerimientos w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.requerimientos || 'Ninguno'}">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Contacto Emergencia</label>
+                            <input type="text" placeholder="Nombre y celular..." class="comp-contacto w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm" value="${comp.contacto_emergencia || ''}">
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+        }
+    },
+
+    populateAbonoDestinatarios(clienteId) {
+        const cli = DataService.clientes.find(c => c.id === clienteId);
+        if (!cli) return;
+
+        const companions = DataService.clientes.filter(c => c.parent_id === clienteId && !c.deleted_at);
+
+        const selectors = [
+            { id: 'cf-abono-live-destinatario', defaultOption: 'Todo el grupo (Dividir)' }
+        ];
+
+        selectors.forEach(selConfig => {
+            const select = document.getElementById(selConfig.id);
+            if (!select) return;
+
+            select.innerHTML = '';
+            
+            if (companions.length > 0) {
+                select.classList.remove('hidden');
+                select.innerHTML = `
+                    <option value="grupo">${selConfig.defaultOption}</option>
+                    <option value="${cli.id}">${cli.nombre} ${cli.apellido} (Titular)</option>
+                `;
+                companions.forEach(comp => {
+                    select.innerHTML += `<option value="${comp.id}">${comp.nombre} ${comp.apellido}</option>`;
+                });
+            } else {
+                select.classList.add('hidden');
+            }
+        });
+    },
+
+    populateNewClientAbonoDestinatario() {
+        const select = document.getElementById('cf-abono-destinatario');
+        const containerDiv = document.getElementById('div-abono-destinatario-new');
+        if (!select || !containerDiv) return;
+
+        const titularNombre = document.getElementById('cf-nombre').value || 'Titular';
+        const titularApellido = document.getElementById('cf-apellido').value || '';
+        const companionsData = this.gatherCompanionsData();
+
+        select.innerHTML = '';
+
+        if (companionsData.length > 0) {
+            containerDiv.classList.remove('hidden');
+            select.innerHTML = `
+                <option value="grupo">Todo el grupo (Dividir equitativamente)</option>
+                <option value="titular">${titularNombre} ${titularApellido} (Titular)</option>
+            `;
+            companionsData.forEach((comp, idx) => {
+                const name = `${comp.nombre || 'Acompañante'} ${comp.apellido || idx + 1}`;
+                select.innerHTML += `<option value="comp-${idx}">${name}</option>`;
+            });
+        } else {
+            containerDiv.classList.add('hidden');
+        }
+    },
+
+    // ── MODAL DE TRANSFERENCIA DE SALDO ───────────────────────────────
+    openTransferModal(id) {
+        const c = DataService.clientes.find(x => x.id === id);
+        if (!c) return;
+
+        let groupId = c.parent_id || c.id;
+        
+        // Determinar miembros del grupo (excluyendo al origen)
+        const groupMembers = [];
+        const titular = DataService.clientes.find(x => x.id === groupId);
+        if (titular) groupMembers.push(titular);
+
+        const companions = DataService.clientes.filter(x => x.parent_id === groupId && !x.deleted_at);
+        groupMembers.push(...companions);
+
+        const destinations = groupMembers.filter(x => x.id !== id);
+
+        if (destinations.length === 0) {
+            return UI.showToast("No hay otros miembros en este grupo para transferir saldo.", "warning");
+        }
+
+        document.getElementById('ctm-origen-id').value = id;
+        document.getElementById('ctm-origen-nombre').value = `${c.nombre} ${c.apellido}`;
+
+        const totalAbo = DataService.abonos
+            .filter(a => a.cliente_id === id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded')
+            .reduce((s, a) => s + (Number(a.monto) || 0), 0);
+
+        document.getElementById('ctm-origen-saldo').value = totalAbo;
+        UI.setCurrencyValue('ctm-origen-saldo-display', totalAbo);
+        UI.setCurrencyValue('ctm-monto', totalAbo);
+
+        const destSelect = document.getElementById('ctm-destinatario');
+        destSelect.innerHTML = '<option value="grupo">Dividir equitativamente entre los que sí viajan</option>';
+        destinations.forEach(d => {
+            destSelect.innerHTML += `<option value="${d.id}">${d.nombre} ${d.apellido} (${d.id === groupId ? 'Titular' : 'Acompañante'})</option>`;
+        });
+
+        UI.openModal('client-transfer-modal', 'ctm-bg', 'ctm-content');
+    },
+
+    async executeTransfer() {
+        const origenId = document.getElementById('ctm-origen-id').value;
+        const monto = UI.parseCurrency(document.getElementById('ctm-monto').value);
+        const destOption = document.getElementById('ctm-destinatario').value;
+        const origenSaldo = parseFloat(document.getElementById('ctm-origen-saldo').value) || 0;
+
+        if (isNaN(monto) || monto <= 0) {
+            return UI.showToast("Ingresa un monto de transferencia válido.", "error");
+        }
+
+        if (monto > origenSaldo) {
+            return UI.showToast("El monto no puede superar el saldo abonado disponible.", "error");
+        }
+
+        const originCli = DataService.clientes.find(c => c.id === origenId);
+        if (!originCli) return;
+
+        let groupId = originCli.parent_id || originCli.id;
+        const destinations = [];
+        const titular = DataService.clientes.find(x => x.id === groupId);
+        if (titular && titular.id !== origenId) destinations.push(titular);
+        const companions = DataService.clientes.filter(x => x.parent_id === groupId && !x.deleted_at && x.id !== origenId);
+        destinations.push(...companions);
+
+        let destinosIds = [];
+        if (destOption === 'grupo') {
+            destinosIds = destinations.map(d => d.id);
+        } else {
+            destinosIds = [destOption];
+        }
+
+        if (destinosIds.length === 0) {
+            return UI.showToast("No hay destinatarios activos en el grupo.", "error");
+        }
+
+        const btn = document.getElementById('ctm-confirm-btn');
+        const prevText = btn.innerHTML;
+        btn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Procesando...';
+        btn.disabled = true;
+
+        try {
+            await DataService.transferirSaldoGrupo(origenId, destinosIds, monto);
+            
+            UI.showToast("Transferencia de saldo realizada correctamente.", "success");
+            this.closeTransferModal();
+            this.refreshUIAfterAbonoChange(origenId);
+        } catch (e) {
+            console.error(e);
+            UI.showToast("Error al ejecutar la transferencia de saldo.", "error");
+        } finally {
+            btn.innerHTML = prevText;
+            btn.disabled = false;
+        }
+    },
+
+    closeTransferModal() {
+        UI.closeModal('client-transfer-modal', 'ctm-bg', 'ctm-content');
+    },
+
+    openMergeModal() {
+        const selectedIds = Array.from(window.DispatchModule.selectedClients || []);
+        if (selectedIds.length < 2) {
+            return UI.showToast("Selecciona al menos 2 reservas para unirlas en un grupo.", "warning");
+        }
+
+        const selectedClients = selectedIds.map(id => DataService.clientes.find(c => c.id === id)).filter(Boolean);
+        if (selectedClients.length < 2) return;
+
+        const titularListContainer = document.getElementById('cmg-titular-list');
+        const companionsListContainer = document.getElementById('cmg-companions-list');
+        if (!titularListContainer || !companionsListContainer) return;
+
+        titularListContainer.innerHTML = '';
+        companionsListContainer.innerHTML = '';
+
+        selectedClients.forEach((client, idx) => {
+            const isChecked = idx === 0 ? 'checked' : '';
+            titularListContainer.innerHTML += `
+                <label class="flex items-center p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all cursor-pointer shadow-sm">
+                    <input type="radio" name="cmg-titular-radio" value="${client.id}" ${isChecked} class="cmg-radio w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer">
+                    <div class="ml-3">
+                        <p class="text-xs font-bold text-slate-800">${client.nombre} ${client.apellido}</p>
+                        <p class="text-[9px] font-mono text-slate-400">CC ${client.documento} | Pax: ${client.pax || 1}</p>
+                    </div>
+                </label>
+            `;
+        });
+
+        const updateCompanionsList = () => {
+            const selectedTitularId = document.querySelector('input[name="cmg-titular-radio"]:checked')?.value;
+            companionsListContainer.innerHTML = '';
+            selectedClients.forEach(client => {
+                if (client.id !== selectedTitularId) {
+                    companionsListContainer.innerHTML += `
+                        <div class="flex items-center gap-2 py-1 text-[11px] text-slate-600 font-semibold">
+                            <i class="ph ph-user text-slate-400"></i>
+                            <span>${client.nombre} ${client.apellido} (CC ${client.documento})</span>
+                        </div>
+                    `;
+                }
+            });
+        };
+
+        titularListContainer.onchange = updateCompanionsList;
+        updateCompanionsList();
+
+        UI.openModal('client-merge-modal', 'cmg-bg', 'cmg-content');
+    },
+
+    async executeMerge() {
+        const titularRadio = document.querySelector('input[name="cmg-titular-radio"]:checked');
+        if (!titularRadio) {
+            return UI.showToast("Debes elegir a un titular para el grupo.", "error");
+        }
+        const titularId = titularRadio.value;
+        const selectedIds = Array.from(window.DispatchModule.selectedClients || []);
+        const companerosIds = selectedIds.filter(id => id !== titularId);
+
+        if (companerosIds.length === 0) {
+            return UI.showToast("No hay acompañantes para unir.", "error");
+        }
+
+        const titular = DataService.clientes.find(c => c.id === titularId);
+        if (!titular) return;
+
+        const confirmText = `¿Estás seguro de unir estas reservas?\n\nLos acompañantes se integrarán al grupo de ${titular.nombre} ${titular.apellido}.\nSus planes, fechas y estados se sincronizarán con los del Titular, y el saldo total consolidado se verá reflejado en su ficha.`;
+        if (!confirm(confirmText)) return;
+
+        const btn = document.getElementById('btn-execute-merge');
+        const prevText = btn.innerHTML;
+        btn.innerHTML = '<i class="ph ph-spinner animate-spin text-sm"></i> Uniendo...';
+        btn.disabled = true;
+
+        try {
+            await DataService.unirClientesEnGrupo(titularId, companerosIds);
+            UI.showToast("Reservas agrupadas exitosamente.", "success");
+            this.closeMergeModal();
+            window.DispatchModule.clearSelection();
+            this.renderTable();
+        } catch (e) {
+            console.error(e);
+            UI.showToast("Error al agrupar las reservas en Supabase.", "error");
+        } finally {
+            btn.innerHTML = prevText;
+            btn.disabled = false;
+        }
+    },
+
+    closeMergeModal() {
+        UI.closeModal('client-merge-modal', 'cmg-bg', 'cmg-content');
+    },
+
+    async desagruparCliente(id) {
+        const c = DataService.clientes.find(x => x.id === id);
+        if (!c || !c.parent_id) return;
+
+        const titular = DataService.clientes.find(x => x.id === c.parent_id);
+        const name = `${c.nombre} ${c.apellido}`;
+        if (!confirm(`¿Estás seguro de desagrupar a ${name}? Pasará a ser una reserva individual e independiente.`)) return;
+
+        try {
+            await DataService.desagruparClienteDeGrupo(id);
+            UI.showToast(`${name} desagrupado con éxito.`, "success");
+            this.closeDetailModal();
+            this.renderTable();
+        } catch (e) {
+            console.error(e);
+            UI.showToast("Error al desagrupar al cliente.", "error");
+        }
     },
 
     // ── SUB-TABS DE RESERVAS ──────────────────────────────────────────

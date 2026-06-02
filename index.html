@@ -639,6 +639,11 @@
                                     onclick="DispatchModule.openDispatchPreview()">
                                     <i class="ph ph-paper-plane-tilt mr-1.5 text-base"></i> Despachar a Prov.
                                 </button>
+                                <button
+                                    class="text-[9px] font-black uppercase tracking-widest hover:text-indigo-400 transition-colors flex items-center shrink-0"
+                                    id="btn-bulk-merge-groups">
+                                    <i class="ph ph-users-three mr-1.5 text-base"></i> Unir en Grupo
+                                </button>
                                 <button onclick="DispatchModule.clearSelection()"
                                     class="text-slate-400 hover:text-red-400 p-0.5 transition-colors shrink-0">
                                     <i class="ph ph-x-circle text-lg"></i>
@@ -2861,6 +2866,9 @@
                 <button type="button"
                     class="tab-btn shrink-0 px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-800 focus:outline-none"
                     onclick="UI.switchTab('cliente', 'venta')">Reserva</button>
+                <button type="button" id="tab-btn-acompanantes"
+                    class="tab-btn shrink-0 px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-800 focus:outline-none hidden"
+                    onclick="UI.switchTab('cliente', 'acompanantes')">Acompañantes</button>
                 <button type="button"
                     class="tab-btn shrink-0 px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-200 text-slate-500 hover:text-slate-800 focus:outline-none"
                     onclick="UI.switchTab('cliente', 'provs')">Operativa</button>
@@ -3046,6 +3054,19 @@
                         </div>
                     </div>
 
+                    <div id="cliente-tab-acompanantes" class="tab-content space-y-4 hidden">
+                        <div class="bg-primary-50/40 border border-primary-100/60 p-4 rounded-xl text-xs text-primary-900 flex items-start shadow-sm mb-3">
+                            <i class="ph ph-users-three text-lg mr-2 mt-0.5 text-primary-600"></i>
+                            <div>
+                                <p class="leading-relaxed"><strong>Registro de Acompañantes</strong><br>
+                                Ingresa la información para cada viajero del grupo. Cada uno se guardará como reserva asociada al titular.</p>
+                            </div>
+                        </div>
+                        <div id="cf-acompanantes-container" class="space-y-4">
+                            <!-- Rendered dynamically based on cf-pax -->
+                        </div>
+                    </div>
+
                     <div id="cliente-tab-provs" class="tab-content space-y-5">
                         <div class="bg-white p-6 rounded-[2rem] border border-slate-200/60 shadow-soft">
                             <div class="flex items-start mb-4 text-slate-600">
@@ -3124,7 +3145,7 @@
                                 class="text-sm font-black text-slate-800 mb-4 flex items-center uppercase tracking-widest">
                                 <i class="ph ph-wallet mr-2 text-primary-600 text-lg"></i> Capital Inicial
                             </h4>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                                 <div>
                                     <label
                                         class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Condición
@@ -3158,6 +3179,14 @@
                                         <option value="Addi">Addi</option>
                                     </select>
                                 </div>
+                                <div id="div-abono-destinatario-new" class="hidden">
+                                    <label
+                                        class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Aplicar abono a:</label>
+                                    <select id="cf-abono-destinatario"
+                                        class="w-full border border-slate-200/60 bg-slate-50/50 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer transition-all shadow-sm">
+                                        <option value="grupo">Todo el grupo (Dividir equitativamente)</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
@@ -3175,6 +3204,10 @@
                                             min="1"
                                             class="currency-input w-full pl-10 pr-4 py-3 border border-emerald-200 rounded-xl text-sm font-black text-slate-800 bg-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-sm">
                                     </div>
+                                    <select id="cf-abono-live-destinatario"
+                                        class="w-full sm:w-1/4 border border-emerald-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-sm hidden">
+                                        <option value="grupo">Todo el grupo (Dividir)</option>
+                                    </select>
                                     <select id="cf-abono-live-metodo"
                                         class="w-full sm:w-1/4 border border-emerald-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-sm">
                                         <option value="Transferencia">Transferencia</option>
@@ -3323,6 +3356,71 @@
                 </div>
             </div>
             <div class="flex-1 overflow-y-auto custom-scrollbar" id="cdm-body">
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Transferencia de Saldo -->
+    <div id="client-transfer-modal" class="fixed inset-0 z-[90] hidden flex items-center justify-center p-2 md:p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"
+            id="ctm-bg" data-action="close-client-transfer"></div>
+        <div class="bg-white/95 backdrop-blur-2xl border border-white rounded-[2rem] shadow-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 relative z-10 flex flex-col max-h-[95vh] md:max-h-[90vh]"
+            id="ctm-content">
+
+            <div class="px-6 py-5 border-b border-slate-100/50 flex justify-between items-center bg-transparent shrink-0">
+                <h3 class="text-xl font-black text-slate-800 flex items-center tracking-tight">
+                    <i class="ph ph-arrows-left-right text-slate-400 mr-3 text-2xl"></i> Transferencia de Saldo
+                </h3>
+                <button type="button" data-action="close-client-transfer"
+                    class="text-slate-400 hover:bg-slate-100 hover:text-slate-900 p-2 rounded-full transition-colors"><i
+                        class="ph ph-x text-lg"></i></button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Origen (Pasajero a Cancelar/Retirar)</label>
+                    <input type="text" id="ctm-origen-nombre" readonly
+                        class="w-full border border-slate-200 bg-slate-100 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 outline-none">
+                    <input type="hidden" id="ctm-origen-id">
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo Abonado Disponible</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                        <input type="text" id="ctm-origen-saldo-display" readonly
+                            class="w-full pl-8 pr-3 py-2 border border-slate-200 bg-slate-100 rounded-xl text-xs font-black text-slate-600 outline-none">
+                        <input type="hidden" id="ctm-origen-saldo">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Monto a Transferir *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                        <input type="text" id="ctm-monto" required inputmode="numeric" placeholder="Ej: 200.000"
+                            class="currency-input w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 transition-all shadow-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Destinatario *</label>
+                    <select id="ctm-destinatario" required
+                        class="w-full border border-slate-200 bg-slate-50/50 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer transition-all shadow-sm">
+                        <option value="grupo">Dividir equitativamente entre los que sí viajan</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="p-5 border-t border-slate-100/50 bg-white rounded-b-[2rem] flex justify-end space-x-3 shrink-0 relative z-10">
+                <button type="button" data-action="close-client-transfer"
+                    class="px-4 py-3 rounded-2xl font-bold text-slate-500 bg-slate-50 border border-slate-200/60 hover:bg-slate-100 hover:text-slate-900 transition-colors focus:outline-none shadow-sm flex items-center">
+                    Cancelar
+                </button>
+                <button type="button" id="ctm-confirm-btn"
+                    class="px-6 py-3 rounded-2xl font-black text-white bg-slate-900 hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition-all flex items-center focus:outline-none hover:-translate-y-0.5 uppercase tracking-widest text-[10px]">
+                    <i class="ph ph-swap mr-2 text-base"></i> Transferir Saldo
+                </button>
             </div>
         </div>
     </div>
@@ -5090,6 +5188,108 @@
                 <button type="button" onclick="UI.closeModal('modal-quick-client', 'mqc-bg', 'mqc-content')" class="flex-1 px-4 py-3.5 rounded-xl font-bold text-slate-500 bg-white hover:bg-slate-100 border border-slate-200/60 transition-all text-xs">Cancelar</button>
                 <button type="submit" form="quick-client-form" id="btn-save-quick-client" class="flex-[2] bg-indigo-600 text-white font-black px-4 py-3.5 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all flex items-center justify-center uppercase tracking-widest text-[10px]">
                     <i class="ph ph-floppy-disk mr-2 text-lg"></i> Registrar en CRM
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TRANSFERENCIA DE SALDO -->
+    <div id="client-transfer-modal" class="fixed inset-0 z-[120] hidden flex items-center justify-center p-2 md:p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"
+            id="ctf-bg" data-action="close-client-transfer"></div>
+        <div class="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 z-10 overflow-hidden modal-mobile-safe flex flex-col max-h-[90vh]"
+            id="ctf-content">
+            <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div>
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center">
+                        <i class="ph ph-hand-coins mr-2 text-indigo-500 text-lg"></i> Transferencia de Saldo
+                    </h3>
+                    <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Transferir fondos entre miembros del grupo</p>
+                </div>
+                <button type="button" data-action="close-client-transfer" class="text-slate-400 hover:text-slate-900 p-1.5 rounded-lg transition-all hover:bg-slate-100">
+                    <i class="ph ph-x text-base"></i>
+                </button>
+            </div>
+            
+            <form id="client-transfer-form" class="p-5 space-y-4">
+                <input type="hidden" id="ctf-origen-id">
+                
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Origen (Pasajero)</label>
+                    <input type="text" id="ctf-origen-nombre" readonly class="w-full text-xs font-bold bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 outline-none text-slate-600 cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Saldo Abonado Disponible</label>
+                    <input type="text" id="ctf-origen-saldo" readonly class="w-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl px-3 py-2 outline-none cursor-not-allowed">
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Monto a Transferir (COP) *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">$</span>
+                        <input type="text" id="ctf-monto" required min="1" inputmode="numeric" class="currency-input w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-xl pl-6 pr-3 py-2 outline-none focus:ring-2 focus:ring-slate-900" placeholder="0">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Destinatario *</label>
+                    <select id="ctf-destinatario" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer text-slate-700">
+                        <!-- Cargar dinámicamente -->
+                    </select>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" data-action="close-client-transfer" class="flex-1 border border-slate-200 text-slate-500 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 hover:text-slate-700 transition-all">Cancelar</button>
+                    <button type="submit" id="btn-execute-transfer" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL UNIR EN GRUPO -->
+    <div id="client-merge-modal" class="fixed inset-0 z-[120] hidden flex items-center justify-center p-2 md:p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300"
+            id="cmg-bg" data-action="close-client-merge"></div>
+        <div class="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-300 z-10 overflow-hidden modal-mobile-safe flex flex-col max-h-[90vh]"
+            id="cmg-content">
+            <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div>
+                    <h3 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center">
+                        <i class="ph ph-users-three mr-2 text-indigo-500 text-lg"></i> Unir Reservas en Grupo
+                    </h3>
+                    <p class="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Crear un grupo a partir de reservas individuales</p>
+                </div>
+                <button type="button" data-action="close-client-merge" class="text-slate-400 hover:text-slate-900 p-1.5 rounded-lg transition-all hover:bg-slate-100">
+                    <i class="ph ph-x text-base"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto flex-1 custom-scrollbar space-y-4 bg-white">
+                <div class="bg-amber-50 border border-amber-100 text-amber-900 p-3.5 rounded-xl text-[11px] font-medium leading-relaxed">
+                    <i class="ph ph-warning-circle text-base text-amber-600 mr-1.5 align-middle"></i>
+                    <strong>¡Atención!</strong> Al unir las reservas, todos los pasajeros seleccionados formarán parte del grupo del <strong>Titular</strong>. Su plan, fecha de viaje, estado y precio se sincronizarán con los del Titular.
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-2">Selecciona al Titular del Grupo *</label>
+                    <div id="cmg-titular-list" class="space-y-2 max-h-[200px] overflow-y-auto p-1 border border-slate-100 rounded-xl bg-slate-50/30">
+                        <!-- Cargar dinámicamente -->
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1">Acompañantes que se unirán</label>
+                    <div id="cmg-companions-list" class="text-xs font-semibold text-slate-600 space-y-1.5 pl-1">
+                        <!-- Mostrar dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-5 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0">
+                <button type="button" data-action="close-client-merge" class="flex-1 border border-slate-200 text-slate-500 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white hover:bg-slate-50 hover:text-slate-700 transition-all">Cancelar</button>
+                <button type="button" id="btn-execute-merge" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5">
+                    <i class="ph ph-users-three text-sm"></i> Unir en Grupo
                 </button>
             </div>
         </div>

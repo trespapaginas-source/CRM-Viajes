@@ -342,7 +342,24 @@ export const DataService = {
                     }
                 }
 
-                resultadoDB = await supabaseClient.from('clientes').update(datosMapeados).eq('id', id);
+                resultadoDB = await supabaseClient.from('clientes').update(datosMapeados).eq('id', id).select();
+
+                // PROPAGACIÓN GRUPAL: Si es titular y actualiza campos compartidos, propagarlos a acompañantes
+                const companions = this.clientes.filter(c => c.parent_id === id && !c.deleted_at);
+                if (companions.length > 0) {
+                    const camposCompartidos = {};
+                    if (datosMapeados.plan_id !== undefined) camposCompartidos.plan_id = datosMapeados.plan_id;
+                    if (datosMapeados.fecha_viaje !== undefined) camposCompartidos.fecha_viaje = datosMapeados.fecha_viaje;
+                    if (datosMapeados.estado !== undefined) camposCompartidos.estado = datosMapeados.estado;
+                    if (datosMapeados.etiqueta !== undefined) camposCompartidos.etiqueta = datosMapeados.etiqueta;
+                    if (datosMapeados.costo_base !== undefined) camposCompartidos.costo_base = datosMapeados.costo_base;
+                    if (datosMapeados.proveedores_vinculados !== undefined) camposCompartidos.proveedores_vinculados = datosMapeados.proveedores_vinculados;
+
+                    if (Object.keys(camposCompartidos).length > 0) {
+                        const resUpdateComps = await supabaseClient.from('clientes').update(camposCompartidos).eq('parent_id', id);
+                        if (resUpdateComps.error) console.warn("Error propagando campos del grupo a acompañantes:", resUpdateComps.error);
+                    }
+                }
             }
             if (resultadoDB.error) throw resultadoDB.error;
             await this.loadAll();
@@ -360,61 +377,158 @@ export const DataService = {
             delete datosParaGuardar.id;
             if (!datosParaGuardar.estado_pago) datosParaGuardar.estado_pago = 'confirmed';
 
-            const posiblesDuplicados = this.abonos.filter(a =>
-                a.cliente_id === datosParaGuardar.cliente_id &&
-                Number(a.monto) === Number(datosParaGuardar.monto) &&
-                a.metodo === datosParaGuardar.metodo
-            );
+            // 1. Verificar si se especificó un destinatario individual del grupo
+            const destId = datosParaGuardar.destinatario_id;
+            delete datosParaGuardar.destinatario_id; // eliminar del payload de Supabase
 
-            if (posiblesDuplicados.length > 0) {
-                const diffMin = (new Date() - new Date(posiblesDuplicados[posiblesDuplicados.length - 1].created_at || new Date())) / 1000 / 60;
-                if (diffMin < 2) {
-                    await this.registrarHistorial(
-                        datosParaGuardar.cliente_id, 
-                        'Alerta Antifraude: Intento de Abono Duplicado', 
-                        'N/A', 
-                        `Monto: $${datosParaGuardar.monto} | Método: ${datosParaGuardar.metodo}`, 
-                        'SEGURIDAD', 
-                        { intento_por: datosParaGuardar.usuario_email || 'Staff' }
-                    );
-                    window.UI.showToast('Abono idéntico detectado hace menos de 2 minutos. Bloqueado por seguridad anti-duplicados.', 'error');
-                    throw new Error("DUPLICATE_PAYMENT");
-                }
+            const isIndividual = destId && destId !== 'grupo' && destId !== datosParaGuardar.cliente_id;
+            const targetClientId = isIndividual ? destId : datosParaGuardar.cliente_id;
+
+            // Si es individual, reasignar el cliente_id al destinatario específico
+            if (isIndividual) {
+                datosParaGuardar.cliente_id = targetClientId;
             }
 
-            let resAbono = await supabaseClient.from('abonos').insert([datosParaGuardar]);
+            // 2. Si no es el abono directo individual, verificar si es un abono grupal para distribuir
+            const companions = (!isIndividual && destId !== datosParaGuardar.cliente_id)
+                ? this.clientes.filter(c => c.parent_id === datosParaGuardar.cliente_id && !c.deleted_at)
+                : [];
 
-            if (resAbono.error && (resAbono.error.code === '42703' || String(resAbono.error.message).includes('column'))) {
-                console.warn("Ejecutando Fallback Seguro: columnas de auditoría no existen. Guardando en modo compatible.");
-                const fallbackData = {
+            if (companions.length > 0) {
+                // DISTRIBUCIÓN GRUPAL EQUITATIVA
+                const totalIntegrantes = companions.length + 1;
+                const splitAmount = Math.floor(datosParaGuardar.monto / totalIntegrantes);
+
+                // Validar duplicados para el titular con el monto dividido
+                const posiblesDuplicados = this.abonos.filter(a =>
+                    a.cliente_id === datosParaGuardar.cliente_id &&
+                    Number(a.monto) === splitAmount &&
+                    a.metodo === datosParaGuardar.metodo
+                );
+
+                if (posiblesDuplicados.length > 0 && splitAmount > 0) {
+                    const diffMin = (new Date() - new Date(posiblesDuplicados[posiblesDuplicados.length - 1].created_at || new Date())) / 1000 / 60;
+                    if (diffMin < 2) {
+                        await this.registrarHistorial(
+                            datosParaGuardar.cliente_id, 
+                            'Alerta Antifraude: Intento de Abono Duplicado (Grupal)', 
+                            'N/A', 
+                            `Monto: $${splitAmount} | Método: ${datosParaGuardar.metodo}`, 
+                            'SEGURIDAD', 
+                            { intento_por: datosParaGuardar.usuario_email || 'Staff' }
+                        );
+                        window.UI.showToast('Abono idéntico detectado hace menos de 2 minutos. Bloqueado por seguridad anti-duplicados.', 'error');
+                        throw new Error("DUPLICATE_PAYMENT");
+                      }
+                }
+
+                // Insertar abono padre (Titular)
+                const parentPayload = {
                     cliente_id: datosParaGuardar.cliente_id,
-                    monto: datosParaGuardar.monto,
-                    metodo: datosParaGuardar.metodo
+                    monto: splitAmount,
+                    metodo: datosParaGuardar.metodo,
+                    estado_pago: datosParaGuardar.estado_pago,
+                    usuario_email: datosParaGuardar.usuario_email || 'Staff'
                 };
-                resAbono = await supabaseClient.from('abonos').insert([fallbackData]);
-                if (!resAbono.error) {
-                    window.UI.showToast("Pago guardado (Modo Compatibilidad). Se recomienda actualizar la BD.", "info");
+                const resParent = await supabaseClient.from('abonos').insert([parentPayload]).select();
+                if (resParent.error) throw resParent.error;
+
+                const parentId = resParent.data[0].id;
+                await this.registrarHistorial(
+                    datosParaGuardar.cliente_id,
+                    'Registro de Abono Principal (Grupal)',
+                    'N/A',
+                    `Abono de $${splitAmount} (Total: $${datosParaGuardar.monto}) vía ${datosParaGuardar.metodo}`,
+                    'CREACION'
+                );
+
+                // Insertar abonos hijos (Acompañantes) en lote (batch)
+                const childrenPayloads = companions.map(comp => ({
+                    cliente_id: comp.id,
+                    monto: splitAmount,
+                    metodo: datosParaGuardar.metodo,
+                    estado_pago: datosParaGuardar.estado_pago,
+                    usuario_email: datosParaGuardar.usuario_email || 'Staff',
+                    parent_abono_id: parentId
+                }));
+
+                const resChildren = await supabaseClient.from('abonos').insert(childrenPayloads);
+                if (resChildren.error) throw resChildren.error;
+
+                for (const comp of companions) {
                     await this.registrarHistorial(
-                        datosParaGuardar.cliente_id,
-                        'Registro de Abono (Modo Compatibilidad)',
+                        comp.id,
+                        'Registro de Abono Hijo (Distribución Grupal)',
+                        'N/A',
+                        `Abono recibido de $${splitAmount} (Origen: Titular)`,
+                        'CREACION'
+                    );
+                }
+
+                await this.loadAll();
+                await this.recalculateClientBalances(datosParaGuardar.cliente_id);
+                for (const comp of companions) {
+                    await this.recalculateClientBalances(comp.id);
+                }
+            } else {
+                // ABONO INDIVIDUAL NORMAL (O Directo a un integrante)
+                // Permitir montos negativos (para transferencias de saldos)
+                const posiblesDuplicados = this.abonos.filter(a =>
+                    a.cliente_id === targetClientId &&
+                    Number(a.monto) === Number(datosParaGuardar.monto) &&
+                    a.metodo === datosParaGuardar.metodo
+                );
+
+                if (posiblesDuplicados.length > 0 && datosParaGuardar.monto > 0) {
+                    const diffMin = (new Date() - new Date(posiblesDuplicados[posiblesDuplicados.length - 1].created_at || new Date())) / 1000 / 60;
+                    if (diffMin < 2) {
+                        await this.registrarHistorial(
+                            targetClientId, 
+                            'Alerta Antifraude: Intento de Abono Duplicado', 
+                            'N/A', 
+                            `Monto: $${datosParaGuardar.monto} | Método: ${datosParaGuardar.metodo}`, 
+                            'SEGURIDAD', 
+                            { intento_por: datosParaGuardar.usuario_email || 'Staff' }
+                        );
+                        window.UI.showToast('Abono idéntico detectado hace menos de 2 minutos. Bloqueado por seguridad anti-duplicados.', 'error');
+                        throw new Error("DUPLICATE_PAYMENT");
+                    }
+                }
+
+                let resAbono = await supabaseClient.from('abonos').insert([datosParaGuardar]);
+
+                if (resAbono.error && (resAbono.error.code === '42703' || String(resAbono.error.message).includes('column'))) {
+                    console.warn("Ejecutando Fallback Seguro: columnas de auditoría no existen. Guardando en modo compatible.");
+                    const fallbackData = {
+                        cliente_id: targetClientId,
+                        monto: datosParaGuardar.monto,
+                        metodo: datosParaGuardar.metodo
+                    };
+                    resAbono = await supabaseClient.from('abonos').insert([fallbackData]);
+                    if (!resAbono.error) {
+                        window.UI.showToast("Pago guardado (Modo Compatibilidad). Se recomienda actualizar la BD.", "info");
+                        await this.registrarHistorial(
+                            targetClientId,
+                            'Registro de Abono (Modo Compatibilidad)',
+                            'N/A',
+                            `Abono de $${datosParaGuardar.monto} vía ${datosParaGuardar.metodo}`,
+                            'CREACION'
+                        );
+                    }
+                } else if (!resAbono.error) {
+                    await this.registrarHistorial(
+                        targetClientId,
+                        'Registro de Abono',
                         'N/A',
                         `Abono de $${datosParaGuardar.monto} vía ${datosParaGuardar.metodo}`,
                         'CREACION'
                     );
                 }
-            } else if (!resAbono.error) {
-                await this.registrarHistorial(
-                    datosParaGuardar.cliente_id,
-                    'Registro de Abono',
-                    'N/A',
-                    `Abono de $${datosParaGuardar.monto} vía ${datosParaGuardar.metodo}`,
-                    'CREACION'
-                );
-            }
 
-            if (resAbono.error) throw resAbono.error;
-            await this.loadAll();
-            await this.recalculateClientBalances(datosParaGuardar.cliente_id);
+                if (resAbono.error) throw resAbono.error;
+                await this.loadAll();
+                await this.recalculateClientBalances(targetClientId);
+            }
         } catch (e) { throw e; }
     },
 
@@ -449,8 +563,23 @@ export const DataService = {
                 res = await supabaseClient.from('abonos').update({ monto: nuevoMonto }).eq('id', abonoId);
             }
             if (res.error) throw res.error;
+
+            // PROPAGACIÓN: Si es un abono principal con abonos hijos vinculados
+            const { error: childError } = await supabaseClient
+                .from('abonos')
+                .update({ monto: nuevoMonto, estado_pago: status })
+                .eq('parent_abono_id', abonoId);
+            
+            if (childError) console.warn("Error propagando cambios a abonos hijos:", childError);
+
             await this.loadAll();
             await this.recalculateClientBalances(clienteId);
+
+            // Recalcular acompañantes si aplica
+            const children = this.abonos.filter(a => a.parent_abono_id === abonoId);
+            for (const child of children) {
+                await this.recalculateClientBalances(child.cliente_id);
+            }
         } catch (e) { throw e; }
     },
 
@@ -516,7 +645,282 @@ export const DataService = {
         await this.registrarHistorial(id, 'Eliminación (Soft Delete)', `Reserva de ${desc}`, `Movida a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { motivo_eliminacion: motivo });
         const { error } = await supabaseClient.from('clientes').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
         if (error) throw error;
+
+        // Si es titular, borrar acompañantes en cascada
+        const companions = this.clientes.filter(c => c.parent_id === id && !c.deleted_at);
+        if (companions.length > 0) {
+            const compIds = companions.map(c => c.id);
+            const { error: compError } = await supabaseClient.from('clientes')
+                .update({ 
+                    deleted_at: new Date().toISOString(), 
+                    deleted_by: user, 
+                    motivo_eliminacion: `Eliminación en cascada por Titular. Motivo original: ${motivo}` 
+                })
+                .in('id', compIds);
+            if (compError) console.warn("Error borrando acompañantes en cascada:", compError);
+            
+            for (const comp of companions) {
+                await this.registrarHistorial(
+                    comp.id, 
+                    'Eliminación en cascada', 
+                    `Acompañante de ${desc}`, 
+                    `Eliminado por cascada al borrar Titular. Motivo: ${motivo}`, 
+                    'ELIMINACION', 
+                    { motivo_eliminacion: motivo }
+                );
+            }
+        }
+
+        // Si es acompañante, restar 1 al Pax del Titular
+        if (clienteActual && clienteActual.parent_id) {
+            const titular = this.clientes.find(c => c.id === clienteActual.parent_id);
+            if (titular) {
+                const newPax = Math.max(1, (titular.pax || 1) - 1);
+                const { error: titularError } = await supabaseClient.from('clientes')
+                    .update({ pax: newPax })
+                    .eq('id', titular.id);
+                if (titularError) console.warn("Error decrementando Pax del titular:", titularError);
+                
+                await this.registrarHistorial(
+                    titular.id, 
+                    'Pax Decrementado', 
+                    `${titular.pax}`, 
+                    `${newPax}`, 
+                    'MODIFICACION', 
+                    { detalle: `Acompañante ${desc} eliminado` }
+                );
+            }
+        }
+
         await this.loadAll();
+    },
+    async transferirSaldoGrupo(origenId, destinosIds, monto) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Staff';
+            const origenCli = this.clientes.find(c => c.id === origenId);
+            const origenNombre = origenCli ? `${origenCli.nombre} ${origenCli.apellido}` : 'Pasajero';
+
+            // 1. Obtener nombres de destinatarios para registrar descripción en el origen
+            const destinosClis = destinosIds.map(id => this.clientes.find(c => c.id === id)).filter(Boolean);
+            const destinosNombres = destinosClis.map(c => `${c.nombre} ${c.apellido}`).join(', ');
+
+            // 2. Insertar abono negativo en el origen
+            const origenPayload = {
+                cliente_id: origenId,
+                monto: -monto,
+                metodo: `Transferencia de Saldo (Salida) hacia ${destinosNombres}`,
+                estado_pago: 'confirmed',
+                usuario_email: user
+            };
+            const { error: errorOrigen } = await supabaseClient.from('abonos').insert([origenPayload]);
+            if (errorOrigen) throw errorOrigen;
+
+            await this.registrarHistorial(
+                origenId,
+                'Transferencia de Saldo (Salida)',
+                'N/A',
+                `Salida de $${monto} hacia ${destinosNombres}`,
+                'MODIFICACION'
+            );
+
+            // 3. Insertar abono positivo (o abonos divididos) en el o los destinos
+            const splitAmount = Math.floor(monto / destinosIds.length);
+            const childrenPayloads = destinosIds.map(destId => ({
+                cliente_id: destId,
+                monto: splitAmount,
+                metodo: `Transferencia de Saldo (Ingreso) recibido de ${origenNombre}`,
+                estado_pago: 'confirmed',
+                usuario_email: user
+            }));
+
+            const { error: errorDestinos } = await supabaseClient.from('abonos').insert(childrenPayloads);
+            if (errorDestinos) throw errorDestinos;
+
+            for (const destId of destinosIds) {
+                await this.registrarHistorial(
+                    destId,
+                    'Transferencia de Saldo (Ingreso)',
+                    'N/A',
+                    `Ingreso de $${splitAmount} recibido de ${origenNombre}`,
+                    'MODIFICACION'
+                );
+            }
+
+            await this.loadAll();
+        } catch (e) {
+            console.error("Error en transferirSaldoGrupo:", e);
+            throw e;
+        }
+    },
+    async unirClientesEnGrupo(titularId, companerosIds) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Staff';
+            const titular = this.clientes.find(c => c.id === titularId);
+            if (!titular) throw new Error("Titular no encontrado");
+
+            // 1. Obtener y aplanar acompañantes de subgrupos si los seleccionados eran titular
+            const allCompsToUpdate = new Set(companerosIds);
+            for (const compId of companerosIds) {
+                const subCompanions = this.clientes.filter(c => c.parent_id === compId && !c.deleted_at);
+                subCompanions.forEach(sc => allCompsToUpdate.add(sc.id));
+            }
+            const finalCompanerosIds = Array.from(allCompsToUpdate);
+
+            // Identificar los antiguos titulares de los clientes que se mueven
+            const oldTitularesIds = new Set();
+            for (const compId of finalCompanerosIds) {
+                const comp = this.clientes.find(c => c.id === compId);
+                if (comp && comp.parent_id && comp.parent_id !== titularId) {
+                    oldTitularesIds.add(comp.parent_id);
+                }
+            }
+
+            // 2. Calcular nuevo pax para el titular
+            const existingCompanionsCount = this.clientes.filter(c => c.parent_id === titularId && !c.deleted_at && !finalCompanerosIds.includes(c.id)).length;
+            const nuevoPax = 1 + existingCompanionsCount + finalCompanerosIds.length;
+
+            // 3. Actualizar el titular en la base de datos (pax)
+            const { error: errorTitular } = await supabaseClient.from('clientes')
+                .update({ pax: nuevoPax })
+                .eq('id', titularId);
+            
+            if (errorTitular) throw errorTitular;
+
+            await this.registrarHistorial(
+                titularId,
+                'Unión de Grupo (Titular)',
+                `${titular.pax || 1}`,
+                `${nuevoPax}`,
+                'MODIFICACION',
+                { detalle: `Se agregaron acompañantes. Nuevo Pax total: ${nuevoPax}` }
+            );
+
+            // 4. Actualizar a cada acompañante
+            for (const compId of finalCompanerosIds) {
+                const comp = this.clientes.find(c => c.id === compId);
+                const precioAnterior = comp ? comp.precio_total : 0;
+                
+                const { error: errorComp } = await supabaseClient.from('clientes')
+                    .update({
+                        parent_id: titularId,
+                        plan_id: titular.plan_id,
+                        fecha_viaje: titular.fecha_viaje,
+                        estado: titular.estado,
+                        etiqueta: titular.etiqueta,
+                        costo_base: titular.costo_base,
+                        precio_total: titular.precio_total,
+                        proveedores_vinculados: titular.proveedores_vinculados,
+                        pax: 1
+                    })
+                    .eq('id', compId);
+
+                if (errorComp) throw errorComp;
+
+                await this.registrarHistorial(
+                    compId,
+                    'Unión de Grupo (Acompañante)',
+                    `Individual (Precio: ${precioAnterior})`,
+                    `Acompañante de ${titular.nombre} ${titular.apellido} (Precio: ${titular.precio_total})`,
+                    'MODIFICACION',
+                    { parent_id: titularId }
+                );
+            }
+
+            // Recalcular pax de los antiguos titulares
+            for (const oldTitId of oldTitularesIds) {
+                const remainingComps = this.clientes.filter(c => c.parent_id === oldTitId && !c.deleted_at && !finalCompanerosIds.includes(c.id));
+                const oldTit = this.clientes.find(c => c.id === oldTitId);
+                const oldNewPax = 1 + remainingComps.length;
+                if (oldTit && oldTit.pax !== oldNewPax) {
+                    await supabaseClient.from('clientes').update({ pax: oldNewPax }).eq('id', oldTitId);
+                    await this.registrarHistorial(
+                        oldTitId,
+                        'Pax Reducido (Unión de Grupo)',
+                        `${oldTit.pax}`,
+                        `${oldNewPax}`,
+                        'MODIFICACION',
+                        { detalle: `Un acompañante se unió a otro grupo.` }
+                    );
+                }
+            }
+
+            await this.loadAll();
+
+            // 5. Recalcular saldos de forma contable para todos
+            await this.recalculateClientBalances(titularId);
+            for (const compId of finalCompanerosIds) {
+                await this.recalculateClientBalances(compId);
+            }
+            for (const oldTitId of oldTitularesIds) {
+                await this.recalculateClientBalances(oldTitId);
+            }
+        } catch (e) {
+            console.error("Error en unirClientesEnGrupo:", e);
+            throw e;
+        }
+    },
+    async desagruparClienteDeGrupo(companionId) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Staff';
+            const companion = this.clientes.find(c => c.id === companionId);
+            if (!companion || !companion.parent_id) throw new Error("Acompañante no válido");
+
+            const titularId = companion.parent_id;
+            const titular = this.clientes.find(c => c.id === titularId);
+
+            // 1. Quitar parent_id y fijar pax en 1
+            const { error: errorComp } = await supabaseClient.from('clientes')
+                .update({ parent_id: null, pax: 1 })
+                .eq('id', companionId);
+            
+            if (errorComp) throw errorComp;
+
+            await this.registrarHistorial(
+                companionId,
+                'Separación de Grupo (Independiente)',
+                `Acompañante de ${titular ? titular.nombre : titularId}`,
+                'Reserva Individual Independiente',
+                'MODIFICACION',
+                { parent_id_previo: titularId }
+            );
+
+            // 2. Desvincular abonos de tipo "Pago Grupal" del acompañante para hacerlos independientes
+            const { error: errorAbonos } = await supabaseClient.from('abonos')
+                .update({ parent_abono_id: null })
+                .eq('cliente_id', companionId)
+                .is('deleted_at', null);
+
+            if (errorAbonos) console.warn("Error desvinculando abonos del acompañante:", errorAbonos);
+
+            // 3. Decrementar pax del titular
+            if (titular) {
+                const remainingComps = this.clientes.filter(c => c.parent_id === titularId && !c.deleted_at && c.id !== companionId);
+                const nuevoPax = 1 + remainingComps.length;
+                const { error: errorTitular } = await supabaseClient.from('clientes')
+                    .update({ pax: nuevoPax })
+                    .eq('id', titularId);
+                
+                if (errorTitular) throw errorTitular;
+
+                await this.registrarHistorial(
+                    titularId,
+                    'Acompañante Separado (Reducción Pax)',
+                    `${titular.pax}`,
+                    `${nuevoPax}`,
+                    'MODIFICACION',
+                    { detalle: `Acompañante ${companion.nombre} ${companion.apellido} separado.` }
+                );
+            }
+
+            await this.loadAll();
+
+            // 4. Recalcular balances
+            await this.recalculateClientBalances(companionId);
+            await this.recalculateClientBalances(titularId);
+        } catch (e) {
+            console.error("Error en desagruparClienteDeGrupo:", e);
+            throw e;
+        }
     },
     async deleteProveedor(id, motivo) {
         const user = window.AuthModule?.currentUser?.email || 'Desconocido';

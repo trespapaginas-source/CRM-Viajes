@@ -28,6 +28,7 @@ import { SearchModule }          from './modules/search.module.js';
 import { DocumentosComponent } from '../src/components/documentos/documentos.component.js';
 import { TrazabilidadComponent } from '../src/components/trazabilidad/trazabilidad.component.js';
 import { PlanesComponent }       from '../src/components/planes/planes.component.js';
+import { ClientsComponent }      from '../src/components/clients/clients.component.js';
 
 // ════════════════════════════════════════════════════════════
 // PUENTE GLOBAL — Necesario para onclick="" del HTML
@@ -62,6 +63,7 @@ window.SearchModule       = SearchModule;
 window.DocumentosComponent = DocumentosComponent;
 window.TrazabilidadComponent = TrazabilidadComponent;
 window.PlanesComponent     = PlanesComponent;
+window.ClientsComponent    = ClientsComponent;
 
 // ════════════════════════════════════════════════════════════
 // ARRANQUE DEL SISTEMA
