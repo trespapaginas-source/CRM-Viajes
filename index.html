@@ -3,6 +3,64 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        function showVisualError(errMessage, errStack) {
+            const errDiv = document.getElementById('loader-error');
+            const loaderText = document.getElementById('loader-text');
+            const spinner = document.querySelector('#global-loader .spinner');
+            if (errDiv) {
+                errDiv.innerHTML = `
+                    <div class="font-bold mb-1"><i class="ph ph-warning-circle mr-1"></i>Error detectado:</div>
+                    <div class="font-mono text-[10px] break-all leading-normal select-all bg-slate-950 p-2.5 rounded-lg text-rose-400 border border-slate-800">${errMessage}</div>
+                    ${errStack ? `<div class="mt-2 text-[9px] text-slate-400 select-all font-mono leading-normal max-h-[150px] overflow-y-auto bg-slate-950 p-2.5 rounded-lg border border-slate-800">${errStack}</div>` : ''}
+                `;
+                errDiv.classList.remove('hidden');
+            }
+            if (loaderText) {
+                loaderText.innerText = "Error de inicialización.";
+                loaderText.className = "text-rose-400 text-sm mt-2 font-black";
+            }
+            if (spinner) {
+                spinner.className = "mb-2 w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full";
+            }
+        }
+
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errStack = error ? error.stack : '';
+            const msg = `${message} (${source}:${lineno}:${colno})`;
+            showVisualError(msg, errStack);
+            
+            const errInfo = {
+                type: 'onerror',
+                message: message,
+                source: source,
+                lineno: lineno,
+                colno: colno,
+                stack: errStack
+            };
+            fetch('/log-error', {
+                method: 'POST',
+                body: JSON.stringify(errInfo),
+                headers: { 'Content-Type': 'application/json' }
+            });
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            const errStack = event.reason ? event.reason.stack : '';
+            const msg = 'Unhandled Rejection: ' + event.reason;
+            showVisualError(msg, errStack);
+
+            const errInfo = {
+                type: 'unhandledrejection',
+                message: msg,
+                stack: errStack
+            };
+            fetch('/log-error', {
+                method: 'POST',
+                body: JSON.stringify(errInfo),
+                headers: { 'Content-Type': 'application/json' }
+            });
+        });
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vive Travel CRM | Gestión Turística</title>
 
@@ -68,10 +126,11 @@
 
     <datalist id="ciudades-list"></datalist>
 
-    <div id="global-loader" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center text-white">
-        <div class="spinner mb-2 w-10 h-10 border-4"></div>
+    <div id="global-loader" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center text-white p-4">
+        <div class="spinner mb-2 w-10 h-10 border-4 border-slate-700 border-t-white rounded-full animate-spin"></div>
         <h2 class="text-xl font-bold tracking-tight">VIVE TRAVEL CRM</h2>
         <p class="text-slate-400 text-sm mt-2" id="loader-text">Conectando base de datos...</p>
+        <div id="loader-error" class="hidden mt-4 bg-rose-950/20 border border-rose-900/30 p-4 rounded-2xl max-w-md w-full text-xs text-rose-300 font-semibold shadow-xl"></div>
     </div>
 
     <div id="login-screen" class="hidden fixed inset-0 login-bg flex flex-col items-center justify-center p-4 z-[100]">

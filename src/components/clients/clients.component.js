@@ -1285,7 +1285,7 @@ export const ClientsComponent = {
                                 <button onclick="ClientsComponent.closeDetailModal(); setTimeout(() => ClientsComponent.openDetailModal('${titular.id}'), 300)" class="text-[10px] text-indigo-600 font-bold hover:underline flex items-center">
                                     <i class="ph ph-arrow-square-out mr-1"></i> Ir al Titular
                                 </button>
-                                <button onclick="ClientsComponent.desagruparCliente('${c.id}')" class="text-[10px] text-rose-600 font-bold hover:underline flex items-center">
+                                <button onclick="ClientsComponent.desagruparCliente('${c.id}', this)" class="text-[10px] text-rose-600 font-bold hover:underline flex items-center">
                                     <i class="ph ph-user-minus mr-1"></i> Desagrupar / Separar
                                 </button>
                             </div>
@@ -1319,7 +1319,7 @@ export const ClientsComponent = {
                                 <p class="text-xs font-semibold text-slate-700">${formatCOP(compAbo)} / ${formatCOP(comp.precio_total)}</p>
                                 <p class="text-[9px] text-slate-400">Saldo: ${formatCOP(compFin.saldo)}</p>
                             </div>
-                            <button onclick="event.stopPropagation(); ClientsComponent.desagruparCliente('${comp.id}')" class="text-rose-600 hover:text-rose-800 p-1.5 rounded-lg hover:bg-rose-50 transition-all cursor-pointer" title="Desagrupar de este grupo">
+                            <button onclick="event.stopPropagation(); ClientsComponent.desagruparCliente('${comp.id}', this)" class="text-rose-600 hover:text-rose-800 p-1.5 rounded-lg hover:bg-rose-50 transition-all cursor-pointer" title="Desagrupar de este grupo">
                                 <i class="ph ph-user-minus text-base"></i>
                             </button>
                         </div>
@@ -2065,13 +2065,24 @@ export const ClientsComponent = {
         UI.closeModal('client-merge-modal', 'cmg-bg', 'cmg-content');
     },
 
-    async desagruparCliente(id) {
+    async desagruparCliente(id, btn = null) {
         const c = DataService.clientes.find(x => x.id === id);
         if (!c || !c.parent_id) return;
 
         const titular = DataService.clientes.find(x => x.id === c.parent_id);
         const name = `${c.nombre} ${c.apellido}`;
         if (!confirm(`¿Estás seguro de desagrupar a ${name}? Pasará a ser una reserva individual e independiente.`)) return;
+
+        let originalContent = '';
+        if (btn) {
+            originalContent = btn.innerHTML;
+            if (btn.classList.contains('hover:underline')) {
+                btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-1"></i> Separando...';
+            } else {
+                btn.innerHTML = '<i class="ph ph-spinner animate-spin text-sm"></i>';
+            }
+            btn.disabled = true;
+        }
 
         try {
             await DataService.desagruparClienteDeGrupo(id);
@@ -2081,6 +2092,10 @@ export const ClientsComponent = {
         } catch (e) {
             console.error(e);
             UI.showToast("Error al desagrupar al cliente.", "error");
+            if (btn) {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }
         }
     },
 

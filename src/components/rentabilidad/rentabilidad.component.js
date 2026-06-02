@@ -11,6 +11,11 @@ export const RentabilidadComponent = {
     currentTab: 'activos',
     eventsBound: false,
 
+    getClientRealPax(c) {
+        const companionsCount = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at).length;
+        return companionsCount > 0 ? 1 : parseInt(c.pax || 1);
+    },
+
     init() {
         this.populateFilters();
         this.bindEvents();
@@ -164,20 +169,20 @@ export const RentabilidadComponent = {
                 salidasMap.set(key, { plan_id: cli.plan_id, plan_nombre: plan.nombre, fecha_viaje: cli.fecha_viaje, pax_total: 0, pax_servicio: 0, ingreso_bruto: 0, ingreso_retenido: 0, clientes: [] });
             }
             const grupo = salidasMap.get(key);
-            grupo.pax_total += parseInt(cli.pax || 1);
+            grupo.pax_total += this.getClientRealPax(cli);
 
             if (st === 'devolución') {
                 const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                 const devuelto = parseFloat(cli.monto_devuelto || 0);
                 grupo.ingreso_bruto += Math.max(0, totalAbo - devuelto);
-                grupo.pax_servicio += parseInt(cli.pax || 1);
+                grupo.pax_servicio += this.getClientRealPax(cli);
             } else if (st === 'en caja') {
                 const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                 grupo.ingreso_bruto += totalAbo;
                 grupo.ingreso_retenido += totalAbo;
             } else {
                 grupo.ingreso_bruto += parseFloat(cli.precio_total || 0);
-                grupo.pax_servicio += parseInt(cli.pax || 1);
+                grupo.pax_servicio += this.getClientRealPax(cli);
             }
 
             grupo.clientes.push(cli);
@@ -225,7 +230,7 @@ export const RentabilidadComponent = {
                             : (plan.proveedores_vinculados || []);
                         cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
                     }
-                    costoOperativoBase += cCost * parseInt(c.pax || 1);
+                    costoOperativoBase += cCost * this.getClientRealPax(c);
                 }
             });
             costoTotal += costoOperativoBase;
@@ -277,7 +282,7 @@ export const RentabilidadComponent = {
         const isPastTrip = dateViajeModal && !isNaN(dateViajeModal) && dateViajeModal < todayModal;
 
         clientesSalida.forEach(c => {
-            const p = parseInt(c.pax || 1);
+            const p = this.getClientRealPax(c);
             paxTotal += p;
 
             const st = c.estado ? c.estado.toLowerCase() : '';
@@ -505,7 +510,7 @@ export const RentabilidadComponent = {
                         : (plan.proveedores_vinculados || []);
                     cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
                 }
-                costoOperativoBase += cCost * parseInt(c.pax || 1);
+                costoOperativoBase += cCost * this.getClientRealPax(c);
             }
         });
         costoTotal += costoOperativoBase;

@@ -20,6 +20,18 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+    // Handler for browser error reports
+    if (req.method === 'POST' && req.url === '/log-error') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            console.log(`\n=======================================================\n[BROWSER CLIENT ERROR]: ${body}\n=======================================================\n`);
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('ok');
+        });
+        return;
+    }
+
     // Decodificar URL para manejar espacios y caracteres especiales en las rutas
     let filePath = path.join(__dirname, decodeURIComponent(req.url));
     
@@ -34,13 +46,19 @@ const server = http.createServer((req, res) => {
     fs.readFile(filePath, (error, content) => {
         if (error) {
             if (error.code === 'ENOENT') {
+                console.log(`404: ${req.url} (File not found at: ${filePath})`);
                 res.writeHead(404, { 'Content-Type': 'text/html' });
                 res.end('<h1>404 Not Found</h1>', 'utf-8');
             } else {
+                console.log(`500: ${req.url} (Error: ${error.code})`);
                 res.writeHead(500);
                 res.end(`Error del servidor: ${error.code} ..\n`);
             }
         } else {
+            // Log successful responses for JS/CSS/HTML/JSON to avoid too much noise from images
+            if (['.html', '.js', '.css', '.json'].includes(extname)) {
+                console.log(`200: ${req.url}`);
+            }
             res.writeHead(200, { 'Content-Type': contentType });
             res.end(content, 'utf-8');
         }
