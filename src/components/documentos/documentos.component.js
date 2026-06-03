@@ -236,15 +236,21 @@ const DocumentosComponent = {
         UI.showToast("Nuevo borrador en blanco iniciado.", "info");
     },
 
-    saveActiveDocument: async function () {
+    saveActiveDocument: async function (silent = false) {
         this.onInputChanged();
         const userEmail = (window.AuthModule?.currentUser?.email || 'anonimo@agencia.com').toLowerCase();
 
         const esNvo = !this.activeDoc.id;
 
         if (esNvo) {
-            const docName = prompt("Escribe un nombre para este borrador de cotización/soporte:", `${this.activeDoc.data.cliente_nombre || 'Borrador'} - ${this.activeDoc.data.destino || 'Sin Destino'}`);
-            if (docName === null) return;
+            let docName;
+            if (silent) {
+                const titlePrefix = (this.activeDoc.data.titulo_documento || (this.activeDoc.type === 'cotizacion' ? 'Cotización' : 'Soporte')).trim();
+                docName = `${titlePrefix} - ${this.activeDoc.data.cliente_nombre || 'Borrador'} - ${this.activeDoc.data.destino || 'Sin Destino'}`;
+            } else {
+                docName = prompt("Escribe un nombre para este borrador de cotización/soporte:", `${this.activeDoc.data.cliente_nombre || 'Borrador'} - ${this.activeDoc.data.destino || 'Sin Destino'}`);
+                if (docName === null) return false;
+            }
             this.activeDoc.name = docName.trim() || `Borrador`;
 
             const payload = {
@@ -280,9 +286,11 @@ const DocumentosComponent = {
                     `Nombre: ${this.activeDoc.name} | Tipo: ${this.activeDoc.type}`,
                     'CREACION'
                 );
+                return true;
             } catch (err) {
                 console.error("Error al guardar documento:", err);
                 UI.showToast("Error al guardar el documento en la base de datos.", "error");
+                return false;
             } finally {
                 if (btn) btn.disabled = false;
             }
@@ -290,8 +298,10 @@ const DocumentosComponent = {
             // Update
             const serverDoc = (DataService.documentos_guardados || []).find(d => d.id === this.activeDoc.id);
             if (serverDoc && this.loadedDocTimestamp && new Date(serverDoc.updated_at) > new Date(this.loadedDocTimestamp)) {
-                const confirmOverwrite = confirm(`Conflicto de Concurrencia:\nEl documento "${serverDoc.nombre}" fue modificado por ${serverDoc.editado_por || serverDoc.creado_por} después de que lo abrieras.\n\n¿Deseas sobreescribir sus cambios de todos modos?`);
-                if (!confirmOverwrite) return;
+                if (!silent) {
+                    const confirmOverwrite = confirm(`Conflicto de Concurrencia:\nEl documento "${serverDoc.nombre}" fue modificado por ${serverDoc.editado_por || serverDoc.creado_por} después de que lo abrieras.\n\n¿Deseas sobreescribir sus cambios de todos modos?`);
+                    if (!confirmOverwrite) return false;
+                }
             }
 
             const payload = {
@@ -328,9 +338,11 @@ const DocumentosComponent = {
                     `Nombre: ${this.activeDoc.name} | Tipo: ${this.activeDoc.type}`,
                     'MODIFICACION'
                 );
+                return true;
             } catch (err) {
                 console.error("Error al actualizar documento:", err);
                 UI.showToast("Error al actualizar el documento en la base de datos.", "error");
+                return false;
             } finally {
                 if (btn) btn.disabled = false;
             }
@@ -1384,10 +1396,17 @@ const DocumentosComponent = {
         </div>`;
     },
 
-    exportToPDF: function () {
+    exportToPDF: async function () {
         this.onInputChanged();
         const container = document.getElementById('pdf_preview_container');
         if (!container) return;
+
+        // Auto-guardado antes de exportar
+        UI.showToast("Auto-guardando borrador antes de exportar...", "info");
+        const saved = await this.saveActiveDocument(true);
+        if (!saved) {
+            UI.showToast("La exportación a PDF continuará, pero los cambios no quedaron guardados en la base de datos.", "warning");
+        }
 
         const titlePrefix = ((this.activeDoc.data.titulo_documento || (this.activeDoc.type === 'cotizacion' ? 'Cotizacion' : 'Soporte_Pago'))).trim().replace(/\s+/g, '_');
         const filename = `${titlePrefix}_${this.activeDoc.data.cliente_nombre || 'Viaje'}_${this.activeDoc.data.destino || 'Destino'}.pdf`;
