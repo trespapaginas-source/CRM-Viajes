@@ -364,9 +364,31 @@ export const PartnersComponent = {
         }
 
         const clientSearch = document.getElementById('pvm-adelanto-cliente-search');
-        if (clientSearch) {
+        const clientDropdown = document.getElementById('pvm-adelanto-cliente-dropdown');
+
+        if (clientSearch && clientDropdown) {
+            clientSearch.addEventListener('focus', () => {
+                this.populatePassengerDropdown(clientSearch.value);
+                clientDropdown.classList.remove('hidden');
+            });
+
             clientSearch.addEventListener('input', (e) => {
                 this.populatePassengerDropdown(e.target.value);
+                clientDropdown.classList.remove('hidden');
+            });
+
+            clientSearch.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            clientDropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!clientDropdown.contains(e.target) && e.target !== clientSearch) {
+                    clientDropdown.classList.add('hidden');
+                }
             });
         }
 
@@ -2320,6 +2342,14 @@ export const PartnersComponent = {
         if (clientSearch) {
             clientSearch.value = '';
         }
+        const clientSelect = document.getElementById('pvm-adelanto-cliente-id');
+        if (clientSelect) {
+            clientSelect.value = '';
+        }
+        const clientDropdown = document.getElementById('pvm-adelanto-cliente-dropdown');
+        if (clientDropdown) {
+            clientDropdown.classList.add('hidden');
+        }
         this.populatePassengerDropdown('');
 
         const planSelect = document.getElementById('pvm-adelanto-plan-id');
@@ -2423,29 +2453,114 @@ export const PartnersComponent = {
 
     populatePassengerDropdown(filterText = '') {
         const clientSelect = document.getElementById('pvm-adelanto-cliente-id');
-        if (!clientSelect) return;
+        const dropdown = document.getElementById('pvm-adelanto-cliente-dropdown');
+        if (!clientSelect || !dropdown) return;
 
-        const currentVal = clientSelect.value;
-        clientSelect.innerHTML = '<option value="">-- Seleccionar Pasajero --</option>';
+        // Clear dropdown
+        dropdown.innerHTML = '';
 
         const activeClients = DataService.clientes.filter(c => !c.deleted_at);
-        activeClients.sort((a, b) => a.nombre.localeCompare(b.nombre));
-
         const normalizedFilter = filterText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        let matches = [];
 
         activeClients.forEach(c => {
             const plan = DataService.planes.find(p => p.id === c.plan_id);
             const planNom = plan ? plan.nombre : 'Plan Genérico';
-            const fullName = `${c.nombre} ${c.apellido}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             const planNomLower = planNom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-
-            if (!normalizedFilter || fullName.includes(normalizedFilter) || planNomLower.includes(normalizedFilter) || (c.fecha_viaje && c.fecha_viaje.includes(normalizedFilter))) {
-                clientSelect.innerHTML += `<option value="${c.id}">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)} - ${UI.sanitize(planNom)} (${c.fecha_viaje})</option>`;
+            
+            let score = 0;
+            if (normalizedFilter) {
+                score = this.getPassengerMatchScore(c, normalizedFilter, planNomLower);
+                if (score === -1) return; // Exclude
             }
+            
+            matches.push({ client: c, planNom, score });
         });
 
-        if (currentVal) {
-            clientSelect.value = currentVal;
+        // Sort: score ascending (priority), then alphabetically
+        matches.sort((a, b) => {
+            if (a.score !== b.score) {
+                return a.score - b.score;
+            }
+            return a.client.nombre.localeCompare(b.client.nombre);
+        });
+
+        // Populate hidden select options
+        clientSelect.innerHTML = '<option value="">-- Seleccionar Pasajero --</option>';
+        activeClients.forEach(c => {
+            const plan = DataService.planes.find(p => p.id === c.plan_id);
+            const planNom = plan ? plan.nombre : 'Plan Genérico';
+            clientSelect.innerHTML += `<option value="${c.id}">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)} - ${UI.sanitize(planNom)} (${c.fecha_viaje})</option>`;
+        });
+
+        if (matches.length === 0) {
+            dropdown.innerHTML = `
+                <div class="px-3 py-3 text-xs text-slate-400 font-bold text-center uppercase tracking-wider">
+                    No se encontraron resultados
+                </div>
+            `;
+        } else {
+            matches.forEach(m => {
+                const c = m.client;
+                const opt = document.createElement('div');
+                opt.className = 'w-full text-left px-3.5 py-2.5 text-xs hover:bg-slate-50 transition-colors cursor-pointer border-b border-slate-50 last:border-0 flex flex-col gap-0.5';
+                opt.innerHTML = `
+                    <span class="font-black text-slate-800">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)}</span>
+                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide truncate">${UI.sanitize(m.planNom)} (${c.fecha_viaje})</span>
+                `;
+                opt.addEventListener('click', () => {
+                    this.selectPassenger(c.id, `${c.nombre} ${c.apellido} - ${m.planNom} (${c.fecha_viaje})`);
+                });
+                dropdown.appendChild(opt);
+            });
+        }
+    },
+
+    getPassengerMatchScore(c, queryNormalized, planNomNormalized) {
+        if (!queryNormalized) return 0;
+        
+        const nombreWords = c.nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
+        const apellidoWords = (c.apellido || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/\s+/);
+        
+        if (nombreWords[0] && nombreWords[0].startsWith(queryNormalized)) return 1;
+        
+        for (let i = 1; i < nombreWords.length; i++) {
+            if (nombreWords[i] && nombreWords[i].startsWith(queryNormalized)) return 2;
+        }
+        
+        if (apellidoWords[0] && apellidoWords[0].startsWith(queryNormalized)) return 3;
+        
+        for (let i = 1; i < apellidoWords.length; i++) {
+            if (apellidoWords[i] && apellidoWords[i].startsWith(queryNormalized)) return 4;
+        }
+        
+        const fullName = `${c.nombre} ${c.apellido || ''}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (fullName.includes(queryNormalized)) return 5;
+        
+        if (planNomNormalized && planNomNormalized.includes(queryNormalized)) return 6;
+        if (c.fecha_viaje && c.fecha_viaje.includes(queryNormalized)) return 7;
+        
+        return -1;
+    },
+
+    selectPassenger(id, nameText) {
+        const clientSelect = document.getElementById('pvm-adelanto-cliente-id');
+        const clientSearch = document.getElementById('pvm-adelanto-cliente-search');
+        const dropdown = document.getElementById('pvm-adelanto-cliente-dropdown');
+
+        if (clientSelect) {
+            clientSelect.value = id;
+            const event = new Event('change', { bubbles: true });
+            clientSelect.dispatchEvent(event);
+        }
+
+        if (clientSearch) {
+            clientSearch.value = nameText;
+        }
+
+        if (dropdown) {
+            dropdown.classList.add('hidden');
         }
     },
 
@@ -2693,6 +2808,8 @@ export const PartnersComponent = {
             document.getElementById('pvm-adelanto-form').reset();
             const clientSearch = document.getElementById('pvm-adelanto-cliente-search');
             if (clientSearch) clientSearch.value = '';
+            const clientDropdown = document.getElementById('pvm-adelanto-cliente-dropdown');
+            if (clientDropdown) clientDropdown.classList.add('hidden');
             this.populatePassengerDropdown('');
             this.clearAdelantoPreview();
             this.currentAdelantoDistribute = false;
