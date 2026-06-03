@@ -2460,7 +2460,7 @@ export const PartnersComponent = {
         dropdown.innerHTML = '';
 
         const activeClients = DataService.clientes.filter(c => !c.deleted_at);
-        const normalizedFilter = filterText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const normalizedFilter = filterText.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
         let matches = [];
 
@@ -2478,13 +2478,18 @@ export const PartnersComponent = {
             matches.push({ client: c, planNom, score });
         });
 
-        // Sort: score ascending (priority), then alphabetically
+        // Sort: score ascending (priority), then alphabetically by full name
         matches.sort((a, b) => {
             if (a.score !== b.score) {
                 return a.score - b.score;
             }
-            return a.client.nombre.localeCompare(b.client.nombre);
+            const nameA = `${a.client.nombre} ${a.client.apellido || ''}`.trim();
+            const nameB = `${b.client.nombre} ${b.client.apellido || ''}`.trim();
+            return nameA.localeCompare(nameB);
         });
+
+        // Debug matches in console
+        console.log('[DEBUG-MATCHES] query:', normalizedFilter, 'results:', matches.map(m => ({ name: `${m.client.nombre} ${m.client.apellido || ''}`.trim(), score: m.score })));
 
         // Populate hidden select options
         clientSelect.innerHTML = '<option value="">-- Seleccionar Pasajero --</option>';
