@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.adelantos_operativos (
     solicitado_por TEXT NOT NULL,
     aprobado_por TEXT,
     fecha_ejecucion DATE,
+    distribuir_grupo BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ,
     deleted_by TEXT

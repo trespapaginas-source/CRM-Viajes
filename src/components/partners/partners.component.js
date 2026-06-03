@@ -13,6 +13,7 @@ export const PartnersComponent = {
     fallbackActive: false,
     fallbackGastosActive: false,
     porcentajeRetencion: 10,
+    currentAdelantoDistribute: false,
 
     getClientRealPax(c) {
         const companionsCount = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at).length;
@@ -358,6 +359,38 @@ export const PartnersComponent = {
                 if (grupGroup) {
                     if (isIndividual) grupGroup.classList.add('hidden');
                     else grupGroup.classList.remove('hidden');
+                }
+            });
+        }
+
+        const clientSearch = document.getElementById('pvm-adelanto-cliente-search');
+        if (clientSearch) {
+            clientSearch.addEventListener('input', (e) => {
+                this.populatePassengerDropdown(e.target.value);
+            });
+        }
+
+        const clientSelect = document.getElementById('pvm-adelanto-cliente-id');
+        if (clientSelect) {
+            clientSelect.addEventListener('change', (e) => {
+                const clientId = e.target.value;
+                if (!clientId) {
+                    this.currentAdelantoDistribute = false;
+                    return;
+                }
+                const client = DataService.clientes.find(c => c.id === clientId && !c.deleted_at);
+                if (client && !client.parent_id) {
+                    const companions = DataService.clientes.filter(x => x.parent_id === client.id && !x.deleted_at);
+                    if (companions.length > 0) {
+                        const confirmDistribute = confirm(
+                            `El pasajero seleccionado es Titular de un grupo (${1 + companions.length} personas en total).\n\n¿Deseas distribuir el impacto financiero de este dinero prestado de forma equitativa entre todos los integrantes de su grupo?\n\n- Aceptar: Distribuir equitativamente entre los integrantes para no alterar el margen de rentabilidad individual del titular.\n- Cancelar: Hacer que el gasto recaiga únicamente sobre el perfil del titular.`
+                        );
+                        this.currentAdelantoDistribute = confirmDistribute;
+                    } else {
+                        this.currentAdelantoDistribute = false;
+                    }
+                } else {
+                    this.currentAdelantoDistribute = false;
                 }
             });
         }
@@ -1153,7 +1186,7 @@ export const PartnersComponent = {
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="py-1.5 px-3 whitespace-nowrap text-[11px] font-medium text-slate-500">${formatShortDate(g.fecha)}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-[11px] font-black text-slate-800">${UI.sanitize(g.categoria)}</td>
-                        <td class="py-1.5 px-3 text-[11px] text-slate-600 max-w-[200px] truncate" title="${UI.sanitize(g.concepto)}">${UI.sanitize(g.concepto)}</td>
+                        <td class="py-1.5 px-3 text-[11px] text-slate-600 max-w-[280px] xl:max-w-[350px] truncate" title="${UI.sanitize(g.concepto)}">${UI.sanitize(g.concepto)}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-center">${receiptHtml}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-right text-[11px] font-black text-slate-800">${amountFormat}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-[10px] text-slate-400 font-bold">${UI.sanitize(g.usuario_email)}</td>
@@ -1482,7 +1515,7 @@ export const PartnersComponent = {
                         <td class="py-2 px-4 whitespace-nowrap text-xs font-black text-slate-800">${UI.sanitize(partnerName)}</td>
                         <td class="py-2 px-4 whitespace-nowrap">${typeBadge}</td>
                         <td class="py-2 px-4 whitespace-nowrap text-right text-xs font-black text-slate-800">${amountFormat}</td>
-                        <td class="py-2 px-4 text-xs text-slate-600 max-w-[200px] truncate" title="${UI.sanitize(m.concepto)}">${UI.sanitize(m.concepto)}</td>
+                        <td class="py-2 px-4 text-xs text-slate-600 max-w-[280px] xl:max-w-[350px] truncate" title="${UI.sanitize(m.concepto)}">${UI.sanitize(m.concepto)}</td>
                         <td class="py-2 px-4 whitespace-nowrap text-[10px] text-slate-400 font-bold">${UI.sanitize(m.usuario_email)}</td>
                         <td class="py-2 px-4 whitespace-nowrap text-center">${deleteBtn}</td>
                     </tr>
@@ -2220,8 +2253,16 @@ export const PartnersComponent = {
 
             let totalAbonos = 0;
             if (adv.cliente_id) {
-                // Relación individual
-                const clientAbonos = DataService.abonos.filter(a => a.cliente_id === adv.cliente_id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
+                // Relación individual (si es compartido con el grupo, consolidar abonos de todo el grupo)
+                const client = DataService.clientes.find(x => x.id === adv.cliente_id);
+                let clientAbonos = [];
+                if (adv.distribuir_grupo && client && !client.parent_id) {
+                    const companions = DataService.clientes.filter(x => x.parent_id === client.id && !x.deleted_at);
+                    const groupIds = [client.id, ...companions.map(x => x.id)];
+                    clientAbonos = DataService.abonos.filter(a => groupIds.includes(a.cliente_id) && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
+                } else {
+                    clientAbonos = DataService.abonos.filter(a => a.cliente_id === adv.cliente_id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
+                }
                 totalAbonos = clientAbonos.reduce((s, a) => s + (Number(a.monto) || 0), 0);
             } else if (adv.plan_id && adv.fecha_viaje) {
                 // Relación grupal (Salida completa)
@@ -2275,17 +2316,11 @@ export const PartnersComponent = {
         const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
 
         // 1. Cargar dropdowns del formulario
-        const clientSelect = document.getElementById('pvm-adelanto-cliente-id');
-        if (clientSelect) {
-            clientSelect.innerHTML = '<option value="">-- Seleccionar Pasajero --</option>';
-            const activeClients = DataService.clientes.filter(c => !c.deleted_at);
-            activeClients.sort((a, b) => a.nombre.localeCompare(b.nombre));
-            activeClients.forEach(c => {
-                const plan = DataService.planes.find(p => p.id === c.plan_id);
-                const planNom = plan ? plan.nombre : 'Plan Genérico';
-                clientSelect.innerHTML += `<option value="${c.id}">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)} - ${UI.sanitize(planNom)} (${c.fecha_viaje})</option>`;
-            });
+        const clientSearch = document.getElementById('pvm-adelanto-cliente-search');
+        if (clientSearch) {
+            clientSearch.value = '';
         }
+        this.populatePassengerDropdown('');
 
         const planSelect = document.getElementById('pvm-adelanto-plan-id');
         if (planSelect) {
@@ -2386,6 +2421,34 @@ export const PartnersComponent = {
         this.renderAdelantosList();
     },
 
+    populatePassengerDropdown(filterText = '') {
+        const clientSelect = document.getElementById('pvm-adelanto-cliente-id');
+        if (!clientSelect) return;
+
+        const currentVal = clientSelect.value;
+        clientSelect.innerHTML = '<option value="">-- Seleccionar Pasajero --</option>';
+
+        const activeClients = DataService.clientes.filter(c => !c.deleted_at);
+        activeClients.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+        const normalizedFilter = filterText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        activeClients.forEach(c => {
+            const plan = DataService.planes.find(p => p.id === c.plan_id);
+            const planNom = plan ? plan.nombre : 'Plan Genérico';
+            const fullName = `${c.nombre} ${c.apellido}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const planNomLower = planNom.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+            if (!normalizedFilter || fullName.includes(normalizedFilter) || planNomLower.includes(normalizedFilter) || (c.fecha_viaje && c.fecha_viaje.includes(normalizedFilter))) {
+                clientSelect.innerHTML += `<option value="${c.id}">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)} - ${UI.sanitize(planNom)} (${c.fecha_viaje})</option>`;
+            }
+        });
+
+        if (currentVal) {
+            clientSelect.value = currentVal;
+        }
+    },
+
     renderAdelantosList() {
         const rol = window.AuthModule?.userProfile?.rol;
         const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
@@ -2420,7 +2483,16 @@ export const PartnersComponent = {
                 let relacionHtml = '';
                 if (adv.cliente_id) {
                     const c = DataService.clientes.find(x => x.id === adv.cliente_id);
-                    relacionHtml = c ? `<span class="font-black text-slate-800">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)}</span><br><span class="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Pasajero</span>` : '<span class="text-slate-400">Cliente Eliminado</span>';
+                    let groupInfo = '';
+                    if (c && !c.parent_id) {
+                        const comps = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at);
+                        if (comps.length > 0) {
+                            groupInfo = adv.distribuir_grupo 
+                                ? `<br><span class="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded border border-emerald-200">Grupo Compartido</span>` 
+                                : `<br><span class="text-[8px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.2 rounded border border-slate-200">Solo Titular</span>`;
+                        }
+                    }
+                    relacionHtml = c ? `<span class="font-black text-slate-800">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)}</span>${groupInfo}<br><span class="text-[8px] text-slate-400 font-bold uppercase tracking-wider">Pasajero</span>` : '<span class="text-slate-400">Cliente Eliminado</span>';
                 } else if (adv.plan_id && adv.fecha_viaje) {
                     const p = DataService.planes.find(x => x.id === adv.plan_id);
                     relacionHtml = p ? `<span class="font-black text-indigo-700">👥 Grupal: ${UI.sanitize(p.nombre)}</span><br><span class="text-[8px] text-slate-400 font-bold uppercase tracking-wider">${UI.sanitize(adv.fecha_viaje)}</span>` : '<span class="text-slate-400">Plan Eliminado</span>';
@@ -2501,8 +2573,8 @@ export const PartnersComponent = {
                 tb.innerHTML += `
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="py-2 px-3 whitespace-nowrap text-[11px] font-medium text-slate-500">${formatShortDate(adv.fecha)}</td>
-                        <td class="py-2 px-3 text-[11px] leading-tight">${relacionHtml}</td>
-                        <td class="py-2 px-3 text-[11px] text-slate-600 max-w-[200px] truncate" title="${UI.sanitize(adv.concepto)}">
+                        <td class="py-2 px-3 text-[11px] leading-tight min-w-[220px]">${relacionHtml}</td>
+                        <td class="py-2 px-3 text-[11px] text-slate-600 max-w-[280px] xl:max-w-[350px] truncate" title="${UI.sanitize(adv.concepto)}">
                             <span class="font-black text-slate-800 uppercase tracking-widest text-[8px] bg-slate-100 px-1 py-0.5 rounded mr-1">${UI.sanitize(adv.tipo_servicio)}</span>
                             ${UI.sanitize(adv.concepto)}
                         </td>
@@ -2601,7 +2673,8 @@ export const PartnersComponent = {
             estado: targetEstado,
             solicitado_por: userEmail,
             aprobado_por: targetEstado !== 'solicitado' ? userEmail : null,
-            fecha_ejecucion: targetEstado === 'ejecutado' ? fecha : null
+            fecha_ejecucion: targetEstado === 'ejecutado' ? fecha : null,
+            distribuir_grupo: this.currentAdelantoDistribute || false
         };
 
         try {
@@ -2618,7 +2691,11 @@ export const PartnersComponent = {
 
             // Limpiar formulario
             document.getElementById('pvm-adelanto-form').reset();
+            const clientSearch = document.getElementById('pvm-adelanto-cliente-search');
+            if (clientSearch) clientSearch.value = '';
+            this.populatePassengerDropdown('');
             this.clearAdelantoPreview();
+            this.currentAdelantoDistribute = false;
             
             // Recalcular finanzas y UI
             this.calculateDistribution();

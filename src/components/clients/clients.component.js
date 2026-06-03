@@ -1333,9 +1333,34 @@ export const ClientsComponent = {
         }
 
         // Calculate if there are active operability advances
-        const clientAdelantos = (DataService.adelantos_operativos || [])
-            .filter(a => a.cliente_id === id && !a.deleted_at && ['aprobado', 'ejecutado'].includes(a.estado));
-        const totalAdelantado = clientAdelantos.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
+        let totalAdelantado = 0;
+        if (c) {
+            // 1. Adelantos directos
+            const directAdelantos = (DataService.adelantos_operativos || [])
+                .filter(a => a.cliente_id === id && !a.deleted_at && ['aprobado', 'ejecutado'].includes(a.estado));
+            
+            directAdelantos.forEach(a => {
+                const companions = DataService.clientes.filter(x => x.parent_id === id && !x.deleted_at);
+                const groupSize = 1 + companions.length;
+                if (a.distribuir_grupo && groupSize > 1) {
+                    totalAdelantado += (Number(a.monto_adelantado) - Number(a.monto_recuperado)) / groupSize;
+                } else {
+                    totalAdelantado += (Number(a.monto_adelantado) - Number(a.monto_recuperado));
+                }
+            });
+
+            // 2. Adelantos indirectos del titular si este cliente es acompañante
+            if (c.parent_id) {
+                const titularAdelantos = (DataService.adelantos_operativos || [])
+                    .filter(a => a.cliente_id === c.parent_id && !a.deleted_at && ['aprobado', 'ejecutado'].includes(a.estado) && a.distribuir_grupo);
+                
+                titularAdelantos.forEach(a => {
+                    const companions = DataService.clientes.filter(x => x.parent_id === c.parent_id && !x.deleted_at);
+                    const groupSize = 1 + companions.length;
+                    totalAdelantado += (Number(a.monto_adelantado) - Number(a.monto_recuperado)) / groupSize;
+                });
+            }
+        }
 
         const bannerAdelantoHtml = totalAdelantado > 0 ? `
             <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 shadow-[0_1px_2px_rgba(245,158,11,0.05)]">
