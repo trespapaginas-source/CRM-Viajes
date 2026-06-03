@@ -438,24 +438,32 @@ export const PartnersComponent = {
 
         const totalInput = document.getElementById('pvm-adelanto-monto-total');
         const cubiertoInput = document.getElementById('pvm-adelanto-monto-cubierto');
-        const diffText = document.getElementById('pvm-adelanto-diferencia-text');
+        const solicitadoInput = document.getElementById('pvm-adelanto-monto-solicitado');
         const riskWarning = document.getElementById('pvm-adelanto-risk-warning');
 
-        const recalculateDiff = () => {
-            const total = UI.parseCurrency(totalInput?.value) || 0;
-            const cubierto = UI.parseCurrency(cubiertoInput?.value) || 0;
-            const diff = total - cubierto;
-            
-            if (diffText) diffText.innerText = formatCOP(diff);
-            
+        const recalculateRisk = () => {
+            const val = solicitadoInput ? (UI.parseCurrency(solicitadoInput.value) || 0) : 0;
             if (riskWarning) {
-                if (diff > 2000000) riskWarning.classList.remove('hidden');
+                if (val > 2000000) riskWarning.classList.remove('hidden');
                 else riskWarning.classList.add('hidden');
             }
         };
 
+        const recalculateDiff = () => {
+            const total = UI.parseCurrency(totalInput?.value) || 0;
+            const cubierto = UI.parseCurrency(cubiertoInput?.value) || 0;
+            const diff = Math.max(0, total - cubierto);
+            
+            if (solicitadoInput) {
+                solicitadoInput.value = String(diff).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            }
+            
+            recalculateRisk();
+        };
+
         if (totalInput) totalInput.addEventListener('input', recalculateDiff);
         if (cubiertoInput) cubiertoInput.addEventListener('input', recalculateDiff);
+        if (solicitadoInput) solicitadoInput.addEventListener('input', recalculateRisk);
 
         const statusFilter = document.getElementById('pvm-adelantos-filtro-estado');
         if (statusFilter) {
@@ -2350,6 +2358,14 @@ export const PartnersComponent = {
         if (clientDropdown) {
             clientDropdown.classList.add('hidden');
         }
+        const solicitadoInput = document.getElementById('pvm-adelanto-monto-solicitado');
+        if (solicitadoInput) {
+            solicitadoInput.value = '';
+        }
+        const riskWarning = document.getElementById('pvm-adelanto-risk-warning');
+        if (riskWarning) {
+            riskWarning.classList.add('hidden');
+        }
         this.populatePassengerDropdown('');
 
         const planSelect = document.getElementById('pvm-adelanto-plan-id');
@@ -2754,7 +2770,13 @@ export const PartnersComponent = {
             return UI.showToast("Debe seleccionar el plan y la fecha de salida para este adelanto grupal.", "error");
         }
 
-        const montoAdelantado = totalServicio - cubiertoCliente;
+        const montoAdelantado = UI.parseCurrency(document.getElementById('pvm-adelanto-monto-solicitado').value) || 0;
+        if (montoAdelantado <= 0) {
+            return UI.showToast("El monto a financiar debe ser mayor a cero.", "error");
+        }
+        if (montoAdelantado > (totalServicio - cubiertoCliente)) {
+            return UI.showToast("El monto a financiar no puede ser mayor a la diferencia (Costo Total - Cubierto Cliente).", "error");
+        }
         const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const rol = window.AuthModule?.userProfile?.rol;
         const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
