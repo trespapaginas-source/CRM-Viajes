@@ -2488,25 +2488,37 @@ export const PartnersComponent = {
             return nameA.localeCompare(nameB);
         });
 
-        // Debug matches in console
-        console.log('[DEBUG-MATCHES] query:', normalizedFilter, 'results:', matches.map(m => ({ name: `${m.client.nombre} ${m.client.apellido || ''}`.trim(), score: m.score })));
+        // Populate hidden select options only when filterText is empty (panel open / initialization)
+        if (filterText === '') {
+            const fragment = document.createDocumentFragment();
+            const defOpt = document.createElement('option');
+            defOpt.value = '';
+            defOpt.textContent = '-- Seleccionar Pasajero --';
+            fragment.appendChild(defOpt);
+            
+            activeClients.forEach(c => {
+                const plan = DataService.planes.find(p => p.id === c.plan_id);
+                const planNom = plan ? plan.nombre : 'Plan Genérico';
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = `${c.nombre} ${c.apellido || ''} - ${planNom} (${c.fecha_viaje})`;
+                fragment.appendChild(option);
+            });
+            clientSelect.innerHTML = '';
+            clientSelect.appendChild(fragment);
+        }
 
-        // Populate hidden select options
-        clientSelect.innerHTML = '<option value="">-- Seleccionar Pasajero --</option>';
-        activeClients.forEach(c => {
-            const plan = DataService.planes.find(p => p.id === c.plan_id);
-            const planNom = plan ? plan.nombre : 'Plan Genérico';
-            clientSelect.innerHTML += `<option value="${c.id}">${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido)} - ${UI.sanitize(planNom)} (${c.fecha_viaje})</option>`;
-        });
+        const visibleMatches = matches.slice(0, 15);
 
-        if (matches.length === 0) {
+        if (visibleMatches.length === 0) {
             dropdown.innerHTML = `
                 <div class="px-3 py-3 text-xs text-slate-400 font-bold text-center uppercase tracking-wider">
                     No se encontraron resultados
                 </div>
             `;
         } else {
-            matches.forEach(m => {
+            const fragment = document.createDocumentFragment();
+            visibleMatches.forEach(m => {
                 const c = m.client;
                 const opt = document.createElement('div');
                 opt.className = 'w-full text-left px-3.5 py-2.5 text-xs hover:bg-slate-50 transition-colors cursor-pointer border-b border-slate-50 last:border-0 flex flex-col gap-0.5';
@@ -2517,8 +2529,9 @@ export const PartnersComponent = {
                 opt.addEventListener('click', () => {
                     this.selectPassenger(c.id, `${c.nombre} ${c.apellido} - ${m.planNom} (${c.fecha_viaje})`);
                 });
-                dropdown.appendChild(opt);
+                fragment.appendChild(opt);
             });
+            dropdown.appendChild(fragment);
         }
     },
 
