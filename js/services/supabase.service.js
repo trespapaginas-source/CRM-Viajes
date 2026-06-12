@@ -197,12 +197,12 @@ export const DataService = {
                 this.ciudades = fullData.data || [];
             } else {
                 try {
-                    const response = await fetch('https://www.datos.gov.co/resource/xdk5-pm3f.json?$limit=1200');
+                    const response = await fetch('https://www.datos.gov.co/resource/gdxc-w37w.json?$limit=1200');
                     const jsonData = await response.json();
                     const mapeoCiudades = jsonData.map(c => ({
-                        id: c.c_digo_dane_del_municipio,
-                        departamento: c.departamento,
-                        municipio: c.municipio
+                        id: c.cod_mpio,
+                        departamento: c.dpto,
+                        municipio: c.nom_mpio
                     }));
                     for (let i = 0; i < mapeoCiudades.length; i += 300) {
                         await supabaseClient.from('ciudades').insert(mapeoCiudades.slice(i, i + 300));

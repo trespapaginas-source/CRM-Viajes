@@ -540,34 +540,88 @@ export const RentabilidadComponent = {
         });
         costoTotal += costoOperativoBase;
 
-        // Construir un texto descriptivo o desglose si hay tarifas distintas
-        const distinctCosts = [...new Set(clientesSalida.map(c => {
-            let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
-            if (cCost === 0) {
-                const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
+        // Construir el desglose detallado de proveedores vinculados
+        const aggregatedProvs = {}; // Clave: Proveedor|Concepto, Valor: { nombre, incluye, costoUnitario, costoTotal, paxCount }
+
+        clientesSalida.forEach(c => {
+            const st = c.estado ? c.estado.toLowerCase() : '';
+            if (st !== 'en caja') {
+                const paxNum = this.getClientRealPax(c);
+                let provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
                     ? c.proveedores_vinculados
                     : (plan.proveedores_vinculados || []);
-                cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
-            }
-            return cCost;
-        }))];
-        if (distinctCosts.length > 1) {
-            desgloseCostosHtml = `<span class="text-[9px] text-slate-500 block mt-0.5">Tarifas mixtas: ${distinctCosts.map(co => formatCOP(co)).join(' / ')}</span>`;
-        } else {
-            const unicoCosto = distinctCosts[0] !== undefined ? distinctCosts[0] : 0;
-            desgloseCostosHtml = `<span class="text-[9px] text-slate-500 block mt-0.5">${formatCOP(unicoCosto)} x ${paxServicio} Pax (servicio)</span>`;
-        }
 
-        list.innerHTML += `
-            <tr class="bg-slate-50">
-                <td class="py-3 px-4"><span class="bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2 py-0.5 rounded">Matriz Base</span></td>
-                <td class="py-3 px-4">
-                    <p class="text-xs font-bold text-slate-700">Costos Operativos (Proveedores)</p>
-                    ${desgloseCostosHtml}
-                </td>
-                <td class="py-3 px-4 text-right font-black text-slate-800">${formatCOP(costoOperativoBase)}</td>
-                <td class="py-3 px-4 text-center"><i class="ph ph-lock-key text-slate-300"></i></td>
-            </tr>`;
+                const sumProvs = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+                
+                // Calcular cCost usando la misma lógica original del sistema
+                let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
+                if (cCost === 0) {
+                    cCost = sumProvs;
+                }
+                
+                // Si el costo final calculado difiere de la suma de los proveedores (o no hay proveedores asignados)
+                if (provs.length === 0 || cCost !== sumProvs) {
+                    const key = `Costo Base Programado|Tarifa base`;
+                    if (!aggregatedProvs[key]) {
+                        aggregatedProvs[key] = {
+                            nombre: 'Costo Base Programado',
+                            incluye: 'Tarifa de costo base por persona',
+                            costoUnitario: cCost,
+                            costoTotal: 0,
+                            paxCount: 0
+                        };
+                    }
+                    aggregatedProvs[key].costoTotal += cCost * paxNum;
+                    aggregatedProvs[key].paxCount += paxNum;
+                } else {
+                    provs.forEach(p => {
+                        const pName = p.nombre || 'Proveedor Desconocido';
+                        const pConcept = p.incluye || 'Servicio general';
+                        const pCosto = parseFloat(p.costo || 0);
+                        const key = `${pName}|${pConcept}`;
+                        if (!aggregatedProvs[key]) {
+                            aggregatedProvs[key] = {
+                                nombre: pName,
+                                incluye: pConcept,
+                                costoUnitario: pCosto,
+                                costoTotal: 0,
+                                paxCount: 0
+                            };
+                        }
+                        aggregatedProvs[key].costoTotal += pCosto * paxNum;
+                        aggregatedProvs[key].paxCount += paxNum;
+                    });
+                }
+            }
+        });
+
+        // Renderizar cada proveedor desglosado en la tabla de costos auditados
+        const provsList = Object.values(aggregatedProvs);
+        if (provsList.length === 0) {
+            list.innerHTML += `
+                <tr class="bg-slate-50 border-b border-slate-100">
+                    <td class="py-3 px-4"><span class="bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2 py-0.5 rounded">Matriz Base</span></td>
+                    <td class="py-3 px-4">
+                        <p class="text-xs font-bold text-slate-700">Costos Operativos (Proveedores)</p>
+                        <span class="text-[9px] text-slate-500 block mt-0.5">$0 x ${paxServicio} Pax (servicio)</span>
+                    </td>
+                    <td class="py-3 px-4 text-right font-black text-slate-800">$0</td>
+                    <td class="py-3 px-4 text-center"><i class="ph ph-lock-key text-slate-300"></i></td>
+                </tr>`;
+        } else {
+            provsList.forEach(ap => {
+                list.innerHTML += `
+                    <tr class="bg-slate-50 border-b border-slate-100">
+                        <td class="py-3 px-4"><span class="bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2 py-0.5 rounded">Matriz Base</span></td>
+                        <td class="py-3 px-4">
+                            <p class="text-xs font-bold text-slate-700">${UI.sanitize(ap.nombre)}</p>
+                            <span class="text-[9px] text-slate-500 block mt-0.5">${UI.sanitize(ap.incluye)} — ${formatCOP(ap.costoUnitario)} x ${ap.paxCount} Pax</span>
+                        </td>
+                        <td class="py-3 px-4 text-right font-black text-slate-800">${formatCOP(ap.costoTotal)}</td>
+                        <td class="py-3 px-4 text-center"><i class="ph ph-lock-key text-slate-300"></i></td>
+                    </tr>`;
+            });
+        }
 
         const gastos = DataService.gastos.filter(g => g.plan_id === this.currentPlanId && g.fecha_viaje === this.currentFecha);
         gastos.forEach(g => {
