@@ -364,12 +364,9 @@ export const RentabilidadComponent = {
             }
         }
 
-        const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador';
         const syncBtn = document.getElementById('btn-sync-rentabilidad-tarifas');
         if (syncBtn) {
-            if (isAdmin) syncBtn.classList.remove('hidden');
-            else syncBtn.classList.add('hidden');
+            syncBtn.classList.remove('hidden');
         }
 
         this.renderGastos(plan, paxServicio, ingresoBruto);

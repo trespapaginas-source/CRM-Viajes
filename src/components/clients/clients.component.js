@@ -542,7 +542,7 @@ export const ClientsComponent = {
                             : `${formatShortDate(f.start)} al ${formatShortDate(f.end)}`;
 
                         if (isPast) {
-                            selectFechas.innerHTML += `<option value="${text}" disabled class="text-slate-400">${text} (Finalizado)</option>`;
+                            selectFechas.innerHTML += `<option value="${text}">${text} (Finalizado)</option>`;
                         } else {
                             selectFechas.innerHTML += `<option value="${text}">${text}</option>`;
                         }
@@ -1010,14 +1010,8 @@ export const ClientsComponent = {
                 }
             }
 
-            if (cliExistente && cliExistente.plan_id === pId) {
-                if (cliExistente.costo_base !== undefined && cliExistente.costo_base !== null) {
-                    costoBaseCongelado = parseFloat(cliExistente.costo_base) || 0;
-                }
-                if (cliExistente.proveedores_vinculados) {
-                    provsVinculadosCongelados = cliExistente.proveedores_vinculados;
-                }
-            }
+            // Removido el congelamiento histórico de tarifas para clientes existentes.
+            // Al guardar, se obtendrán siempre los costos actualizados del catálogo (general o por fecha).
 
             const contactoEl = document.getElementById('cf-contacto');
             const etiquetaEl = document.getElementById('cf-etiqueta');
