@@ -12,6 +12,7 @@ export const PlanesComponent = {
     currentCostScope: 'general',
     generalProveedoresBackup: [],
     generalCostoBaseBackup: 0,
+    originalGeneralProveedores: [],
     eventsBound: false,
 
     init() {
@@ -331,6 +332,7 @@ export const PlanesComponent = {
                 selTipo.value = pq.tipo;
                 
                 this.generalProveedoresBackup = JSON.parse(JSON.stringify(pq.proveedores_vinculados || []));
+                this.originalGeneralProveedores = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
                 this.generalCostoBaseBackup = parseFloat(pq.costo_base || 0);
                 this.tempProveedores = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
                 this.tempServiciosIncluidos = pq.servicios_incluidos || [];
@@ -338,6 +340,7 @@ export const PlanesComponent = {
         } else {
             document.getElementById('plan-form-title').innerText = "Nuevo Plan";
             this.generalProveedoresBackup = [];
+            this.originalGeneralProveedores = [];
             this.generalCostoBaseBackup = 0;
             this.tempProveedores = [];
             this.tempServiciosIncluidos = [
@@ -519,6 +522,16 @@ export const PlanesComponent = {
 
         this.saveCurrentTableToScope();
 
+        // Propagar tarifa base general a salidas que no hayan sido personalizadas
+        if (this.originalGeneralProveedores && this.originalGeneralProveedores.length > 0) {
+            this.tempFechas.forEach(f => {
+                if (this.areProvidersIdentical(f.proveedores_vinculados, this.originalGeneralProveedores)) {
+                    f.proveedores_vinculados = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
+                    f.costo_base = this.generalCostoBaseBackup;
+                }
+            });
+        }
+
         const obj = {
             id: document.getElementById('pf-id').value || "",
             nombre: document.getElementById('pf-nombre').value,
@@ -659,5 +672,16 @@ export const PlanesComponent = {
         this.tempProveedores = JSON.parse(JSON.stringify(this.generalProveedoresBackup));
         this.renderTempProveedores();
         UI.showToast("Tarifa base copiada a esta salida.", "success");
+    },
+
+    areProvidersIdentical(listA, listB) {
+        if (!listA || !listB) return listA === listB;
+        if (listA.length !== listB.length) return false;
+        for (let i = 0; i < listA.length; i++) {
+            if (listA[i].id_proveedor !== listB[i].id_proveedor) return false;
+            if (listA[i].incluye !== listB[i].incluye) return false;
+            if (parseFloat(listA[i].costo) !== parseFloat(listB[i].costo)) return false;
+        }
+        return true;
     }
 };
