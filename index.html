@@ -239,6 +239,14 @@
                     <span class="font-bold text-sm">Internacionales</span>
                 </a>
 
+                <a href="#" data-target="notificaciones"
+                    class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group relative">
+                    <i class="ph ph-bell text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity"></i>
+                    <span class="font-bold text-sm">Notificaciones</span>
+                    <span class="ml-auto bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full hidden"
+                        id="nav-notification-badge">0</span>
+                </a>
+
                 <p class="px-3 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 mt-6 opacity-60">
                     Finanzas</p>
 
@@ -839,6 +847,62 @@
                             <div id="internacionales-table-empty" class="hidden col-span-full flex flex-col items-center justify-center py-16 text-slate-400 w-full text-center">
                                 <i class="ph ph-folder-open text-5xl mb-3 opacity-30"></i>
                                 <p class="text-sm font-bold uppercase tracking-widest">Sin registros internacionales</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- NUEVA SECCIÓN: NOTIFICACIONES -->
+                <section id="view-notificaciones" class="view-section max-w-7xl mx-auto hidden">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+                        <div>
+                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Alertas y Notificaciones</h3>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-[0.25em] mt-0.5">Control de salidas próximas (4, 3 y 2 días antes)</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button id="btn-send-email-alerts" class="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2.5 px-5 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-sm hover:-translate-y-0.5 flex items-center">
+                                <i class="ph ph-envelope-simple mr-2 text-sm"></i> Enviar Alertas por Correo
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="notifications-container">
+                        <!-- Alertas críticas: 2 días -->
+                        <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                            <div class="px-5 py-4 border-b border-rose-100 bg-rose-50/50 flex justify-between items-center shrink-0">
+                                <h4 class="font-black text-[10px] uppercase text-rose-700 tracking-widest flex items-center">
+                                    <i class="ph ph-warning-circle mr-1.5 text-base text-rose-500"></i> Críticas (Salen en 2 días)
+                                </h4>
+                                <span class="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-2d">0</span>
+                            </div>
+                            <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-2d">
+                                <!-- list of 2d alerts -->
+                            </div>
+                        </div>
+
+                        <!-- Alertas urgentes: 3 días -->
+                        <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                            <div class="px-5 py-4 border-b border-orange-100 bg-orange-50/50 flex justify-between items-center shrink-0">
+                                <h4 class="font-black text-[10px] uppercase text-orange-700 tracking-widest flex items-center">
+                                    <i class="ph ph-warning mr-1.5 text-base text-orange-500"></i> Urgentes (Salen en 3 días)
+                                </h4>
+                                <span class="bg-orange-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-3d">0</span>
+                            </div>
+                            <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-3d">
+                                <!-- list of 3d alerts -->
+                            </div>
+                        </div>
+
+                        <!-- Alertas informativas: 4 días -->
+                        <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                            <div class="px-5 py-4 border-b border-blue-100 bg-blue-50/50 flex justify-between items-center shrink-0">
+                                <h4 class="font-black text-[10px] uppercase text-blue-700 tracking-widest flex items-center">
+                                    <i class="ph ph-info mr-1.5 text-base text-blue-500"></i> Informativas (Salen en 4 días)
+                                </h4>
+                                <span class="bg-blue-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-4d">0</span>
+                            </div>
+                            <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-4d">
+                                <!-- list of 4d alerts -->
                             </div>
                         </div>
                     </div>
