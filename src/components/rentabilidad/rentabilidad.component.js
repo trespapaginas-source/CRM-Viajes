@@ -297,6 +297,88 @@ export const RentabilidadComponent = {
             if (this.currentTab !== 'internacionales' && isInt) return false;
             return c.plan_id === planId && c.fecha_viaje === fecha && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st);
         });
+
+        // Resolve current catalog rates for this departure date
+        let targetCostoBase = parseFloat(plan.costo_base || 0);
+        let targetProvs = plan.proveedores_vinculados || [];
+
+        const dateConfig = (plan.fechas || []).find(f => {
+            const formattedDate = f.start === f.end
+                ? formatShortDate(f.start)
+                : `${formatShortDate(f.start)} al ${formatShortDate(f.end)}`;
+            return formattedDate === fecha;
+        });
+
+        if (dateConfig && dateConfig.proveedores_vinculados && dateConfig.proveedores_vinculados.length > 0) {
+            targetCostoBase = parseFloat(dateConfig.costo_base || 0);
+            targetProvs = dateConfig.proveedores_vinculados;
+        }
+
+        if (targetCostoBase === 0 && targetProvs.length > 0) {
+            targetCostoBase = targetProvs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+        }
+
+        // Check for any client record out of sync with catalog costs
+        let hasMismatch = false;
+        clientesSalida.forEach(c => {
+            const cCost = parseFloat(c.costo_base || 0);
+            const cProvs = c.proveedores_vinculados || [];
+            
+            // Compare cost and providers
+            const costsMatch = Math.abs(cCost - targetCostoBase) < 0.01;
+            
+            let provsMatch = true;
+            if (cProvs.length !== targetProvs.length) {
+                provsMatch = false;
+            } else {
+                const sortKey = p => p.id_proveedor || p.id_provider || p.nombre || '';
+                const sortedA = [...cProvs].sort((x, y) => sortKey(x).localeCompare(sortKey(y)));
+                const sortedB = [...targetProvs].sort((x, y) => sortKey(x).localeCompare(sortKey(y)));
+                for (let i = 0; i < sortedA.length; i++) {
+                    const pA = sortedA[i];
+                    const pB = sortedB[i];
+                    if (pA.nombre !== pB.nombre || pA.incluye !== pB.incluye || Math.abs(parseFloat(pA.costo || 0) - parseFloat(pB.costo || 0)) > 0.01) {
+                        provsMatch = false;
+                        break;
+                    }
+                }
+            }
+            if (!costsMatch || !provsMatch) {
+                hasMismatch = true;
+            }
+        });
+
+        if (hasMismatch) {
+            console.log("Detectado desajuste de tarifas con el catálogo. Sincronizando automáticamente...");
+            supabaseClient
+                .from('clientes')
+                .update({
+                    costo_base: targetCostoBase,
+                    proveedores_vinculados: targetProvs
+                })
+                .eq('plan_id', planId)
+                .eq('fecha_viaje', fecha)
+                .is('deleted_at', null)
+                .then(({ error }) => {
+                    if (!error) {
+                        // Actualizar localmente la memoria caché de DataService
+                        DataService.clientes.forEach(c => {
+                            const st = c.estado ? c.estado.toLowerCase() : '';
+                            const isInt = c.tipo_reserva === 'Internacional';
+                            const matchTab = (this.currentTab === 'internacionales' && isInt) || (this.currentTab !== 'internacionales' && !isInt);
+                            if (c.plan_id === planId && c.fecha_viaje === fecha && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st) && matchTab) {
+                                c.costo_base = targetCostoBase;
+                                c.proveedores_vinculados = JSON.parse(JSON.stringify(targetProvs));
+                            }
+                        });
+                        // Reabrir modal para refrescar visualmente
+                        this.openFinancialModal(planId, fecha);
+                    } else {
+                        console.error("Error en auto-sincronización:", error);
+                    }
+                });
+        }
+
         let paxTotal = 0; let paxServicio = 0; let ingresoBruto = 0; let ingresoRetenido = 0;
         const ul = document.getElementById('rdm-passengers-list');
         ul.innerHTML = '';
