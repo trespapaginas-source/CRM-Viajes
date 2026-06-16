@@ -118,7 +118,17 @@ export const NotificationsComponent = {
                 body: JSON.stringify({ alerts: alertsPayload })
             });
 
-            const data = await response.json();
+            if (response.status === 404 || response.status === 405) {
+                throw new Error("El servidor local de correos no está disponible en este entorno estático (Cloudflare Pages).");
+            }
+
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonErr) {
+                throw new Error("Respuesta inválida del servidor de correos.");
+            }
+
             if (response.ok && data.status === 'success') {
                 localStorage.setItem('crm_last_alert_email_sent_date', todayStr);
                 UI.showToast("Alerta de correo enviada exitosamente via Resend.", "success");
@@ -127,7 +137,10 @@ export const NotificationsComponent = {
             }
         } catch (err) {
             console.error("Error sending email alerts:", err);
-            UI.showToast("Falla enviando alertas: " + err.message, "error");
+            // Si el envío no fue manual (force=false), silenciamos el toast de error para no importunar en producción estática
+            if (force) {
+                UI.showToast("No se pudo enviar: " + err.message, "error");
+            }
         } finally {
             if (btn) {
                 btn.disabled = false;
