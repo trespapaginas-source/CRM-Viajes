@@ -46,16 +46,18 @@ export const NotificationsComponent = {
         }
 
         const alerts = this.getNotificationsData();
-        const hasAlerts = alerts['2d'].length > 0 || alerts['3d'].length > 0 || alerts['4d'].length > 0;
+        const hasAlerts = alerts['1d_checkin'].length > 0 || alerts['1d_checkout'].length > 0 || alerts['2d'].length > 0 || alerts['3d'].length > 0 || alerts['4d'].length > 0;
         
         if (!hasAlerts) {
-            if (force) UI.showToast("No hay salidas programadas para los próximos 2, 3 o 4 días.", "info");
+            if (force) UI.showToast("No hay salidas o retornos programados para el período configurado.", "info");
             return;
         }
 
         // Prepare the detailed passenger list inside the alert group
         // To display passenger names, ID/cedula, cell phone, plan, date, total value, and remaining balance
         const alertsPayload = {
+            '1d_checkin': [],
+            '1d_checkout': [],
             '2d': [],
             '3d': [],
             '4d': []
@@ -95,6 +97,8 @@ export const NotificationsComponent = {
             });
         };
 
+        processAlerts('1d_checkin');
+        processAlerts('1d_checkout');
         processAlerts('2d');
         processAlerts('3d');
         processAlerts('4d');
@@ -164,29 +168,76 @@ export const NotificationsComponent = {
             departuresMap[key].clientes.push(cli);
         });
 
-        // 2. Filter departures occurring in exactly 2, 3, or 4 days
+        // 2. Filter departures occurring in exactly 1, 2, 3, or 4 days, or return in 1 day
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         const alerts = {
+            '1d_checkin': [],
+            '1d_checkout': [],
             '2d': [],
             '3d': [],
             '4d': []
         };
 
         Object.values(departuresMap).forEach(dep => {
-            const dateViaje = parseSpanishDate(dep.fecha_viaje);
-            if (!dateViaje || isNaN(dateViaje)) return;
+            const plan = DataService.planes.find(p => p.id === dep.plan_id);
+            if (!plan) return;
 
-            const diffTime = dateViaje - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            let startDate = null;
+            let endDate = null;
 
-            if (diffDays === 2) {
+            // Check if travel date is a range
+            const parts = dep.fecha_viaje.split(/\s+al\s+/i);
+            if (parts.length === 2) {
+                startDate = parseSpanishDate(parts[0].trim());
+                endDate = parseSpanishDate(parts[1].trim());
+            } else {
+                startDate = parseSpanishDate(dep.fecha_viaje);
+                if (startDate && !isNaN(startDate)) {
+                    const dText = plan.duracion || '';
+                    const dMatch = dText.match(/(\d+)\s*noches/i);
+                    const nights = dMatch ? parseInt(dMatch[1]) : 0;
+                    if (nights > 0) {
+                        endDate = new Date(startDate);
+                        endDate.setDate(endDate.getDate() + nights);
+                    } else {
+                        endDate = startDate;
+                    }
+                }
+            }
+
+            if (!startDate || isNaN(startDate)) return;
+
+            const diffTimeStart = startDate - today;
+            const diffDaysStart = Math.ceil(diffTimeStart / (1000 * 60 * 60 * 24));
+
+            if (diffDaysStart === 1) {
+                alerts['1d_checkin'].push(dep);
+            } else if (diffDaysStart === 2) {
                 alerts['2d'].push(dep);
-            } else if (diffDays === 3) {
+            } else if (diffDaysStart === 3) {
                 alerts['3d'].push(dep);
-            } else if (diffDays === 4) {
+            } else if (diffDaysStart === 4) {
                 alerts['4d'].push(dep);
+            }
+
+            // Check-out alert: exactly 1 day before return
+            // Only if return is after start (nights > 0 or it's a range with diff dates) and it is international or > 1 night
+            if (endDate && !isNaN(endDate) && endDate > startDate) {
+                const diffTimeEnd = endDate - today;
+                const diffDaysEnd = Math.ceil(diffTimeEnd / (1000 * 60 * 60 * 24));
+
+                const dText = plan.duracion || '';
+                const dMatch = dText.match(/(\d+)\s*noches/i);
+                const nights = dMatch ? parseInt(dMatch[1]) : 0;
+
+                const isInternational = plan.categoria && plan.categoria.toLowerCase() === 'internacional';
+                const hasMultipleNights = nights > 1;
+
+                if (diffDaysEnd === 1 && (isInternational || hasMultipleNights)) {
+                    alerts['1d_checkout'].push(dep);
+                }
             }
         });
 
@@ -195,7 +246,7 @@ export const NotificationsComponent = {
 
     updateNotificationBadge() {
         const alerts = this.getNotificationsData();
-        const totalAlerts = alerts['2d'].length + alerts['3d'].length + alerts['4d'].length;
+        const totalAlerts = alerts['1d_checkin'].length + alerts['1d_checkout'].length + alerts['2d'].length + alerts['3d'].length + alerts['4d'].length;
 
         const badge = document.getElementById('nav-notification-badge');
         if (badge) {
@@ -212,16 +263,20 @@ export const NotificationsComponent = {
         const alerts = this.getNotificationsData();
 
         // 1. Render counts in cards headers
+        const el1dCheckinCount = document.getElementById('alert-count-1d-checkin');
+        const el1dCheckoutCount = document.getElementById('alert-count-1d-checkout');
         const el2dCount = document.getElementById('alert-count-2d');
         const el3dCount = document.getElementById('alert-count-3d');
         const el4dCount = document.getElementById('alert-count-4d');
         
+        if (el1dCheckinCount) el1dCheckinCount.innerText = alerts['1d_checkin'].length;
+        if (el1dCheckoutCount) el1dCheckoutCount.innerText = alerts['1d_checkout'].length;
         if (el2dCount) el2dCount.innerText = alerts['2d'].length;
         if (el3dCount) el3dCount.innerText = alerts['3d'].length;
         if (el4dCount) el4dCount.innerText = alerts['4d'].length;
 
         // 2. Render lists contents
-        const renderList = (listId, listData) => {
+        const renderList = (listId, listData, actionText = 'Ver Finanzas') => {
             const container = document.getElementById(listId);
             if (!container) return;
             container.innerHTML = '';
@@ -253,13 +308,15 @@ export const NotificationsComponent = {
                         
                         <button data-action="open-financial-modal" data-plan-id="${dep.plan_id}" data-fecha-viaje="${dep.fecha_viaje}"
                             class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-2.5 rounded-xl text-[9px] uppercase tracking-widest transition-all shadow-sm hover:-translate-y-0.5">
-                            <i class="ph ph-eye mr-1 text-xs"></i> Ver Finanzas
+                            <i class="ph ph-eye mr-1 text-xs"></i> ${actionText}
                         </button>
                     </div>
                 `;
             });
         };
 
+        renderList('alert-list-1d-checkin', alerts['1d_checkin'], 'Ver Check-in / Finanzas');
+        renderList('alert-list-1d-checkout', alerts['1d_checkout'], 'Ver Check-out / Finanzas');
         renderList('alert-list-2d', alerts['2d']);
         renderList('alert-list-3d', alerts['3d']);
         renderList('alert-list-4d', alerts['4d']);

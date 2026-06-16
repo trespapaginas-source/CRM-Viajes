@@ -94,6 +94,8 @@ const sendResendEmail = async (alerts) => {
         `;
     };
 
+    htmlContent += renderAlertGroup('🔑 Check-in Requerido (Salidas en 1 día)', '#8b5cf6', alerts['1d_checkin']);
+    htmlContent += renderAlertGroup('🔔 Check-out Requerido (Regresos en 1 día)', '#ec4899', alerts['1d_checkout']);
     htmlContent += renderAlertGroup('🚨 Críticas (Salidas en 2 días)', '#ef4444', alerts['2d']);
     htmlContent += renderAlertGroup('⚠️ Urgentes (Salidas en 3 días)', '#f97316', alerts['3d']);
     htmlContent += renderAlertGroup('ℹ️ Informativas (Salidas en 4 días)', '#3b82f6', alerts['4d']);
@@ -113,7 +115,7 @@ const sendResendEmail = async (alerts) => {
         },
         body: JSON.stringify({
             from: 'onboarding@resend.dev',
-            to: ['vivemarketingdigital@gmail.com', 'trespa.paginas@gmail.com'],
+            to: ['vivemarketingdigital@gmail.com', 'trespa.paginas@gmail.com', 'luismendezramirez@hotmail.es'],
             subject: '🚨 CRM Vive Travel: Alerta de Salidas Próximas',
             html: htmlContent
         })
@@ -121,6 +123,27 @@ const sendResendEmail = async (alerts) => {
 
     if (!response.ok) {
         const errText = await response.text();
+        if (response.status === 403 && errText.includes('You can only send testing emails to your own email address')) {
+            console.warn("Resend Sandbox detected. Retrying send to verified sandbox owner (trespa.paginas@gmail.com)...");
+            const retryResponse = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${RESEND_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    from: 'onboarding@resend.dev',
+                    to: ['trespa.paginas@gmail.com'],
+                    subject: '🚨 CRM Vive Travel: Alerta de Salidas Próximas (Sandbox Mode)',
+                    html: htmlContent
+                })
+            });
+            if (!retryResponse.ok) {
+                const retryErrText = await retryResponse.text();
+                throw new Error(`Resend API Error (Retry): ${retryResponse.status} - ${retryErrText}`);
+            }
+            return await retryResponse.json();
+        }
         throw new Error(`Resend API Error: ${response.status} - ${errText}`);
     }
 

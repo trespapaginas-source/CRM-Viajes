@@ -10,8 +10,10 @@ export const PartnersComponent = {
     activeTab: 'desempeno',
     movements: [],
     corporateExpenses: [],
+    fondosFlotantes: [],
     fallbackActive: false,
     fallbackGastosActive: false,
+    fallbackFondosActive: false,
     porcentajeRetencion: 10,
     currentAdelantoDistribute: false,
 
@@ -107,6 +109,7 @@ export const PartnersComponent = {
         await this.loadMovements();
         await this.loadCorporateExpenses();
         await this.loadAgencyConfig();
+        await this.loadFondosFlotantes();
         
         const adminSettings = document.getElementById('pvm-admin-settings');
         if (currentUserEmail === 'trespa.paginas@gmail.com') {
@@ -167,6 +170,16 @@ export const PartnersComponent = {
                 this.saveSettings();
             } else if (action === 'remove-partner') {
                 this.removePartner(parseInt(target.dataset.idx));
+            } else if (action === 'pvm-edit-fondo') {
+                this.handleEditFondoFlotante(target.dataset.id);
+            } else if (action === 'pvm-release-fondo') {
+                if (confirm("¿Estás seguro de que deseas liberar/aplicar este fondo a su reserva? Dejará de ser considerado liquidez flotante disponible.")) {
+                    this.handleReleaseFondoFlotante(target.dataset.id);
+                }
+            } else if (action === 'pvm-delete-fondo') {
+                if (confirm("¿Estás seguro de que deseas eliminar este fondo flotante?")) {
+                    this.handleDeleteFondoFlotante(target.dataset.id);
+                }
             } else if (action === 'close-partners-vault' || e.target.id === 'pvm-bg') {
                 UI.closeModal('partners-vault-modal', 'pvm-bg', 'pvm-content');
                 UI.closeModal('pvm-movimiento-modal', 'pvm-mov-bg', 'pvm-mov-content');
@@ -293,6 +306,28 @@ export const PartnersComponent = {
             ejecutarForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleEjecutarSubmit();
+            });
+        }
+
+        const fondoForm = document.getElementById('pvm-fondo-form');
+        if (fondoForm) {
+            fondoForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleFondoFlotanteSubmit();
+            });
+        }
+
+        const cancelFondoBtn = document.getElementById('pvm-btn-cancel-fondo');
+        if (cancelFondoBtn) {
+            cancelFondoBtn.addEventListener('click', () => {
+                this.clearFondoForm();
+            });
+        }
+
+        const statusFondosFilter = document.getElementById('pvm-fondos-filtro-estado');
+        if (statusFondosFilter) {
+            statusFondosFilter.addEventListener('change', () => {
+                this.renderFondosFlotantesList();
             });
         }
 
@@ -951,7 +986,7 @@ export const PartnersComponent = {
     // TAB NAVIGATION
     switchTab(tabName) {
         this.activeTab = tabName;
-        const tabs = ['desempeno', 'saldos', 'rentabilidad-mensual', 'gastos-corporativos', 'planes-rendimiento', 'adelantos-operativos'];
+        const tabs = ['desempeno', 'saldos', 'rentabilidad-mensual', 'gastos-corporativos', 'planes-rendimiento', 'adelantos-operativos', 'fondos-flotantes'];
         tabs.forEach(t => {
             const btn = document.getElementById(`pvm-tab-btn-${t}`);
             const panel = document.getElementById(`pvm-panel-${t}`);
@@ -986,6 +1021,8 @@ export const PartnersComponent = {
             this.renderPlanesRendimiento();
         } else if (this.activeTab === 'adelantos-operativos') {
             this.renderAdelantosPanel();
+        } else if (this.activeTab === 'fondos-flotantes') {
+            this.renderFondosFlotantesPanel();
         }
     },
 
@@ -2050,6 +2087,26 @@ export const PartnersComponent = {
             return UI.showToast(`Fondos insuficientes. El socio sólo tiene disponible ${formatCOP(disponible)}.`, "error");
         }
 
+        // Bloqueo de retiros si comprometen fondos flotantes
+        const totalFloatPool = (this.fondosFlotantes || [])
+            .filter(f => f.estado === 'disponible')
+            .reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+            
+        let totalSociosDisp = 0;
+        this.sociosConfig.forEach(soc => {
+            const ganado = histUN * (soc.porcentaje / 100);
+            const retirado = this.movements
+                .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
+                .reduce((acc, m) => acc + m.monto, 0);
+            totalSociosDisp += (ganado - retirado);
+        });
+        const balanceF = histUB > histGC ? histRetenidoFondo : -(histGC - histUB);
+        const cajaTeoricaPre = balanceF + totalSociosDisp;
+
+        if (tipo === 'retiro' && (cajaTeoricaPre - monto) < totalFloatPool) {
+            return UI.showToast(`Operación bloqueada: Mantener el fondo de clientes en custodia requiere un respaldo de ${formatCOP(totalFloatPool)} en caja. Caja estimada restante: ${formatCOP(cajaTeoricaPre - monto)}.`, "error");
+        }
+
         const res = await this.saveMovement(email, tipo, monto, fecha, concepto);
         if (res.success) {
             UI.showToast(`Movimiento registrado con éxito.`, "success");
@@ -2418,7 +2475,11 @@ export const PartnersComponent = {
             totalSociosDisponible += (ganadoHistorico - totalRetirado);
         });
         const balanceFondo = histUB > histGC ? histRetenidoFondo : -(histGC - histUB);
-        const cajaTeorica = balanceFondo + totalSociosDisponible;
+        // Sumar fondos flotantes activos a la caja teórica
+        const totalFloatPool = (this.fondosFlotantes || [])
+            .filter(f => f.estado === 'disponible')
+            .reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+        const cajaTeorica = balanceFondo + totalSociosDisponible + totalFloatPool;
         const liquidezLibre = cajaTeorica - totalTransito - totalVouchers;
 
         // Render KPI Texts
@@ -3017,5 +3078,339 @@ export const PartnersComponent = {
         if (previewImg) previewImg.src = '';
         if (previewName) previewName.innerText = '';
         if (fileNameLabel) fileNameLabel.innerText = 'Adjuntar Comprobante';
+    },
+
+    // DATABASE FONDOS FLOTANTES
+    async loadFondosFlotantes() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('fondos_flotantes')
+                .select('*')
+                .is('deleted_at', null)
+                .order('fecha_registro', { ascending: false });
+            if (error) throw error;
+            this.fondosFlotantes = data || [];
+            this.fallbackFondosActive = false;
+        } catch (e) {
+            console.warn('Supabase fallback for fondos flotantes:', e);
+            const local = localStorage.getItem('trv_fondos_flotantes');
+            this.fondosFlotantes = local ? JSON.parse(local) : [];
+            this.fallbackFondosActive = true;
+        }
+    },
+
+    async saveFondoFlotante(clienteNombre, planNombre, monto, fechaRegistro, fechaLimite, estado = 'disponible') {
+        const userEmail = window.AuthModule?.currentUser?.email || 'unknown@travelers.com';
+        const newFondo = {
+            id: crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2) + Date.now().toString(36)),
+            cliente_nombre: clienteNombre,
+            plan_nombre: planNombre,
+            monto: Number(monto),
+            fecha_registro: fechaRegistro,
+            fecha_limite: fechaLimite,
+            estado,
+            usuario_email: userEmail,
+            created_at: new Date().toISOString()
+        };
+
+        if (this.fallbackFondosActive) {
+            this.fondosFlotantes.unshift(newFondo);
+            localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+            return { success: true };
+        } else {
+            try {
+                const row = { ...newFondo };
+                delete row.id;
+                const { error } = await supabaseClient
+                    .from('fondos_flotantes')
+                    .insert([row]);
+                if (error) throw error;
+                await this.loadFondosFlotantes();
+                return { success: true };
+            } catch (e) {
+                console.error('Error saving fondo flotante to Supabase, saving to local instead:', e);
+                this.fallbackFondosActive = true;
+                this.fondosFlotantes.unshift(newFondo);
+                localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+                return { success: true, fallback: true };
+            }
+        }
+    },
+
+    async updateFondoFlotante(id, clienteNombre, planNombre, monto, fechaRegistro, fechaLimite, estado) {
+        if (this.fallbackFondosActive) {
+            this.fondosFlotantes = this.fondosFlotantes.map(f => f.id === id ? {
+                ...f,
+                cliente_nombre: clienteNombre,
+                plan_nombre: planNombre,
+                monto: Number(monto),
+                fecha_registro: fechaRegistro,
+                fecha_limite: fechaLimite,
+                estado
+            } : f);
+            localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+            return { success: true };
+        } else {
+            try {
+                const { error } = await supabaseClient
+                    .from('fondos_flotantes')
+                    .update({
+                        cliente_nombre: clienteNombre,
+                        plan_nombre: planNombre,
+                        monto: Number(monto),
+                        fecha_registro: fechaRegistro,
+                        fecha_limite: fechaLimite,
+                        estado
+                    })
+                    .eq('id', id);
+                if (error) throw error;
+                await this.loadFondosFlotantes();
+                return { success: true };
+            } catch (e) {
+                console.error('Error updating fondo flotante in Supabase, updating local instead:', e);
+                this.fondosFlotantes = this.fondosFlotantes.map(f => f.id === id ? {
+                    ...f,
+                    cliente_nombre: clienteNombre,
+                    plan_nombre: planNombre,
+                    monto: Number(monto),
+                    fecha_registro: fechaRegistro,
+                    fecha_limite: fechaLimite,
+                    estado
+                } : f);
+                localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+                return { success: true };
+            }
+        }
+    },
+
+    async releaseFondoFlotante(id) {
+        if (this.fallbackFondosActive) {
+            this.fondosFlotantes = this.fondosFlotantes.map(f => f.id === id ? { ...f, estado: 'aplicado_reserva' } : f);
+            localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+            return { success: true };
+        } else {
+            try {
+                const { error } = await supabaseClient
+                    .from('fondos_flotantes')
+                    .update({ estado: 'aplicado_reserva' })
+                    .eq('id', id);
+                if (error) throw error;
+                await this.loadFondosFlotantes();
+                return { success: true };
+            } catch (e) {
+                console.error('Error releasing fondo flotante in Supabase, updating local instead:', e);
+                this.fondosFlotantes = this.fondosFlotantes.map(f => f.id === id ? { ...f, estado: 'aplicado_reserva' } : f);
+                localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+                return { success: true };
+            }
+        }
+    },
+
+    async deleteFondoFlotante(id) {
+        if (this.fallbackFondosActive) {
+            this.fondosFlotantes = this.fondosFlotantes.filter(f => f.id !== id);
+            localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+            return { success: true };
+        } else {
+            try {
+                const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+                const { error } = await supabaseClient
+                    .from('fondos_flotantes')
+                    .update({ deleted_at: new Date().toISOString(), deleted_by: user })
+                    .eq('id', id);
+                if (error) throw error;
+                await this.loadFondosFlotantes();
+                return { success: true };
+            } catch (e) {
+                console.error('Error deleting fondo flotante from Supabase, attempting local:', e);
+                this.fondosFlotantes = this.fondosFlotantes.filter(f => f.id !== id);
+                localStorage.setItem('trv_fondos_flotantes', JSON.stringify(this.fondosFlotantes));
+                return { success: true };
+            }
+        }
+    },
+
+    // SUBMIT HANDLERS
+    async handleFondoFlotanteSubmit() {
+        const id = document.getElementById('pvm-fondo-id').value;
+        const cliente = document.getElementById('pvm-fondo-cliente').value;
+        const plan = document.getElementById('pvm-fondo-plan').value;
+        const monto = UI.parseCurrency(document.getElementById('pvm-fondo-monto').value) || 0;
+        const fechaReg = document.getElementById('pvm-fondo-fecha-registro').value;
+        const fechaLim = document.getElementById('pvm-fondo-fecha-limite').value;
+
+        if (monto <= 0) {
+            return UI.showToast("El monto debe ser mayor a cero.", "error");
+        }
+        if (!cliente || !plan || !fechaReg || !fechaLim) {
+            return UI.showToast("Por favor complete todos los campos obligatorios.", "error");
+        }
+
+        let res;
+        if (id) {
+            res = await this.updateFondoFlotante(id, cliente, plan, monto, fechaReg, fechaLim, 'disponible');
+        } else {
+            res = await this.saveFondoFlotante(cliente, plan, monto, fechaReg, fechaLim, 'disponible');
+        }
+
+        if (res.success) {
+            UI.showToast(id ? "Fondo flotante actualizado." : "Fondo flotante registrado.", "success");
+            this.clearFondoForm();
+            this.renderFondosFlotantesPanel();
+            this.calculateDistribution();
+        } else {
+            UI.showToast("Error al procesar fondo flotante.", "error");
+        }
+    },
+
+    async handleEditFondoFlotante(id) {
+        const f = this.fondosFlotantes.find(x => x.id === id);
+        if (!f) return;
+
+        document.getElementById('pvm-fondo-id').value = f.id;
+        document.getElementById('pvm-fondo-cliente').value = f.cliente_nombre;
+        document.getElementById('pvm-fondo-plan').value = f.plan_nombre;
+        UI.setCurrencyValue('pvm-fondo-monto', f.monto);
+        document.getElementById('pvm-fondo-fecha-registro').value = f.fecha_registro;
+        document.getElementById('pvm-fondo-fecha-limite').value = f.fecha_limite;
+
+        // Change title and button text
+        document.getElementById('pvm-fondo-form-title').innerHTML = `<i class="ph ph-note-pencil mr-1.5 text-base text-indigo-500"></i> Editar Fondo Flotante`;
+        document.getElementById('pvm-btn-save-fondo').innerHTML = `<i class="ph ph-floppy-disk text-xs"></i> Guardar`;
+        document.getElementById('pvm-btn-cancel-fondo').classList.remove('hidden');
+    },
+
+    async handleReleaseFondoFlotante(id) {
+        const res = await this.releaseFondoFlotante(id);
+        if (res.success) {
+            UI.showToast("Fondo flotante liberado y aplicado a su reserva.", "success");
+            this.renderFondosFlotantesPanel();
+            this.calculateDistribution();
+        } else {
+            UI.showToast("Error al liberar fondo flotante.", "error");
+        }
+    },
+
+    async handleDeleteFondoFlotante(id) {
+        const res = await this.deleteFondoFlotante(id);
+        if (res.success) {
+            UI.showToast("Fondo flotante eliminado con éxito.", "success");
+            this.clearFondoForm();
+            this.renderFondosFlotantesPanel();
+            this.calculateDistribution();
+        } else {
+            UI.showToast("Error al eliminar fondo flotante.", "error");
+        }
+    },
+
+    clearFondoForm() {
+        document.getElementById('pvm-fondo-id').value = '';
+        document.getElementById('pvm-fondo-cliente').value = '';
+        document.getElementById('pvm-fondo-plan').value = '';
+        document.getElementById('pvm-fondo-monto').value = '';
+        document.getElementById('pvm-fondo-fecha-registro').value = new Date().toISOString().substring(0, 10);
+        document.getElementById('pvm-fondo-fecha-limite').value = '';
+
+        document.getElementById('pvm-fondo-form-title').innerHTML = `<i class="ph ph-plus-circle mr-1.5 text-base text-slate-500"></i> Registrar Fondo Flotante`;
+        document.getElementById('pvm-btn-save-fondo').innerHTML = `<i class="ph ph-floppy-disk text-xs"></i> Registrar`;
+        document.getElementById('pvm-btn-cancel-fondo').classList.add('hidden');
+    },
+
+    // RENDER HANDLERS
+    renderFondosFlotantesPanel() {
+        const banner = document.getElementById('pvm-fondos-fallback-banner');
+        if (banner) {
+            if (this.fallbackFondosActive) banner.classList.remove('hidden');
+            else banner.classList.add('hidden');
+        }
+
+        // Set default date if empty
+        const dateReg = document.getElementById('pvm-fondo-fecha-registro');
+        if (dateReg && !dateReg.value) {
+            dateReg.value = new Date().toISOString().substring(0, 10);
+        }
+
+        // Compute KPIs
+        const activeFondos = (this.fondosFlotantes || []).filter(f => !f.deleted_at);
+        const totalActivos = activeFondos.reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+        
+        const disponibles = activeFondos.filter(f => f.estado === 'disponible').reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+        const aplicados = activeFondos.filter(f => f.estado === 'aplicado_reserva').reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+
+        const rol = window.AuthModule?.userProfile?.rol;
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+
+        if (document.getElementById('pvm-fondos-kpi-total')) {
+            document.getElementById('pvm-fondos-kpi-total').innerText = isAdmin ? formatCOP(totalActivos) : '***';
+        }
+        if (document.getElementById('pvm-fondos-kpi-disponibles')) {
+            document.getElementById('pvm-fondos-kpi-disponibles').innerText = isAdmin ? formatCOP(disponibles) : '***';
+        }
+        if (document.getElementById('pvm-fondos-kpi-aplicados')) {
+            document.getElementById('pvm-fondos-kpi-aplicados').innerText = isAdmin ? formatCOP(aplicados) : '***';
+        }
+
+        this.renderFondosFlotantesList();
+    },
+
+    renderFondosFlotantesList() {
+        const statusFilter = document.getElementById('pvm-fondos-filtro-estado')?.value || 'todos';
+        const activeFondos = (this.fondosFlotantes || []).filter(f => !f.deleted_at);
+
+        const filtered = activeFondos.filter(f => {
+            if (statusFilter === 'todos') return true;
+            return f.estado === statusFilter;
+        });
+
+        const countEl = document.getElementById('pvm-fondos-count');
+        if (countEl) countEl.innerText = `${filtered.length} Registros`;
+
+        const tb = document.getElementById('pvm-fondos-list');
+        const emptyState = document.getElementById('pvm-fondos-empty');
+
+        if (!tb || !emptyState) return;
+
+        tb.innerHTML = '';
+
+        if (filtered.length === 0) {
+            emptyState.classList.remove('hidden');
+            tb.parentElement.classList.add('hidden');
+        } else {
+            emptyState.classList.add('hidden');
+            tb.parentElement.classList.remove('hidden');
+
+            const rol = window.AuthModule?.userProfile?.rol;
+            const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+
+            filtered.forEach(f => {
+                const isDisponible = f.estado === 'disponible';
+                const statusBadge = isDisponible
+                    ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase tracking-widest"><i class="ph ph-trend-up mr-1 text-[10px]"></i>Flotante</span>`
+                    : `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-slate-50 text-slate-500 border border-slate-200 uppercase tracking-widest"><i class="ph ph-lock mr-1 text-[10px]"></i>Aplicado</span>`;
+
+                let actionBtns = '';
+                if (isAdmin) {
+                    if (isDisponible) {
+                        actionBtns += `<button type="button" data-action="pvm-release-fondo" data-id="${f.id}" class="text-emerald-500 hover:text-emerald-700 transition-colors p-1" title="Aplicar a reserva (Bloquear)"><i class="ph ph-lock text-sm"></i></button>`;
+                        actionBtns += `<button type="button" data-action="pvm-edit-fondo" data-id="${f.id}" class="text-indigo-500 hover:text-indigo-700 transition-colors p-1 ml-1" title="Editar"><i class="ph ph-note-pencil text-sm"></i></button>`;
+                    }
+                    actionBtns += `<button type="button" data-action="pvm-delete-fondo" data-id="${f.id}" class="text-red-400 hover:text-red-600 transition-colors p-1 ml-1" title="Eliminar"><i class="ph ph-trash text-sm"></i></button>`;
+                } else {
+                    actionBtns = `<span class="text-slate-300 text-[10px]">-</span>`;
+                }
+
+                tb.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="py-2 px-3 whitespace-nowrap text-[11px] font-medium text-slate-500">${formatShortDate(f.fecha_registro)}</td>
+                        <td class="py-2 px-3 text-[11px] font-black text-slate-800">${UI.sanitize(f.cliente_nombre)}</td>
+                        <td class="py-2 px-3 text-[11px] text-slate-600 max-w-[200px] truncate" title="${UI.sanitize(f.plan_nombre)}">${UI.sanitize(f.plan_nombre)}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-right text-[11px] font-black text-slate-800">${isAdmin ? formatCOP(f.monto) : '***'}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-[11px] font-bold text-rose-500">${formatShortDate(f.fecha_limite)}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-center">${statusBadge}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-center">${actionBtns}</td>
+                    </tr>
+                `;
+            });
+        }
     }
 };

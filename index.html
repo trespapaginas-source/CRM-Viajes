@@ -857,7 +857,7 @@
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
                         <div>
                             <h3 class="text-2xl font-black text-slate-800 tracking-tight">Alertas y Notificaciones</h3>
-                            <p class="text-xs font-bold text-slate-400 uppercase tracking-[0.25em] mt-0.5">Control de salidas próximas (4, 3 y 2 días antes)</p>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-[0.25em] mt-0.5">Control logístico y operacional de salidas y regresos</p>
                         </div>
                         <div class="flex items-center gap-3">
                             <button id="btn-send-email-alerts" class="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2.5 px-5 rounded-xl text-[10px] uppercase tracking-widest transition-all shadow-sm hover:-translate-y-0.5 flex items-center">
@@ -866,43 +866,83 @@
                         </div>
                     </div>
                     
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="notifications-container">
-                        <!-- Alertas críticas: 2 días -->
-                        <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
-                            <div class="px-5 py-4 border-b border-rose-100 bg-rose-50/50 flex justify-between items-center shrink-0">
-                                <h4 class="font-black text-[10px] uppercase text-rose-700 tracking-widest flex items-center">
-                                    <i class="ph ph-warning-circle mr-1.5 text-base text-rose-500"></i> Críticas (Salen en 2 días)
-                                </h4>
-                                <span class="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-2d">0</span>
+                    <!-- CONTROL DE OPERACIONES (MAÑANA / 1 DÍA) -->
+                    <div class="mb-8">
+                        <h4 class="text-[10px] font-black text-slate-450 uppercase tracking-[0.25em] mb-4 flex items-center">
+                            <i class="ph ph-calendar-check mr-2 text-base text-slate-400"></i> Operaciones Próximas (Mañana / 1 Día)
+                        </h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Check-in: 1 día -->
+                            <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[250px]">
+                                <div class="px-5 py-4 border-b border-violet-100 bg-violet-50/50 flex justify-between items-center shrink-0">
+                                    <h4 class="font-black text-[10px] uppercase text-violet-700 tracking-widest flex items-center">
+                                        <i class="ph ph-key mr-1.5 text-base text-violet-550"></i> Check-in Requerido (Salidas)
+                                    </h4>
+                                    <span class="bg-violet-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-1d-checkin">0</span>
+                                </div>
+                                <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-1d-checkin">
+                                    <!-- list of 1d check-in alerts -->
+                                </div>
                             </div>
-                            <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-2d">
-                                <!-- list of 2d alerts -->
+
+                            <!-- Check-out: 1 día -->
+                            <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[250px]">
+                                <div class="px-5 py-4 border-b border-pink-100 bg-pink-50/50 flex justify-between items-center shrink-0">
+                                    <h4 class="font-black text-[10px] uppercase text-pink-700 tracking-widest flex items-center">
+                                        <i class="ph ph-bell mr-1.5 text-base text-pink-550"></i> Check-out Requerido (Regresos)
+                                    </h4>
+                                    <span class="bg-pink-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-1d-checkout">0</span>
+                                </div>
+                                <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-1d-checkout">
+                                    <!-- list of 1d check-out alerts -->
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Alertas urgentes: 3 días -->
-                        <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
-                            <div class="px-5 py-4 border-b border-orange-100 bg-orange-50/50 flex justify-between items-center shrink-0">
-                                <h4 class="font-black text-[10px] uppercase text-orange-700 tracking-widest flex items-center">
-                                    <i class="ph ph-warning mr-1.5 text-base text-orange-500"></i> Urgentes (Salen en 3 días)
-                                </h4>
-                                <span class="bg-orange-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-3d">0</span>
+                    <!-- CONTROL DE SALIDAS PRE-VIAJE (2, 3 Y 4 DÍAS ANTES) -->
+                    <div>
+                        <h4 class="text-[10px] font-black text-slate-450 uppercase tracking-[0.25em] mb-4 flex items-center">
+                            <i class="ph ph-hourglass mr-2 text-base text-slate-400"></i> Cronograma Pre-Viaje (Monitoreo Financiero)
+                        </h4>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="notifications-container">
+                            <!-- Alertas críticas: 2 días -->
+                            <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                                <div class="px-5 py-4 border-b border-rose-100 bg-rose-50/50 flex justify-between items-center shrink-0">
+                                    <h4 class="font-black text-[10px] uppercase text-rose-700 tracking-widest flex items-center">
+                                        <i class="ph ph-warning-circle mr-1.5 text-base text-rose-500"></i> Críticas (Salen en 2 días)
+                                    </h4>
+                                    <span class="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-2d">0</span>
+                                </div>
+                                <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-2d">
+                                    <!-- list of 2d alerts -->
+                                </div>
                             </div>
-                            <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-3d">
-                                <!-- list of 3d alerts -->
-                            </div>
-                        </div>
 
-                        <!-- Alertas informativas: 4 días -->
-                        <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
-                            <div class="px-5 py-4 border-b border-blue-100 bg-blue-50/50 flex justify-between items-center shrink-0">
-                                <h4 class="font-black text-[10px] uppercase text-blue-700 tracking-widest flex items-center">
-                                    <i class="ph ph-info mr-1.5 text-base text-blue-500"></i> Informativas (Salen en 4 días)
-                                </h4>
-                                <span class="bg-blue-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-4d">0</span>
+                            <!-- Alertas urgentes: 3 días -->
+                            <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                                <div class="px-5 py-4 border-b border-orange-100 bg-orange-50/50 flex justify-between items-center shrink-0">
+                                    <h4 class="font-black text-[10px] uppercase text-orange-700 tracking-widest flex items-center">
+                                        <i class="ph ph-warning mr-1.5 text-base text-orange-500"></i> Urgentes (Salen en 3 días)
+                                    </h4>
+                                    <span class="bg-orange-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-3d">0</span>
+                                </div>
+                                <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-3d">
+                                    <!-- list of 3d alerts -->
+                                </div>
                             </div>
-                            <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-4d">
-                                <!-- list of 4d alerts -->
+
+                            <!-- Alertas informativas: 4 días -->
+                            <div class="bg-white rounded-[1.5rem] border border-slate-200/50 shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                                <div class="px-5 py-4 border-b border-blue-100 bg-blue-50/50 flex justify-between items-center shrink-0">
+                                    <h4 class="font-black text-[10px] uppercase text-blue-700 tracking-widest flex items-center">
+                                        <i class="ph ph-info mr-1.5 text-base text-blue-500"></i> Informativas (Salen en 4 días)
+                                    </h4>
+                                    <span class="bg-blue-500 text-white text-[9px] px-2 py-0.5 rounded-lg font-black" id="alert-count-4d">0</span>
+                                </div>
+                                <div class="p-4 overflow-y-auto flex-1 custom-scrollbar space-y-4" id="alert-list-4d">
+                                    <!-- list of 4d alerts -->
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -4123,6 +4163,9 @@
                 <button type="button" data-action="pvm-switch-tab" data-tab="adelantos-operativos" id="pvm-tab-btn-adelantos-operativos" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
                     <i class="ph ph-handshake mr-1"></i> Adelantos Operativos
                 </button>
+                <button type="button" data-action="pvm-switch-tab" data-tab="fondos-flotantes" id="pvm-tab-btn-fondos-flotantes" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-slate-500 hover:text-slate-800 hover:bg-slate-100/80">
+                    <i class="ph ph-piggy-bank mr-1"></i> Fondo Flotante
+                </button>
             </div>
 
             <div class="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-6 space-y-5">
@@ -4825,6 +4868,126 @@
                                 <div id="pvm-adelantos-empty" class="hidden py-8 text-center">
                                     <i class="ph ph-handshake text-3xl text-slate-200 mb-2"></i>
                                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin adelantos operativos registrados</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel 7: Fondo Flotante -->
+                <div id="pvm-panel-fondos-flotantes" class="space-y-5 hidden">
+                    <!-- Fila de KPIs de Fondo Flotante -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Fondos Flotantes Activos</p>
+                                <p class="text-base font-black text-slate-800 mt-0.5 tracking-tight" id="pvm-fondos-kpi-total">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-500"><i class="ph ph-piggy-bank text-lg"></i></div>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Disponibles para Operaciones</p>
+                                <p class="text-base font-black text-emerald-600 mt-0.5 tracking-tight" id="pvm-fondos-kpi-disponibles">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-500"><i class="ph ph-trend-up text-lg"></i></div>
+                        </div>
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Aplicados a Reservas (Cerrados)</p>
+                                <p class="text-base font-black text-slate-500 mt-0.5 tracking-tight" id="pvm-fondos-kpi-aplicados">$0</p>
+                            </div>
+                            <div class="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-500"><i class="ph ph-lock text-lg"></i></div>
+                        </div>
+                    </div>
+
+                    <div id="pvm-fondos-fallback-banner" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-start gap-3 shadow-sm">
+                        <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5"></i>
+                        <div>
+                            <p class="text-xs font-bold text-amber-900">Guardado Local Activo (Fallback)</p>
+                            <p class="text-[10px] text-amber-700 mt-0.5 leading-relaxed">
+                                La tabla <code class="bg-amber-100/80 px-1 py-0.5 rounded text-[9px] font-mono">fondos_flotantes</code> no existe o no es accesible. Los datos se guardarán localmente en el navegador.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Fila Principal: Formulario y Listado -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                        <!-- Formulario de Registro/Edición -->
+                        <div class="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm h-fit">
+                            <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider mb-3 flex items-center" id="pvm-fondo-form-title">
+                                <i class="ph ph-plus-circle mr-1.5 text-base text-slate-500"></i> Registrar Fondo Flotante
+                            </h4>
+                            <form id="pvm-fondo-form" class="space-y-3">
+                                <input type="hidden" id="pvm-fondo-id">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Nombre del Cliente / Titular</label>
+                                    <input type="text" id="pvm-fondo-cliente" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="Ej: Juan Camilo Rivera...">
+                                </div>
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Plan Provisional / Concepto</label>
+                                    <input type="text" id="pvm-fondo-plan" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="Ej: Viaje a San Andrés Agosto 2026...">
+                                </div>
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Monto Recibido ($)</label>
+                                    <input type="text" id="pvm-fondo-monto" required inputmode="numeric" class="currency-input w-full text-xs font-black bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm text-slate-800" placeholder="0">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Fecha Recibo</label>
+                                        <input type="date" id="pvm-fondo-fecha-registro" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm text-slate-800">
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Límite para Aplicar</label>
+                                        <input type="date" id="pvm-fondo-fecha-limite" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm text-slate-800">
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 pt-2">
+                                    <button type="button" id="pvm-btn-cancel-fondo" class="hidden flex-1 border border-slate-200 text-slate-500 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Cancelar</button>
+                                    <button type="submit" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5" id="pvm-btn-save-fondo">
+                                        <i class="ph ph-floppy-disk text-xs"></i> Registrar
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Listado de Fondos Flotantes -->
+                        <div class="lg:col-span-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div class="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                                    <h4 class="text-[9px] font-black text-slate-600 uppercase tracking-widest flex items-center">
+                                        <i class="ph ph-list-bullet mr-1.5 text-base"></i> Fondos en Custodia
+                                    </h4>
+                                    <div class="flex items-center gap-2">
+                                        <select id="pvm-fondos-filtro-estado" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold text-slate-700 outline-none cursor-pointer">
+                                            <option value="todos">Todos los estados</option>
+                                            <option value="disponible">Disponibles (Flotantes)</option>
+                                            <option value="aplicado_reserva">Aplicados a Reserva</option>
+                                        </select>
+                                        <span class="bg-indigo-100 text-indigo-700 text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest" id="pvm-fondos-count">0 Registros</span>
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left text-xs border-collapse">
+                                        <thead class="bg-white text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 tracking-widest whitespace-nowrap">
+                                            <tr>
+                                                <th class="py-2 px-3">Fecha Recibo</th>
+                                                <th class="py-2 px-3">Cliente</th>
+                                                <th class="py-2 px-3">Plan / Concepto</th>
+                                                <th class="py-2 px-3 text-right">Monto</th>
+                                                <th class="py-2 px-3">Límite Aplicar</th>
+                                                <th class="py-2 px-3 text-center">Estado</th>
+                                                <th class="py-2 px-3 text-center">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="pvm-fondos-list" class="divide-y divide-slate-100/50">
+                                            <!-- Rendered dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="pvm-fondos-empty" class="hidden py-8 text-center">
+                                    <i class="ph ph-piggy-bank text-3xl text-slate-200 mb-2"></i>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin fondos flotantes registrados</p>
                                 </div>
                             </div>
                         </div>
