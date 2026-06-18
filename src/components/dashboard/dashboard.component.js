@@ -1,7 +1,7 @@
 import { DataService } from '../../../js/services/supabase.service.js';
 import { Store } from '../../core/store.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, parseSpanishDate } from '../../../js/utils/format.utils.js';
+import { formatCOP, parseSpanishDate, formatDoubleDate } from '../../../js/utils/format.utils.js';
 
 export const DashboardComponent = {
     currentRange: 'mes',
@@ -126,18 +126,31 @@ export const DashboardComponent = {
                 totalRecaudado += abonosCli;
                 carteraPendiente += Math.max(precio - abonosCli, 0);
 
-                const paxCli = parseInt(cli.pax || 1);
-                totalPasajeros += paxCli;
+                // Real PAX to avoid double counting group companions
+                const companionsCount = DataService.clientes.filter(x => x.parent_id === cli.id && !x.deleted_at).length;
+                const realPaxCli = companionsCount > 0 ? 1 : parseInt(cli.pax || 1);
+                totalPasajeros += realPaxCli;
 
                 const plan = DataService.planes.find(p => p.id === cli.plan_id);
                 if (plan) {
-                    const planCost = parseFloat(plan.costo_base || 0) * paxCli;
+                    // Cost base fallback logic matching Rentabilidad module
+                    let cCost = (cli.costo_base !== undefined && cli.costo_base !== null) ? parseFloat(cli.costo_base) : parseFloat(plan.costo_base || 0);
+                    if (cCost === 0) {
+                        const provs = (cli.proveedores_vinculados && cli.proveedores_vinculados.length > 0)
+                            ? cli.proveedores_vinculados
+                            : (plan.proveedores_vinculados || []);
+                        cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
+                    }
+                    const planCost = cCost * realPaxCli;
                     costosBase += planCost;
 
-                    if (!planStats[plan.id]) {
-                        planStats[plan.id] = {
+                    // Group by plan.id AND cli.fecha_viaje to represent specific departures
+                    const statKey = `${plan.id}_${cli.fecha_viaje}`;
+                    if (!planStats[statKey]) {
+                        planStats[statKey] = {
                             nombre: plan.nombre,
                             destino: plan.destino,
+                            fecha_viaje: cli.fecha_viaje,
                             totalVendido: 0,
                             totalRecaudado: 0,
                             costos: 0,
@@ -147,13 +160,13 @@ export const DashboardComponent = {
                         };
                     }
 
-                    planStats[plan.id].totalVendido += precio;
-                    planStats[plan.id].totalRecaudado += abonosCli;
-                    planStats[plan.id].costos += planCost;
-                    planStats[plan.id].pax += paxCli;
+                    planStats[statKey].totalVendido += precio;
+                    planStats[statKey].totalRecaudado += abonosCli;
+                    planStats[statKey].costos += planCost;
+                    planStats[statKey].pax += realPaxCli;
 
-                    if (abonosCli >= precio - 1) planStats[plan.id].pagados += paxCli;
-                    else planStats[plan.id].deben += paxCli;
+                    if (abonosCli >= precio - 1) planStats[statKey].pagados += realPaxCli;
+                    else planStats[statKey].deben += realPaxCli;
                 }
             }
         });
@@ -162,12 +175,20 @@ export const DashboardComponent = {
         DataService.gastos.forEach(gasto => {
             const gastoDate = new Date(gasto.created_at);
             if (gastoDate >= startDate) {
+                let valorCalculado = 0;
                 if (gasto.tipo_valor === 'fijo') {
-                    costosBase += parseFloat(gasto.valor || 0);
+                    valorCalculado = parseFloat(gasto.valor || 0);
                 } else if (gasto.tipo_valor === 'porcentaje') {
                     const key = `${gasto.plan_id}_${gasto.fecha_viaje}`;
                     const ingresoBrutoSalida = ingresosSalidaMap[key] || 0;
-                    costosBase += ingresoBrutoSalida * (parseFloat(gasto.valor) / 100);
+                    valorCalculado = ingresoBrutoSalida * (parseFloat(gasto.valor) / 100);
+                }
+                
+                costosBase += valorCalculado;
+                
+                const statKey = `${gasto.plan_id}_${gasto.fecha_viaje}`;
+                if (planStats[statKey]) {
+                    planStats[statKey].costos += valorCalculado;
                 }
             }
         });
@@ -208,18 +229,33 @@ export const DashboardComponent = {
         if (!container) return;
         container.innerHTML = '';
 
-        const plansArray = Object.values(planStats).sort((a, b) => b.totalVendido - a.totalVendido);
-        const top3Plans = plansArray.slice(0, 3);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-        top3Plans.forEach(p => {
+        // Filter: only group departures of more than 3 people that are upcoming, sorting by passenger count descending
+        const plansArray = Object.values(planStats).filter(p => {
+            if (!p.fecha_viaje || p.fecha_viaje.toLowerCase().includes('abierta')) return false;
+            
+            const dateViaje = parseSpanishDate(p.fecha_viaje);
+            if (dateViaje && !isNaN(dateViaje) && dateViaje < today) {
+                return false;
+            }
+            
+            return p.pax > 3;
+        }).sort((a, b) => b.pax - a.pax);
+        
+        const top6Plans = plansArray.slice(0, 6);
+
+        top6Plans.forEach(p => {
             const pct = p.totalVendido > 0 ? Math.min(100, Math.round((p.totalRecaudado / p.totalVendido) * 100)) : 0;
             const margenReal = p.totalRecaudado - p.costos;
+            const formattedDate = formatDoubleDate(p.fecha_viaje);
 
             container.innerHTML += `
                 <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col relative overflow-hidden transition-all shadow-[0_1px_2px_rgba(15,23,42,0.02)]">
                     <div class="relative z-10 flex-1 flex flex-col">
                         <h4 class="font-semibold text-slate-900 text-base leading-tight truncate pr-2">${UI.sanitize(p.nombre)}</h4>
-                        <p class="text-[10px] text-slate-400 font-medium mb-3 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')}</p>
+                        <p class="text-[10px] text-slate-400 font-medium mb-3 mt-1 flex items-center"><i class="ph ph-map-pin mr-1.5 text-slate-300 text-sm"></i>${UI.sanitize(p.destino || 'Destino Abierto')} • ${UI.sanitize(formattedDate)}</p>
                         <div class="grid grid-cols-2 gap-y-3 gap-x-4 mb-4">
                             <div>
                                 <p class="text-[10px] text-slate-400 font-medium mb-0.5">Total Vendido</p>
@@ -266,7 +302,7 @@ export const DashboardComponent = {
             `;
         });
 
-        const emptySlots = 3 - top3Plans.length;
+        const emptySlots = 6 - top6Plans.length;
         for (let i = 0; i < emptySlots; i++) {
             container.innerHTML += `
                 <div class="border border-dashed border-slate-200 bg-transparent rounded-2xl flex flex-col items-center justify-center text-slate-400 min-h-[280px] p-6 transition-colors hover:bg-slate-50/50">
@@ -274,7 +310,7 @@ export const DashboardComponent = {
                         <i class="ph ph-map-trifold text-2xl text-slate-300"></i>
                     </div>
                     <p class="text-[11px] font-semibold uppercase tracking-wider text-center text-slate-500">Espacio Disponible</p>
-                    <p class="text-[10px] text-center mt-2 max-w-[200px] text-slate-400 font-medium">El sistema añadirá automáticamente un nuevo plan cuando registre ventas.</p>
+                    <p class="text-[10px] text-center mt-2 max-w-[200px] text-slate-400 font-medium">El sistema añadirá automáticamente un nuevo plan grupal cuando registre ventas.</p>
                 </div>
             `;
         }
@@ -289,8 +325,19 @@ export const DashboardComponent = {
         Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
         Chart.defaults.color = '#64748b';
 
-        const plansArray = Object.values(planStats).sort((a, b) => b.totalVendido - a.totalVendido);
-        const labels = plansArray.map(p => p.nombre.length > 15 ? p.nombre.substring(0, 15) + '...' : p.nombre);
+        const plansArray = Object.values(planStats)
+            .filter(p => p.fecha_viaje && !p.fecha_viaje.toLowerCase().includes('abierta'))
+            .sort((a, b) => b.totalVendido - a.totalVendido);
+        
+        const labels = plansArray.map(p => {
+            const shortName = p.nombre.length > 12 ? p.nombre.substring(0, 12) + '...' : p.nombre;
+            let shortDate = p.fecha_viaje;
+            const match = p.fecha_viaje.match(/(\d+)\s+de\s+([A-Za-z]+)/i);
+            if (match) {
+                shortDate = `${match[1]} ${match[2].substring(0,3)}`;
+            }
+            return `${shortName} (${shortDate})`;
+        });
         const dataVendido = plansArray.map(p => p.totalVendido);
         const dataRecaudado = plansArray.map(p => p.totalRecaudado);
 

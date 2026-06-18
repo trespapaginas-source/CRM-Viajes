@@ -20,6 +20,7 @@ import { RentabilidadComponent } from '../../src/components/rentabilidad/rentabi
 import { InternacionalesComponent } from '../../src/components/internacionales/internacionales.component.js';
 import { DocumentosComponent } from '../../src/components/documentos/documentos.component.js';
 import { TrazabilidadComponent } from '../../src/components/trazabilidad/trazabilidad.component.js';
+import { NotificationsComponent } from '../../src/components/notifications/notifications.component.js';
 
 export const App = {
     async initData() {
@@ -51,6 +52,7 @@ export const App = {
             InternacionalesComponent.init();
             DocumentosComponent.init();
             TrazabilidadComponent.init();
+            NotificationsComponent.init();
 
             const savedView = localStorage.getItem('vivetravel_active_view') || 'dashboard';
             this.navigate(savedView);
@@ -115,7 +117,8 @@ export const App = {
             'rentabilidad': 'Rentabilidad y Salidas',
             'internacionales': 'Directorio Internacional',
             'documentos': 'Documentos y Soportes',
-            'trazabilidad': 'Trazabilidad y Auditoría'
+            'trazabilidad': 'Trazabilidad y Auditoría',
+            'notificaciones': 'Alertas de Salidas'
         };
 
         const headerObj = document.getElementById('header-title');
@@ -147,5 +150,6 @@ export const App = {
         if (viewIdentifier === 'configuracion') window.ConfigModule.loadSecurityProfiles();
         // InternacionalesComponent escucha al Store
         if (viewIdentifier === 'trazabilidad')   window.TrazabilidadComponent.loadLogs();
+        if (viewIdentifier === 'notificaciones') NotificationsComponent.render();
     }
 };

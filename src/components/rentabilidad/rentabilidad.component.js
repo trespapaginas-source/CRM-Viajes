@@ -61,6 +61,8 @@ export const RentabilidadComponent = {
                 this.clearSoporte();
             } else if (action === 'sync-rentabilidad-tarifas') {
                 this.syncRatesWithCatalog();
+            } else if (action === 'export-viajeros') {
+                this.exportViajerosCSV();
             }
         });
 
@@ -865,5 +867,80 @@ export const RentabilidadComponent = {
             syncBtn.disabled = false;
             syncBtn.innerHTML = originalHtml;
         }
+    },
+
+    exportViajerosCSV() {
+        const planId = this.currentPlanId;
+        const fecha = this.currentFecha;
+        if (!planId || !fecha) return;
+
+        const plan = DataService.planes.find(p => p.id === planId) || { nombre: 'Plan Sin Nombre' };
+        
+        const clientesSalida = DataService.clientes.filter(c => {
+            const st = c.estado ? c.estado.toLowerCase() : '';
+            const isInt = c.tipo_reserva === 'Internacional';
+            const matchTab = (this.currentTab === 'internacionales' && isInt) || (this.currentTab !== 'internacionales' && !isInt);
+            return c.plan_id === planId && c.fecha_viaje === fecha && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st) && matchTab;
+        });
+
+        if (clientesSalida.length === 0) {
+            return UI.showToast("No hay viajeros para exportar en esta salida.", "error");
+        }
+
+        // CSV Headers: Nombre, Cédula, Celular, Plan, Fecha, Valor Total, Saldo Pendiente
+        const headers = ["Nombre", "Cédula", "Celular", "Plan", "Fecha", "Valor Total", "Saldo Pendiente"];
+        const rows = [];
+
+        clientesSalida.forEach(c => {
+            const abonos = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
+            const totalAbonado = abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            
+            let precio = parseFloat(c.precio_total || 0);
+            const st = c.estado ? c.estado.toLowerCase() : '';
+            if (st === 'devolución') {
+                const devuelto = parseFloat(c.monto_devuelto || 0);
+                precio = Math.max(0, totalAbonado - devuelto);
+            } else if (st === 'en caja') {
+                precio = totalAbonado;
+            }
+
+            const saldo = Math.max(precio - totalAbonado, 0);
+
+            const nombreCompleto = `${c.nombre || ''} ${c.apellido || ''}`.trim();
+            const cedula = c.documento || c.dni || '';
+            const celular = c.telefono || '';
+            
+            rows.push([
+                nombreCompleto,
+                cedula,
+                celular,
+                plan.nombre,
+                fecha,
+                precio,
+                saldo
+            ]);
+        });
+
+        // Convert rows to CSV format (semicolon delimited for Excel compatibility)
+        const csvContent = "\ufeff" + [
+            headers.join(";"),
+            ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(";"))
+        ].join("\n");
+
+        // Download CSV file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        
+        const cleanPlanName = plan.nombre.replace(/[^a-zA-Z0-9]/g, "_");
+        const cleanFecha = fecha.replace(/[^a-zA-Z0-9]/g, "_");
+        link.setAttribute("download", `Viajeros_${cleanPlanName}_${cleanFecha}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        UI.showToast("Listado de viajeros exportado correctamente.", "success");
     }
 };
