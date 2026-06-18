@@ -166,6 +166,7 @@ const DocumentosComponent = {
             name: '',
             type: 'soporte',
             data: {
+                moneda: 'COP',
                 titulo_documento: 'SOPORTE DE PAGO',
                 fecha_emision: new Date().toISOString().split('T')[0],
                 sello_texto: 'PAGO PARCIAL',
@@ -707,8 +708,9 @@ const DocumentosComponent = {
         const getEl = (id) => document.getElementById(id);
 
         if (getEl('doc_type')) getEl('doc_type').value = this.activeDoc.type;
+        if (getEl('doc_moneda')) getEl('doc_moneda').value = this.activeDoc.data.moneda || 'COP';
         if (getEl('doc_titulo_documento')) {
-            getEl('doc_titulo_documento').value = this.activeDoc.data.titulo_documento || (this.activeDoc.type === 'cotizacion' ? 'COTIZACIÓN PREMIUM' : 'SOPORTE DE PAGO');
+            getEl('doc_titulo_documento').value = this.activeDoc.data.titulo_documento || (this.activeDoc.type === 'cotizacion' ? 'COTIZACIÓN' : 'SOPORTE DE PAGO');
         }
         if (getEl('doc_fecha_emision')) getEl('doc_fecha_emision').value = this.activeDoc.data.fecha_emision || '';
         if (getEl('doc_sello_texto')) getEl('doc_sello_texto').value = this.activeDoc.data.sello_texto || '';
@@ -858,7 +860,7 @@ const DocumentosComponent = {
                 div.innerHTML = `
                     <input type="text" placeholder="Categoría" value="${item.categoria}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'categoria', this.value)" class="w-1/4 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                     <input type="text" placeholder="Descripción" value="${item.descripcion}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'descripcion', this.value)" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
-                    <input type="text" placeholder="Valor" value="${item.valor ? String(item.valor).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'valor', this.value)" class="currency-input w-1/4 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                    <input type="text" placeholder="Valor" value="${this.formatValueForInput(item.valor)}" oninput="DocumentosComponent.onListInputChanged('adicionales', ${idx}, 'valor', this.value)" class="currency-input w-1/4 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                     <button type="button" onclick="DocumentosComponent.removeAdicionalRow(${idx})" class="text-rose-500 hover:text-rose-700 p-2"><i class="ph ph-trash text-base"></i></button>
                 `;
                 adicContainer.appendChild(div);
@@ -874,7 +876,7 @@ const DocumentosComponent = {
                 div.className = 'flex gap-2 items-center';
                 div.innerHTML = `
                     <input type="text" placeholder="Fecha (Ej: 19/05/2026)" value="${item.fecha}" oninput="DocumentosComponent.onListInputChanged('abonos', ${idx}, 'fecha', this.value)" class="w-1/3 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
-                    <input type="text" placeholder="Monto" value="${item.monto ? String(item.monto).replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}" oninput="DocumentosComponent.onListInputChanged('abonos', ${idx}, 'monto', this.value)" class="currency-input flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                    <input type="text" placeholder="Monto" value="${this.formatValueForInput(item.monto)}" oninput="DocumentosComponent.onListInputChanged('abonos', ${idx}, 'monto', this.value)" class="currency-input flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
                     <button type="button" onclick="DocumentosComponent.removeAbonoRow(${idx})" class="text-rose-500 hover:text-rose-700 p-2"><i class="ph ph-trash text-base"></i></button>
                 `;
                 abonosContainer.appendChild(div);
@@ -998,6 +1000,7 @@ const DocumentosComponent = {
         const oldEmail = this.activeDoc.data.cliente_email || '';
 
         this.activeDoc.type = getVal('doc_type') || 'soporte';
+        this.activeDoc.data.moneda = getVal('doc_moneda') || 'COP';
         this.activeDoc.data.titulo_documento = getVal('doc_titulo_documento');
         this.activeDoc.data.fecha_emision = getVal('doc_fecha_emision');
         this.activeDoc.data.sello_texto = getVal('doc_sello_texto');
@@ -1094,8 +1097,42 @@ const DocumentosComponent = {
     },
 
     formatCurrency: function (value) {
-        if (!value && value !== 0) return '$ 0';
+        if (!value && value !== 0) {
+            return this.activeDoc?.data?.moneda === 'USD' ? '$ 0.00 USD' : '$ 0';
+        }
+        const isUSD = this.activeDoc?.data?.moneda === 'USD';
+        if (isUSD) {
+            return '$ ' + parseFloat(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD';
+        }
         return '$ ' + parseFloat(value).toLocaleString('es-CO');
+    },
+
+    formatValueForInput: function (val) {
+        if (val === undefined || val === null || val === '') return '';
+        const isUSD = this.activeDoc?.data?.moneda === 'USD';
+        if (isUSD) {
+            const num = parseFloat(val) || 0;
+            return num.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        } else {
+            let str = String(val).replace(/\D/g, '');
+            if (str.length > 1) {
+                str = str.replace(/^0+/, '');
+            }
+            return str.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+    },
+
+    onCurrencyChanged: function () {
+        const selectMoneda = document.getElementById('doc_moneda');
+        if (selectMoneda) {
+            this.activeDoc.data.moneda = selectMoneda.value;
+        }
+        if (this.activeDoc.data.paquete_valor !== undefined) {
+            UI.setCurrencyValue('doc_paquete_valor', this.activeDoc.data.paquete_valor);
+        }
+        this.renderEditorLists();
+        this.recalculate();
+        this.renderPreview();
     },
 
     formatDate: function (dateStr) {
@@ -1125,9 +1162,10 @@ const DocumentosComponent = {
 
     buildPreviewHTML: function () {
         const data = this.activeDoc.data;
+        const isUSD = data.moneda === 'USD';
         const c1 = this.settings.color1 || '#005C7A';
         const c2 = this.settings.color2 || '#2563eb';
-        const typeLabel = ((data.titulo_documento || '').trim().toUpperCase()) || (this.activeDoc.type === 'cotizacion' ? 'COTIZACIÓN PREMIUM' : 'SOPORTE DE PAGO');
+        const typeLabel = ((data.titulo_documento || '').trim().toUpperCase()) || (this.activeDoc.type === 'cotizacion' ? 'COTIZACIÓN' : 'SOPORTE DE PAGO');
 
         const fmt = (val) => this.formatCurrency(val);
         const formatDate = (dStr) => this.formatDate(dStr);
@@ -1388,6 +1426,12 @@ const DocumentosComponent = {
                             </td>
                         </tr>
                     </table>
+                    ${isUSD ? `
+                    <div style="font-size: 8px; color: #64748b; margin-top: 8px; text-align: right; font-style: italic; font-weight: 600; line-height: 1.35;">
+                        * Cotización expresada en Dólares Americanos (USD).<br>
+                        * Sujeta a la tasa de cambio (TRM) vigente al día del pago.
+                    </div>
+                    ` : ''}
                 </div>
             </div>
 
@@ -1770,8 +1814,19 @@ const DocumentosComponent = {
     updateDefaultTitleFromType: function () {
         const docType = document.getElementById('doc_type')?.value;
         const titleEl = document.getElementById('doc_titulo_documento');
+        const sealTextEl = document.getElementById('doc_sello_texto');
+        const sealSubtextEl = document.getElementById('doc_sello_subtexto');
+
         if (titleEl) {
-            titleEl.value = docType === 'cotizacion' ? 'COTIZACIÓN PREMIUM' : 'SOPORTE DE PAGO';
+            titleEl.value = docType === 'cotizacion' ? 'COTIZACIÓN' : 'SOPORTE DE PAGO';
+        }
+
+        if (docType === 'cotizacion') {
+            if (sealTextEl) sealTextEl.value = 'PROPUESTA';
+            if (sealSubtextEl) sealSubtextEl.value = 'COTIZACIÓN';
+        } else {
+            if (sealTextEl) sealTextEl.value = 'PAGO PARCIAL';
+            if (sealSubtextEl) sealSubtextEl.value = 'RESERVA ACTIVA';
         }
 
         const selectPoliticas = document.getElementById('politicas_template_select');
