@@ -201,6 +201,9 @@ export const PartnersComponent = {
                 if (confirm("¿Estás seguro de que deseas eliminar este gasto corporativo?")) {
                     this.handleDeleteGastoCorp(id);
                 }
+            } else if (action === 'pvm-pagar-deuda-gasto') {
+                const id = target.dataset.id;
+                this.pagarDeudaGasto(id);
             } else if (action === 'pvm-delete-adelanto') {
                 const id = target.dataset.id;
                 if (confirm("¿Estás seguro de que deseas eliminar este adelanto operativo?")) {
@@ -705,11 +708,13 @@ export const PartnersComponent = {
                 } else if (st === 'en caja') {
                     const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                     ingresoBruto += totalAbo;
+                } else if (st === 'reprogramado') {
+                    // No aporta ingresos a esta salida
                 } else {
                     ingresoBruto += parseFloat(c.precio_total || 0);
                 }
 
-                if (st !== 'en caja') {
+                if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
                     let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan?.costo_base || 0);
                     if (cCost === 0) {
                         const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
@@ -757,10 +762,12 @@ export const PartnersComponent = {
         // Filtered Future trips
         const filteredFutureTrips = allTrips.filter(t => t.dateObj >= dateStart && t.dateObj <= dateEnd && t.dateObj > hoy);
 
-        // Filtered Corporate Expenses
+        // Filtered Corporate Expenses (only ones paid by Agency Utility, or repaid Float debts, excluding reserve-funded/pending float ones)
         const filteredCorpExpenses = this.corporateExpenses.filter(g => {
             const d = new Date(`${g.fecha}T00:00:00`);
-            return d >= dateStart && d <= dateEnd;
+            const isMatchedRange = d >= dateStart && d <= dateEnd;
+            const isOrdinario = g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos;
+            return isMatchedRange && isOrdinario;
         });
 
         // 2. Filtrar y calcular pérdidas de adelantos declarados como "perdido" en este rango de fechas
@@ -1125,7 +1132,7 @@ export const PartnersComponent = {
         }
     },
 
-    async saveCorporateExpense(concepto, categoria, monto, fecha, comprobante = '') {
+    async saveCorporateExpense(concepto, categoria, monto, fecha, comprobante = '', origenFondos = 'Utilidad de la Agencia', estadoPago = 'pagado') {
         const userEmail = window.AuthModule?.currentUser?.email || 'unknown@travelers.com';
         const newGasto = {
             id: crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2) + Date.now().toString(36)),
@@ -1135,6 +1142,8 @@ export const PartnersComponent = {
             fecha,
             comprobante,
             usuario_email: userEmail,
+            origen_fondos: origenFondos,
+            estado_pago: estadoPago,
             created_at: new Date().toISOString()
         };
 
@@ -1245,6 +1254,25 @@ export const PartnersComponent = {
                 const amountFormat = formatCOP(g.monto);
                 const deleteBtn = isAdmin ? `<button type="button" data-action="pvm-delete-gasto-corp" data-id="${g.id}" class="text-red-400 hover:text-red-600 transition-colors p-1" title="Eliminar gasto"><i class="ph ph-trash"></i></button>` : '';
 
+                const origen = g.origen_fondos || 'Utilidad de la Agencia';
+                let statusBadge = '';
+                let actionBtnHtml = deleteBtn;
+
+                if (origen === 'Fondo Flotante') {
+                    if (g.estado_pago === 'pendiente') {
+                        statusBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-rose-50 text-rose-600 border border-rose-100 uppercase tracking-wider">Deuda (Pendiente)</span>`;
+                        if (isAdmin) {
+                            actionBtnHtml = `<button type="button" data-action="pvm-pagar-deuda-gasto" data-id="${g.id}" class="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider transition-all" title="Pagar y reembolsar al flotante"><i class="ph ph-check-circle inline mr-0.5"></i> Pagar</button> ` + deleteBtn;
+                        }
+                    } else {
+                        statusBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 uppercase tracking-wider">Reembolsado (OK)</span>`;
+                    }
+                } else if (origen === 'Fondo de Reserva') {
+                    statusBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 uppercase tracking-wider">Reserva</span>`;
+                } else {
+                    statusBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">Pagado</span>`;
+                }
+
                 const receiptHtml = g.comprobante 
                     ? `<button type="button" data-action="open-lightbox" data-url="${g.comprobante}" class="text-indigo-500 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 transition-all" title="Ver comprobante"><i class="ph ph-image text-xs"></i> Ver</button>`
                     : `<span class="text-slate-300 text-[10px]">Sin soporte</span>`;
@@ -1253,11 +1281,13 @@ export const PartnersComponent = {
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="py-1.5 px-3 whitespace-nowrap text-[11px] font-medium text-slate-500">${formatShortDate(g.fecha)}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-[11px] font-black text-slate-800">${UI.sanitize(g.categoria)}</td>
-                        <td class="py-1.5 px-3 text-[11px] text-slate-600 max-w-[280px] xl:max-w-[350px] truncate" title="${UI.sanitize(g.concepto)}">${UI.sanitize(g.concepto)}</td>
+                        <td class="py-1.5 px-3 text-[11px] text-slate-600 max-w-[200px] truncate" title="${UI.sanitize(g.concepto)}">${UI.sanitize(g.concepto)}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-center">${receiptHtml}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-right text-[11px] font-black text-slate-800">${amountFormat}</td>
+                        <td class="py-1.5 px-3 whitespace-nowrap text-[10px] font-bold text-slate-600">${UI.sanitize(origen)}</td>
+                        <td class="py-1.5 px-3 whitespace-nowrap text-center">${statusBadge}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-[10px] text-slate-400 font-bold">${UI.sanitize(g.usuario_email)}</td>
-                        <td class="py-1.5 px-3 whitespace-nowrap text-center">${deleteBtn}</td>
+                        <td class="py-1.5 px-3 whitespace-nowrap text-center">${actionBtnHtml}</td>
                     </tr>
                 `;
             });
@@ -1277,8 +1307,15 @@ export const PartnersComponent = {
         const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
         const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
-        // Historical corporate expenses
-        const histGC = this.corporateExpenses.reduce((acc, g) => acc + g.monto, 0);
+        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
+        const histGC = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
+            .reduce((acc, g) => acc + g.monto, 0);
+
+        // Corporate expenses funded by the Reserve Fund
+        const histGC_Reserva = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Fondo de Reserva')
+            .reduce((acc, g) => acc + g.monto, 0);
 
         // Net Profit (devengado histórico total)
         // Aplicando la misma jerarquía de prioridad:
@@ -1338,13 +1375,17 @@ export const PartnersComponent = {
                 const puedeVerDinero = isAdmin || esMio;
 
                 const ganadoHistorico = histUN * (soc.porcentaje / 100);
+                const reserveShare = histRetenidoFondo * (soc.porcentaje / 100);
                 const totalRetirado = this.movements
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                     .reduce((acc, m) => acc + m.monto, 0);
-                const disponible = ganadoHistorico - totalRetirado;
+                
+                // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
+                const disponible = (ganadoHistorico + reserveShare) - totalRetirado;
                 const proyectadoSocio = futureUB * (soc.porcentaje / 100);
 
                 const ganadoFormat = puedeVerDinero ? formatCOP(ganadoHistorico) : '***';
+                const reserveShareFormat = puedeVerDinero ? formatCOP(reserveShare) : '***';
                 const retiradoFormat = puedeVerDinero ? formatCOP(totalRetirado) : '***';
                 const disponibleFormat = puedeVerDinero ? formatCOP(disponible) : '***';
                 const proyectadoFormat = puedeVerDinero ? formatCOP(proyectadoSocio) : '***';
@@ -1376,17 +1417,20 @@ export const PartnersComponent = {
                 }
 
                 // Generar Tooltip descriptivo de la fórmula
-                const tooltipTitle = `Fórmula de Cálculo:\n(Utilidad Bruta Histórica: ${formatCOP(histUB)} - Gastos Corporativos: ${formatCOP(histGC)}) * 90% (Neta Distribuible) * ${soc.porcentaje}% (Socio Share) = ${formatCOP(ganadoHistorico)}`;
+                const tooltipTitle = `Fórmula de Cálculo:\n(Utilidad Bruta Realizada: ${formatCOP(histUB)} - Gastos Corporativos: ${formatCOP(histGC)}) * 90% (Neta Distribuible) * ${soc.porcentaje}% (Socio Share) = ${formatCOP(ganadoHistorico)}\n\n¿De dónde viene este dinero?\nRepresenta tu ganancia neta consolidada (90%) sobre los viajes ya realizados y cobrados, descontando los gastos fijos corporativos del negocio.`;
+                const reserveShareTooltip = `Fórmula de Cálculo:\nUtilidad de Operación (${formatCOP(histUB - histGC)}) * 10% Retención * ${soc.porcentaje}% (Socio Share) = ${formatCOP(reserveShare)}\n\n¿Qué es esto?\nEs tu participación en el Fondo de Reserva acumulado. Este saldo actúa como garantía para cubrir tus sobre-retiros antes de entrar en déficit real.`;
+                const futureTooltipTitle = `Fórmula de Cálculo:\nUtilidad de Viajes Futuros: ${formatCOP(futureUB)} * ${soc.porcentaje}% (Socio Share) = ${formatCOP(proyectadoSocio)}\n\n¿De dónde viene este dinero?\nProviene de la utilidad proyectada de las reservas asociadas a viajes con fechas de salida futuras.\n\n¿Qué debe ocurrir para ganarlo?\n1. Que se realicen las salidas programadas (sin cancelaciones).\n2. Que los viajeros completen sus saldos pendientes por pagar.\n3. Que no ocurran gastos imprevistos que disminuyan el margen de cada viaje.`;
 
                 // Generar HTML de la barra de progreso visual de retiros vs ganado
                 let progressHtml = '';
                 if (puedeVerDinero) {
-                    if (ganadoHistorico > 0) {
-                        const pct = Math.min(100, Math.round((totalRetirado / ganadoHistorico) * 100));
-                        const isExceeded = totalRetirado > ganadoHistorico;
+                    const totalCupo = ganadoHistorico + reserveShare;
+                    if (totalCupo > 0) {
+                        const pct = Math.min(100, Math.round((totalRetirado / totalCupo) * 100));
+                        const isExceeded = totalRetirado > totalCupo;
                         const barColor = isExceeded ? 'bg-rose-500' : 'bg-indigo-500';
                         const textLabel = isExceeded 
-                            ? `Sobre-retirado: ${Math.round((totalRetirado / ganadoHistorico) * 100)}%` 
+                            ? `Sobre-retirado: ${Math.round((totalRetirado / totalCupo) * 100)}%` 
                             : `Retirado: ${pct}%`;
                         progressHtml = `
                             <div class="mt-2.5 pt-2 border-t border-slate-100/50">
@@ -1445,10 +1489,17 @@ export const PartnersComponent = {
                             <div class="space-y-1.5 mt-3">
                                 <div class="flex justify-between text-[10px]">
                                     <span class="text-slate-500 font-medium flex items-center">
-                                        Ganado Histórico:
-                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${tooltipTitle}"></i>` : ''}
+                                        Ganado Histórico (90%):
+                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${tooltipTitle}" onclick="alert(this.getAttribute('title'))"></i>` : ''}
                                     </span>
                                     <span class="text-slate-800 font-bold">${ganadoFormat}</span>
+                                </div>
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-slate-500 font-medium flex items-center">
+                                        Fondo Reserva (10%):
+                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${reserveShareTooltip}" onclick="alert(this.getAttribute('title'))"></i>` : ''}
+                                    </span>
+                                    <span class="text-slate-700 font-semibold">${reserveShareFormat}</span>
                                 </div>
                                 <div class="flex justify-between text-[10px] hover:bg-slate-100/50 cursor-pointer p-0.5 -mx-0.5 rounded transition-colors" 
                                      data-action="filter-partner-withdrawals" data-email="${soc.email}" title="Hacer clic para ver desglose de transacciones abajo">
@@ -1456,11 +1507,14 @@ export const PartnersComponent = {
                                     <span class="text-slate-600 font-bold underline decoration-dotted decoration-indigo-400">${retiradoFormat}</span>
                                 </div>
                                 <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-100 items-center">
-                                    <span class="text-slate-700 font-black flex items-center">Disponible: ${statusBadgeHtml}</span>
+                                    <span class="text-slate-700 font-black flex items-center">Disponible Real: ${statusBadgeHtml}</span>
                                     <span class="${disponibleColor} font-black">${disponibleFormat}</span>
                                 </div>
                                 <div class="flex justify-between text-[10px] pt-1.5 border-t border-slate-100">
-                                    <span class="text-slate-500 font-medium">Proyectado Futuro:</span>
+                                    <span class="text-slate-500 font-medium flex items-center">
+                                        Proyectado Futuro:
+                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${futureTooltipTitle}" onclick="alert(this.getAttribute('title'))"></i>` : ''}
+                                    </span>
                                     <span class="text-indigo-600 font-black">${proyectadoFormat}</span>
                                 </div>
                             </div>
@@ -1472,8 +1526,30 @@ export const PartnersComponent = {
             });
 
             if (isAdmin) {
-                const fondoDisponible = histUB > histGC ? histRetenidoFondo : -(histGC - histUB);
+                // Calculate how much of the reserve fund is used by each partner to cover over-withdrawals
+                let totalReservaUtilizada = 0;
+                this.sociosConfig.forEach(soc => {
+                    const ganado = histUN * (soc.porcentaje / 100);
+                    const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+                    const retirado = this.movements
+                        .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
+                        .reduce((acc, m) => acc + m.monto, 0);
+                    
+                    const excess = Math.max(0, retirado - ganado);
+                    const reserveUsed = Math.min(reserve, excess);
+                    totalReservaUtilizada += reserveUsed;
+                });
+
+                // disponible of the reserve fund is the retained amount minus reserve corporate expenses and minus what was used by partners
+                const fondoDisponible = histUB > histGC 
+                    ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
+                    : -(histGC - histUB);
                 const balanceColorClass = fondoDisponible >= 0 ? 'text-emerald-600' : 'text-rose-500';
+                
+                const retencionTooltip = `Retención Acumulada:\n${formatCOP(histRetenidoFondo)}\n\n¿Qué es esto?\nEs la retención acumulada del 10% calculada sobre la utilidad de operación (Utilidad Bruta de Viajes Realizados - Gastos Corporativos). Este dinero está guardado físicamente en caja y no ha sido utilizado.`;
+                const gastosTooltip = `Gastos con Reserva:\n${formatCOP(histGC_Reserva)}\n\n¿De dónde se pagaron?\nGastos corporativos pagados directamente utilizando el Fondo de Reserva.`;
+                const disponibleTooltip = `Saldo Disponible del Fondo:\n${formatCOP(fondoDisponible)}\n\n¿Cómo se calcula?\nEs la Retención Acumulada (${formatCOP(histRetenidoFondo)}) menos Gastos con Reserva (${formatCOP(histGC_Reserva)}) y menos la reserva utilizada por los socios para cubrir sus sobre-retiros (${formatCOP(totalReservaUtilizada)}).`;
+
                 grid.innerHTML += `
                     <div class="rounded-xl p-4 shadow-sm flex flex-col justify-between border border-dashed border-slate-300 bg-slate-50/50">
                         <div>
@@ -1490,19 +1566,28 @@ export const PartnersComponent = {
                             
                             <div class="space-y-1.5 mt-3">
                                 <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium">Retención Acumulada:</span>
+                                    <span class="text-slate-500 font-medium flex items-center">
+                                        Retención Acumulada:
+                                        <i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${retencionTooltip}" onclick="alert(this.getAttribute('title'))"></i>
+                                    </span>
                                     <span class="text-slate-800 font-bold">${formatCOP(histRetenidoFondo)}</span>
                                 </div>
                                 <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium">Gastos Corp. Pagados:</span>
-                                    <span class="text-slate-600 font-bold">${formatCOP(histGC)}</span>
+                                    <span class="text-slate-500 font-medium flex items-center">
+                                        Gastos con Reserva:
+                                        <i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${gastosTooltip}" onclick="alert(this.getAttribute('title'))"></i>
+                                    </span>
+                                    <span class="text-slate-600 font-bold">${formatCOP(histGC_Reserva)}</span>
                                 </div>
                                 <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-200">
-                                    <span class="text-slate-700 font-black">Saldo Disponible:</span>
+                                    <span class="text-slate-700 font-black flex items-center">
+                                        Saldo Disponible:
+                                        <i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${disponibleTooltip}" onclick="alert(this.getAttribute('title'))"></i>
+                                    </span>
                                     <span class="${balanceColorClass} font-black">${formatCOP(fondoDisponible)}</span>
                                 </div>
-                                <div class="text-[8px] text-slate-400 italic font-semibold leading-tight pt-1.5 border-t border-slate-100 mt-1">
-                                    Nota: Los gastos fijos se cubren con la utilidad bruta mensual antes de realizar la retención del fondo.
+                                <div class="text-[8px] text-slate-500 font-semibold leading-tight pt-1.5 border-t border-slate-100 mt-1">
+                                    * Nota: Los gastos corporativos se descontaron antes de la retención. El Saldo Disponible es dinero neto guardado, libre y 100% utilizable.
                                 </div>
                             </div>
                         </div>
@@ -1671,11 +1756,13 @@ export const PartnersComponent = {
             const costos = monthTrips.reduce((acc, t) => acc + t.costoTotal, 0);
             const bruta = ingresos - costos;
 
-            // Corporate expenses in this month
+            // Corporate expenses in this month (only ones paid by Agency Utility, or repaid Float debts, excluding reserve-funded/pending float ones)
             const monthGastos = this.corporateExpenses.filter(g => {
                 if (!g.fecha) return false;
                 const parts = g.fecha.split('-');
-                return `${parts[0]}-${parts[1]}` === month;
+                const isMatchedMonth = `${parts[0]}-${parts[1]}` === month;
+                const isOrdinario = g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos;
+                return isMatchedMonth && isOrdinario;
             });
             const gastosCorp = monthGastos.reduce((acc, g) => acc + g.monto, 0);
 
@@ -2011,17 +2098,27 @@ export const PartnersComponent = {
         const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
         const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
-        // Historical corporate expenses
-        const histGC = this.corporateExpenses.reduce((acc, g) => acc + g.monto, 0);
+        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
+        const histGC = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
+            .reduce((acc, g) => acc + g.monto, 0);
 
-        // Net Profit (devengado histórico)
-        const histUN = histUB - histGC;
+        // Net Profit (devengado histórico total applying 10% retention)
+        let histUN = 0;
+        let histRetenidoFondo = 0;
+        if (histUB > histGC) {
+            const histUN_Operacion = histUB - histGC;
+            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
+            histUN = histUN_Operacion - histRetenidoFondo;
+        }
 
         const ganadoHistorico = histUN * (partner.porcentaje / 100);
+        const reserveShare = histRetenidoFondo * (partner.porcentaje / 100);
         const totalRetirado = this.movements
             .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
             .reduce((acc, m) => acc + m.monto, 0);
-        const disponible = ganadoHistorico - totalRetirado;
+        // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
+        const disponible = (ganadoHistorico + reserveShare) - totalRetirado;
 
         document.getElementById('pvm-mov-socio-email').value = partner.email;
         document.getElementById('pvm-mov-tipo').value = tipo;
@@ -2068,39 +2165,73 @@ export const PartnersComponent = {
         const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
         const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
-        // Historical corporate expenses
-        const histGC = this.corporateExpenses.reduce((acc, g) => acc + g.monto, 0);
+        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
+        const histGC = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
+            .reduce((acc, g) => acc + g.monto, 0);
 
-        // Net Profit (devengado histórico)
-        const histUN = histUB - histGC;
+        const histGC_Reserva = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Fondo de Reserva')
+            .reduce((acc, g) => acc + g.monto, 0);
+
+        // Net Profit (devengado histórico total applying 10% retention)
+        let histUN = 0;
+        let histRetenidoFondo = 0;
+        if (histUB > histGC) {
+            const histUN_Operacion = histUB - histGC;
+            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
+            histUN = histUN_Operacion - histRetenidoFondo;
+        }
 
         const partner = this.sociosConfig.find(s => s.email.toLowerCase() === email.toLowerCase());
         if (!partner) return UI.showToast("Socio no encontrado", "error");
 
         const ganadoHistorico = histUN * (partner.porcentaje / 100);
+        const reserveShare = histRetenidoFondo * (partner.porcentaje / 100);
         const totalRetirado = this.movements
             .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
             .reduce((acc, m) => acc + m.monto, 0);
-        const disponible = ganadoHistorico - totalRetirado;
+        // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
+        const disponible = (ganadoHistorico + reserveShare) - totalRetirado;
 
         if (monto > disponible + 0.01) {
             return UI.showToast(`Fondos insuficientes. El socio sólo tiene disponible ${formatCOP(disponible)}.`, "error");
         }
 
         // Bloqueo de retiros si comprometen fondos flotantes
+        const pendingFloatExpenses = (this.corporateExpenses || [])
+            .filter(g => g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pendiente')
+            .reduce((sum, g) => sum + (Number(g.monto) || 0), 0);
         const totalFloatPool = (this.fondosFlotantes || [])
             .filter(f => f.estado === 'disponible')
-            .reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+            .reduce((sum, f) => sum + (Number(f.monto) || 0), 0) - pendingFloatExpenses;
             
         let totalSociosDisp = 0;
         this.sociosConfig.forEach(soc => {
             const ganado = histUN * (soc.porcentaje / 100);
+            const reserve = histRetenidoFondo * (soc.porcentaje / 100);
             const retirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
-            totalSociosDisp += (ganado - retirado);
+            totalSociosDisp += ((ganado + reserve) - retirado);
         });
-        const balanceF = histUB > histGC ? histRetenidoFondo : -(histGC - histUB);
+
+        let totalReservaUtilizada = 0;
+        this.sociosConfig.forEach(soc => {
+            const ganado = histUN * (soc.porcentaje / 100);
+            const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+            const retirado = this.movements
+                .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
+                .reduce((acc, m) => acc + m.monto, 0);
+            
+            const excess = Math.max(0, retirado - ganado);
+            const reserveUsed = Math.min(reserve, excess);
+            totalReservaUtilizada += reserveUsed;
+        });
+
+        const balanceF = histUB > histGC 
+            ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
+            : -(histGC - histUB);
         const cajaTeoricaPre = balanceF + totalSociosDisp;
 
         if (tipo === 'retiro' && (cajaTeoricaPre - monto) < totalFloatPool) {
@@ -2189,7 +2320,9 @@ export const PartnersComponent = {
             }
         }
 
-        const res = await this.saveCorporateExpense(concepto, categoria, monto, fecha, comprobante);
+        const origenFondos = document.getElementById('pvm-gasto-corp-origen')?.value || 'Utilidad de la Agencia';
+        const estadoPago = origenFondos === 'Fondo Flotante' ? 'pendiente' : 'pagado';
+        const res = await this.saveCorporateExpense(concepto, categoria, monto, fecha, comprobante, origenFondos, estadoPago);
         
         if (submitBtn) {
             submitBtn.innerHTML = originalHtml;
@@ -2200,11 +2333,42 @@ export const PartnersComponent = {
             UI.showToast("Gasto corporativo registrado con éxito.", "success");
             document.getElementById('pvm-gasto-corp-form').reset();
             this.clearGastoCorpPreview();
+            // Restablecer el select del origen a su valor por defecto
+            const selectOrigen = document.getElementById('pvm-gasto-corp-origen');
+            if (selectOrigen) selectOrigen.value = 'Utilidad de la Agencia';
+            
             // Set default date to today
             document.getElementById('pvm-gasto-corp-fecha').value = new Date().toISOString().substring(0, 10);
             this.calculateDistribution();
         } else {
             UI.showToast("Error al registrar gasto corporativo.", "error");
+        }
+    },
+
+    async pagarDeudaGasto(id) {
+        if (!confirm("¿Confirmas que deseas reembolsar esta deuda del Fondo Flotante utilizando los fondos de Utilidad de la Agencia? Esto moverá el dinero de vuelta al fondo flotante y cargará el egreso en la utilidad distribuible actual.")) return;
+        
+        if (this.fallbackGastosActive) {
+            this.corporateExpenses = this.corporateExpenses.map(g => 
+                g.id === id ? { ...g, estado_pago: 'pagado' } : g
+            );
+            localStorage.setItem('trv_gastos_corporativos', JSON.stringify(this.corporateExpenses));
+            this.calculateDistribution();
+            UI.showToast("Deuda reembolsada localmente con éxito.", "success");
+        } else {
+            try {
+                const { error } = await supabaseClient
+                    .from('gastos_corporativos')
+                    .update({ estado_pago: 'pagado' })
+                    .eq('id', id);
+                if (error) throw error;
+                await this.loadCorporateExpenses();
+                this.calculateDistribution();
+                UI.showToast("Deuda reembolsada y pagada con éxito en la base de datos.", "success");
+            } catch (e) {
+                console.error("Error al pagar deuda en Supabase:", e);
+                UI.showToast("Error al liquidar la deuda en Supabase.", "error");
+            }
         }
     },
 
@@ -2456,7 +2620,14 @@ export const PartnersComponent = {
         const allTrips = this.getAllTrips();
         const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
         const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-        const histGC = this.corporateExpenses.reduce((acc, g) => acc + g.monto, 0);
+        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
+        const histGC = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
+            .reduce((acc, g) => acc + g.monto, 0);
+
+        const histGC_Reserva = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Fondo de Reserva')
+            .reduce((acc, g) => acc + g.monto, 0);
         
         let histUN = 0;
         let histRetenidoFondo = 0;
@@ -2469,16 +2640,40 @@ export const PartnersComponent = {
         let totalSociosDisponible = 0;
         this.sociosConfig.forEach(soc => {
             const ganadoHistorico = histUN * (soc.porcentaje / 100);
+            const reserveShare = histRetenidoFondo * (soc.porcentaje / 100);
             const totalRetirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
-            totalSociosDisponible += (ganadoHistorico - totalRetirado);
+            // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
+            totalSociosDisponible += ((ganadoHistorico + reserveShare) - totalRetirado);
         });
-        const balanceFondo = histUB > histGC ? histRetenidoFondo : -(histGC - histUB);
+
+        let totalReservaUtilizada = 0;
+        this.sociosConfig.forEach(soc => {
+            const ganado = histUN * (soc.porcentaje / 100);
+            const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+            const retirado = this.movements
+                .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
+                .reduce((acc, m) => acc + m.monto, 0);
+            
+            const excess = Math.max(0, retirado - ganado);
+            const reserveUsed = Math.min(reserve, excess);
+            totalReservaUtilizada += reserveUsed;
+        });
+
+        const balanceFondo = histUB > histGC 
+            ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
+            : -(histGC - histUB);
+
+        const pendingFloatExpenses = (this.corporateExpenses || [])
+            .filter(g => g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pendiente')
+            .reduce((sum, g) => sum + (Number(g.monto) || 0), 0);
+
         // Sumar fondos flotantes activos a la caja teórica
         const totalFloatPool = (this.fondosFlotantes || [])
             .filter(f => f.estado === 'disponible')
-            .reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+            .reduce((sum, f) => sum + (Number(f.monto) || 0), 0) - pendingFloatExpenses;
+
         const cajaTeorica = balanceFondo + totalSociosDisponible + totalFloatPool;
         const liquidezLibre = cajaTeorica - totalTransito - totalVouchers;
 
@@ -3334,7 +3529,10 @@ export const PartnersComponent = {
         const activeFondos = (this.fondosFlotantes || []).filter(f => !f.deleted_at);
         const totalActivos = activeFondos.reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
         
-        const disponibles = activeFondos.filter(f => f.estado === 'disponible').reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
+        const pendingFloatExpenses = (this.corporateExpenses || [])
+            .filter(g => g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pendiente')
+            .reduce((sum, g) => sum + (Number(g.monto) || 0), 0);
+        const disponibles = activeFondos.filter(f => f.estado === 'disponible').reduce((sum, f) => sum + (Number(f.monto) || 0), 0) - pendingFloatExpenses;
         const aplicados = activeFondos.filter(f => f.estado === 'aplicado_reserva').reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
 
         const rol = window.AuthModule?.userProfile?.rol;

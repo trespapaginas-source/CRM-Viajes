@@ -202,7 +202,9 @@ export const RentabilidadComponent = {
                 const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                 const devuelto = parseFloat(cli.monto_devuelto || 0);
                 grupo.ingreso_bruto += Math.max(0, totalAbo - devuelto);
-                grupo.pax_servicio += this.getClientRealPax(cli);
+                // Excluir de pasajeros en servicio
+            } else if (st === 'reprogramado') {
+                // No aporta ingresos a esta salida y tampoco cuenta como pax_servicio
             } else if (st === 'en caja') {
                 const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                 grupo.ingreso_bruto += totalAbo;
@@ -249,7 +251,7 @@ export const RentabilidadComponent = {
             let costoOperativoBase = 0;
             data.clientes.forEach(c => {
                 const st = c.estado ? c.estado.toLowerCase() : '';
-                if (st !== 'en caja') {
+                if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
                     let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
                     if (cCost === 0) {
                         const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
@@ -400,7 +402,9 @@ export const RentabilidadComponent = {
             if (st === 'devolución') {
                 const devuelto = parseFloat(c.monto_devuelto || 0);
                 ingresoBruto += Math.max(0, abonado - devuelto);
-                paxServicio += p;
+                // Excluir de pasajeros en servicio
+            } else if (st === 'reprogramado') {
+                // No aporta ingresos a esta salida y tampoco cuenta como pasajeros en servicio
             } else if (st === 'en caja') {
                 ingresoBruto += abonado;
                 ingresoRetenido += abonado;
@@ -608,7 +612,7 @@ export const RentabilidadComponent = {
 
         clientesSalida.forEach(c => {
             const st = c.estado ? c.estado.toLowerCase() : '';
-            if (st !== 'en caja') {
+            if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
                 let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
                 if (cCost === 0) {
                     const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
@@ -626,7 +630,7 @@ export const RentabilidadComponent = {
 
         clientesSalida.forEach(c => {
             const st = c.estado ? c.estado.toLowerCase() : '';
-            if (st !== 'en caja') {
+            if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
                 const paxNum = this.getClientRealPax(c);
                 let provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
                     ? c.proveedores_vinculados
@@ -900,6 +904,8 @@ export const RentabilidadComponent = {
             if (st === 'devolución') {
                 const devuelto = parseFloat(c.monto_devuelto || 0);
                 precio = Math.max(0, totalAbonado - devuelto);
+            } else if (st === 'reprogramado') {
+                precio = 0;
             } else if (st === 'en caja') {
                 precio = totalAbonado;
             }
