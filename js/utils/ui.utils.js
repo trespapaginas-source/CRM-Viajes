@@ -123,22 +123,91 @@ export const UI = {
     },
 
     formatCurrencyElement(input) {
-        let val = input.value.replace(/\D/g, '');
-        if (val) {
-            if (val.length > 1) {
-                val = val.replace(/^0+/, '');
+        const isUSD = window.DocumentosComponent?.activeDoc?.data?.moneda === 'USD';
+        if (isUSD) {
+            let val = input.value;
+            // Remove everything except digits, dots, and commas
+            val = val.replace(/[^0-9.,]/g, '');
+            
+            // Standardize decimal separator to comma
+            if (!val.includes(',')) {
+                const lastDotIdx = val.lastIndexOf('.');
+                if (lastDotIdx !== -1) {
+                    const charsAfterDot = val.substring(lastDotIdx + 1);
+                    // If the dot is at the end or followed by 1 or 2 digits, it is a decimal separator
+                    if (charsAfterDot.length === 0 || charsAfterDot.length === 1 || charsAfterDot.length === 2) {
+                        val = val.substring(0, lastDotIdx) + ',' + charsAfterDot;
+                    }
+                }
             }
-            input.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            
+            // Handle decimal separation
+            const hasComma = val.includes(',');
+            if (hasComma) {
+                // Strip all dots (thousand separators)
+                val = val.replace(/\./g, '');
+                const parts = val.split(',');
+                let integerPart = parts[0].replace(/\D/g, '');
+                let decimalPart = parts.slice(1).join('').replace(/\D/g, '').substring(0, 2);
+                
+                if (integerPart) {
+                    if (integerPart.length > 1) {
+                        integerPart = integerPart.replace(/^0+/, '');
+                    }
+                    integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                } else {
+                    integerPart = '0';
+                }
+                
+                input.value = integerPart + ',' + decimalPart;
+            } else {
+                let cleanVal = val.replace(/\D/g, '');
+                if (cleanVal) {
+                    if (cleanVal.length > 1) {
+                        cleanVal = cleanVal.replace(/^0+/, '');
+                    }
+                    input.value = cleanVal.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                } else {
+                    input.value = '';
+                }
+            }
         } else {
-            input.value = '';
+            let val = input.value.replace(/\D/g, '');
+            if (val) {
+                if (val.length > 1) {
+                    val = val.replace(/^0+/, '');
+                }
+                input.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            } else {
+                input.value = '';
+            }
         }
     },
 
     parseCurrency(val) {
         if (val === undefined || val === null || val === '') return 0;
         if (typeof val === 'number') return val;
-        const clean = String(val).replace(/[\$\s]/g, '').replace(/\./g, '').trim();
-        return parseFloat(clean) || 0;
+        
+        const isUSD = window.DocumentosComponent?.activeDoc?.data?.moneda === 'USD';
+        if (isUSD) {
+            let clean = String(val).replace(/[\$\s]/g, '').trim();
+            const lastDot = clean.lastIndexOf('.');
+            const lastComma = clean.lastIndexOf(',');
+            if (lastComma > lastDot) {
+                // Comma is decimal separator. Remove all dots, replace comma with dot.
+                clean = clean.replace(/\./g, '').replace(/,/g, '.');
+            } else if (lastDot > lastComma) {
+                // Dot is decimal separator. Remove all commas.
+                clean = clean.replace(/,/g, '');
+            } else {
+                // Single separator or no mixed separator, assume decimal if it contains dot or comma
+                clean = clean.replace(/,/g, '.');
+            }
+            return parseFloat(clean) || 0;
+        } else {
+            const clean = String(val).replace(/[\$\s]/g, '').replace(/\./g, '').trim();
+            return parseFloat(clean) || 0;
+        }
     },
 
     setCurrencyValue(id, val) {
@@ -148,11 +217,17 @@ export const UI = {
                 el.value = '';
                 return;
             }
-            let str = String(val).replace(/\D/g, '');
-            if (str.length > 1) {
-                str = str.replace(/^0+/, '');
+            const isUSD = window.DocumentosComponent?.activeDoc?.data?.moneda === 'USD';
+            if (isUSD) {
+                const num = parseFloat(val) || 0;
+                el.value = num.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            } else {
+                let str = String(val).replace(/\D/g, '');
+                if (str.length > 1) {
+                    str = str.replace(/^0+/, '');
+                }
+                el.value = str.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
             }
-            el.value = str.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
         }
     }
 };

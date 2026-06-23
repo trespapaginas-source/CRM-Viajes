@@ -1939,24 +1939,24 @@
                         <div class="crm-form bg-white p-6 rounded-[1.5rem] shadow-sm border border-slate-200/50 h-[800px] overflow-y-auto custom-scrollbar space-y-6">
                             
                             <!-- PERSISTENCIA Y BORRADORES -->
-                            <div class="flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200/60 mb-6">
-                                <div class="flex-1 w-full">
+                            <div class="flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200/60 mb-6">
+                                <div class="flex-1 min-w-0 w-full">
                                     <label class="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Documentos Guardados</label>
                                     <div class="flex gap-2">
-                                        <select id="saved_docs_select" onchange="DocumentosComponent.loadSavedDocument(this.value)" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                                        <select id="saved_docs_select" onchange="DocumentosComponent.loadSavedDocument(this.value)" class="w-full min-w-0 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none truncate">
                                             <option value="">-- Cargar Borrador --</option>
                                         </select>
-                                        <button type="button" onclick="DocumentosComponent.deleteActiveDocument()" class="bg-white border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-2 rounded-xl transition-all font-bold flex items-center justify-center shadow-sm" title="Eliminar borrador">
+                                        <button type="button" onclick="DocumentosComponent.deleteActiveDocument()" class="bg-white border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-2 rounded-xl transition-all font-bold flex items-center justify-center shadow-sm shrink-0" title="Eliminar borrador">
                                             <i class="ph ph-trash text-base"></i>
                                         </button>
                                     </div>
                                 </div>
-                                <div class="flex gap-2 w-full sm:w-auto self-end">
-                                    <button type="button" onclick="DocumentosComponent.newBlankDocument()" class="flex-1 sm:flex-none px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold rounded-xl text-xs transition-all shadow-sm">
-                                        Nuevo
+                                <div class="flex gap-2 shrink-0 justify-end">
+                                    <button type="button" onclick="DocumentosComponent.newBlankDocument()" class="px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold rounded-xl text-xs transition-all shadow-sm flex items-center gap-1.5 shrink-0">
+                                        <i class="ph ph-file-plus text-base"></i> Nuevo
                                     </button>
-                                    <button type="button" onclick="DocumentosComponent.saveActiveDocument()" class="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 text-white hover:bg-slate-800 font-bold rounded-xl text-xs transition-all shadow-md">
-                                        Guardar
+                                    <button type="button" onclick="DocumentosComponent.saveActiveDocument()" class="px-4 py-2.5 bg-slate-900 text-white hover:bg-slate-800 font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1.5 shrink-0">
+                                        <i class="ph ph-floppy-disk text-base"></i> Guardar
                                     </button>
                                 </div>
                             </div>
@@ -1991,11 +1991,11 @@
                                     <i class="ph ph-caret-down accordion-icon text-slate-400 transition-transform duration-300"></i>
                                 </div>
                                 <div class="accordion-content space-y-4 mt-4">
-                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                                         <div>
                                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Tipo de Documento</label>
                                             <select id="doc_type" onchange="DocumentosComponent.updateDefaultTitleFromType()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
-                                                <option value="cotizacion">Cotización Premium</option>
+                                                <option value="cotizacion">Cotización</option>
                                                 <option value="soporte">Soporte de Pago / Recibo</option>
                                             </select>
                                         </div>
@@ -2006,6 +2006,13 @@
                                         <div>
                                             <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Fecha de Emisión</label>
                                             <input type="date" id="doc_fecha_emision" onchange="DocumentosComponent.onInputChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">Moneda</label>
+                                            <select id="doc_moneda" onchange="DocumentosComponent.onCurrencyChanged()" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none cursor-pointer">
+                                                <option value="COP">COP ($) - Pesos Colombianos</option>
+                                                <option value="USD">USD ($) - Dólares Americanos</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4517,6 +4524,15 @@
                                 </div>
 
                                 <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Origen de Fondos / Cuenta de Pago</label>
+                                    <select id="pvm-gasto-corp-origen" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm">
+                                        <option value="Utilidad de la Agencia">Utilidad de la Agencia (General)</option>
+                                        <option value="Fondo de Reserva">Fondo de Reserva</option>
+                                        <option value="Fondo Flotante">Fondo Flotante</option>
+                                    </select>
+                                </div>
+
+                                <div>
                                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Fecha</label>
                                     <input type="date" id="pvm-gasto-corp-fecha" required class="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm">
                                 </div>
@@ -4570,6 +4586,8 @@
                                                 <th class="py-2 px-3">Concepto</th>
                                                 <th class="py-2 px-3 text-center">Soporte</th>
                                                 <th class="py-2 px-3 text-right">Monto</th>
+                                                <th class="py-2 px-3">Origen</th>
+                                                <th class="py-2 px-3">Estado</th>
                                                 <th class="py-2 px-3">Usuario</th>
                                                 <th class="py-2 px-3 text-center">Acción</th>
                                             </tr>

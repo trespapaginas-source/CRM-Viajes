@@ -646,6 +646,25 @@ export const DataService = {
         const { error } = await supabaseClient.from('clientes').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
         if (error) throw error;
 
+        // Soft-delete todos los abonos del cliente
+        const { error: abonoError } = await supabaseClient.from('abonos')
+            .update({ 
+                deleted_at: new Date().toISOString(), 
+                deleted_by: user, 
+                motivo_eliminacion: `Eliminado junto con el cliente. Motivo: ${motivo}` 
+            })
+            .eq('cliente_id', id);
+        if (abonoError) console.warn("Error borrando abonos del cliente:", abonoError);
+
+        // Soft-delete todos los adelantos operativos del cliente
+        const { error: adelantoError } = await supabaseClient.from('adelantos_operativos')
+            .update({ 
+                deleted_at: new Date().toISOString(), 
+                deleted_by: user
+            })
+            .eq('cliente_id', id);
+        if (adelantoError) console.warn("Error borrando adelantos operativos del cliente:", adelantoError);
+
         // Si es titular, borrar acompañantes en cascada
         const companions = this.clientes.filter(c => c.parent_id === id && !c.deleted_at);
         if (companions.length > 0) {
@@ -658,6 +677,25 @@ export const DataService = {
                 })
                 .in('id', compIds);
             if (compError) console.warn("Error borrando acompañantes en cascada:", compError);
+
+            // Soft-delete todos los abonos de los acompañantes en cascada
+            const { error: compAbonoError } = await supabaseClient.from('abonos')
+                .update({
+                    deleted_at: new Date().toISOString(),
+                    deleted_by: user,
+                    motivo_eliminacion: `Eliminado por cascada al borrar Titular. Motivo original: ${motivo}`
+                })
+                .in('cliente_id', compIds);
+            if (compAbonoError) console.warn("Error borrando abonos de acompañantes en cascada:", compAbonoError);
+
+            // Soft-delete todos los adelantos operativos de los acompañantes en cascada
+            const { error: compAdelantoError } = await supabaseClient.from('adelantos_operativos')
+                .update({
+                    deleted_at: new Date().toISOString(),
+                    deleted_by: user
+                })
+                .in('cliente_id', compIds);
+            if (compAdelantoError) console.warn("Error borrando adelantos operativos de acompañantes en cascada:", compAdelantoError);
             
             for (const comp of companions) {
                 await this.registrarHistorial(
