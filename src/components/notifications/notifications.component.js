@@ -13,7 +13,7 @@ export const NotificationsComponent = {
         }, 3000);
 
         Store.subscribe((state) => {
-            if (state.lastUpdated === 'full' || state.lastUpdated === 'clientes' || state.lastUpdated === 'planes') {
+            if (state.lastUpdated === 'full' || state.lastUpdated === 'clientes' || state.lastUpdated === 'planes' || state.lastUpdated === 'alertas_gestionadas') {
                 this.updateNotificationBadge();
                 if (document.getElementById('view-notificaciones')?.classList.contains('active')) {
                     this.render();
@@ -21,10 +21,42 @@ export const NotificationsComponent = {
             }
         });
 
-        // Event listener for manual email button
+        // Event listeners
         document.body.addEventListener('click', (e) => {
             if (e.target.closest('#btn-send-email-alerts')) {
                 this.sendEmailAlerts(true);
+            }
+
+            const btnMarkManaged = e.target.closest('[data-action="mark-managed"]');
+            if (btnMarkManaged) {
+                const tipo = btnMarkManaged.getAttribute('data-type');
+                const planId = btnMarkManaged.getAttribute('data-plan-id');
+                const fechaViaje = btnMarkManaged.getAttribute('data-fecha-viaje');
+                
+                DataService.markAlertaGestionada(tipo, planId, fechaViaje);
+                UI.showToast("Alerta marcada como gestionada.", "success");
+            }
+
+            const btnUnmarkManaged = e.target.closest('[data-action="unmark-managed"]');
+            if (btnUnmarkManaged) {
+                const tipo = btnUnmarkManaged.getAttribute('data-type');
+                const planId = btnUnmarkManaged.getAttribute('data-plan-id');
+                const fechaViaje = btnUnmarkManaged.getAttribute('data-fecha-viaje');
+                
+                DataService.removeAlertaGestionada(tipo, planId, fechaViaje);
+                UI.showToast("Alerta restaurada.", "info");
+            }
+
+            const btnToggle = e.target.closest('[data-action="toggle-passengers"]');
+            if (btnToggle) {
+                const listDiv = btnToggle.nextElementSibling;
+                const icon = btnToggle.querySelector('.ph');
+                if (listDiv) {
+                    listDiv.classList.toggle('hidden');
+                    if (icon) {
+                        icon.classList.toggle('rotate-180');
+                    }
+                }
             }
         });
     },
@@ -225,31 +257,44 @@ export const NotificationsComponent = {
             const diffTimeStart = startDate - today;
             const diffDaysStart = Math.ceil(diffTimeStart / (1000 * 60 * 60 * 24));
 
-            if (diffDaysStart === 1) {
-                alerts['1d_checkin'].push(dep);
-            } else if (diffDaysStart === 2) {
-                alerts['2d'].push(dep);
-            } else if (diffDaysStart === 3) {
-                alerts['3d'].push(dep);
-            } else if (diffDaysStart === 4) {
-                alerts['4d'].push(dep);
+            const isManaged = (type) => {
+                return (DataService.alertas_gestionadas || []).some(
+                    a => a.tipo === type && a.plan_id === dep.plan_id && a.fecha_viaje === dep.fecha_viaje
+                );
+            };
+
+            if ((diffDaysStart === 1 || diffDaysStart === 0) && !isManaged('1d_checkin')) {
+                alerts['1d_checkin'].push({
+                    ...dep,
+                    relativeStatus: diffDaysStart === 0 ? 'Sale Hoy' : 'Sale Mañana'
+                });
+            } else if (diffDaysStart === 2 && !isManaged('2d')) {
+                alerts['2d'].push({
+                    ...dep,
+                    relativeStatus: 'Sale en 2 días'
+                });
+            } else if (diffDaysStart === 3 && !isManaged('3d')) {
+                alerts['3d'].push({
+                    ...dep,
+                    relativeStatus: 'Sale en 3 días'
+                });
+            } else if (diffDaysStart === 4 && !isManaged('4d')) {
+                alerts['4d'].push({
+                    ...dep,
+                    relativeStatus: 'Sale en 4 días'
+                });
             }
 
-            // Check-out alert: exactly 1 day before return
-            // Only if return is after start (nights > 0 or it's a range with diff dates) and it is international or > 1 night
+            // Check-out alert: exactly 1 day before return or on return day
             if (endDate && !isNaN(endDate) && endDate > startDate) {
                 const diffTimeEnd = endDate - today;
                 const diffDaysEnd = Math.ceil(diffTimeEnd / (1000 * 60 * 60 * 24));
 
-                const dText = plan.duracion || '';
-                const dMatch = dText.match(/(\d+)\s*noches/i);
-                const nights = dMatch ? parseInt(dMatch[1]) : 0;
-
-                const isInternational = plan.categoria && plan.categoria.toLowerCase() === 'internacional';
-                const hasMultipleNights = nights > 1;
-
-                if (diffDaysEnd === 1 && (isInternational || hasMultipleNights)) {
-                    alerts['1d_checkout'].push(dep);
+                if ((diffDaysEnd === 1 || diffDaysEnd === 0) && !isManaged('1d_checkout')) {
+                    alerts['1d_checkout'].push({
+                        ...dep,
+                        relativeStatus: diffDaysEnd === 0 ? 'Regresa Hoy' : 'Regresa Mañana'
+                    });
                 }
             }
         });
@@ -307,9 +352,44 @@ export const NotificationsComponent = {
             }
 
             listData.forEach(dep => {
+                const alertType = listId.replace('alert-list-', '').replace(/-/g, '_');
+                
+                const relativeStatusLabel = dep.relativeStatus ? `
+                    <span class="inline-block px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${alertType.includes('checkout') ? 'bg-pink-50 border border-pink-100 text-pink-700' : alertType.includes('checkin') ? 'bg-violet-50 border border-violet-100 text-violet-700' : 'bg-slate-100 border border-slate-200 text-slate-655'} ml-1.5 align-middle">
+                        ${dep.relativeStatus}
+                    </span>
+                ` : '';
+
+                const passengersList = dep.clientes && dep.clientes.length > 0 ? `
+                    <div class="mt-3 border-t border-slate-100 pt-2.5">
+                        <button data-action="toggle-passengers" class="w-full flex items-center justify-between text-[9px] font-black text-slate-450 uppercase tracking-widest hover:text-slate-700 transition-colors focus:outline-none">
+                            <span>Pasajeros (${dep.pax} Pax)</span>
+                            <i class="ph ph-caret-down text-xs transition-transform duration-300"></i>
+                        </button>
+                        <div class="hidden mt-2 space-y-1.5 pl-1.5 transition-all">
+                            ${dep.clientes.map(c => `
+                                <div class="text-[10px] font-bold text-slate-600 flex items-center gap-1.5">
+                                    <div class="w-1 h-1 rounded-full bg-slate-300 shrink-0"></div>
+                                    <span>${UI.sanitize(c.nombre)} ${UI.sanitize(c.apellido || '')}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : '';
+
                 container.innerHTML += `
-                    <div class="bg-slate-50/50 border border-slate-200/40 p-4 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.01)] hover:shadow-md transition-all duration-300 relative overflow-hidden group bg-white">
-                        <h5 class="font-bold text-slate-900 text-sm leading-snug mb-1 pr-4">${UI.sanitize(dep.plan_nombre)}</h5>
+                    <div class="bg-slate-50/50 border border-slate-200/40 p-4 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.01)] hover:shadow-md transition-all duration-300 relative overflow-hidden group bg-white text-left">
+                        <!-- Mark as Managed Button -->
+                        <button data-action="mark-managed" data-type="${alertType}" data-plan-id="${dep.plan_id}" data-fecha-viaje="${UI.sanitize(dep.fecha_viaje)}"
+                            title="Marcar como Gestionado"
+                            class="absolute top-3 right-3 text-slate-300 hover:text-emerald-500 hover:bg-emerald-50 w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none">
+                            <i class="ph ph-check-circle text-lg"></i>
+                        </button>
+
+                        <h5 class="font-bold text-slate-900 text-sm leading-snug mb-1 pr-8 flex flex-wrap items-center gap-1">
+                            ${UI.sanitize(dep.plan_nombre)}
+                            ${relativeStatusLabel}
+                        </h5>
                         <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-3.5 flex items-center">
                             <i class="ph ph-map-pin mr-1 text-slate-350"></i> ${UI.sanitize(dep.destino || 'Destino Abierto')}
                         </p>
@@ -323,6 +403,8 @@ export const NotificationsComponent = {
                             class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-2.5 rounded-xl text-[9px] uppercase tracking-widest transition-all shadow-sm hover:-translate-y-0.5">
                             <i class="ph ph-eye mr-1 text-xs"></i> ${actionText}
                         </button>
+
+                        ${passengersList}
                     </div>
                 `;
             });
@@ -333,5 +415,59 @@ export const NotificationsComponent = {
         renderList('alert-list-2d', alerts['2d']);
         renderList('alert-list-3d', alerts['3d']);
         renderList('alert-list-4d', alerts['4d']);
+
+        // 3. Render managed alerts list
+        const managedContainer = document.getElementById('alert-list-managed');
+        if (managedContainer) {
+            managedContainer.innerHTML = '';
+            const managedData = DataService.alertas_gestionadas || [];
+            
+            if (managedData.length === 0) {
+                managedContainer.innerHTML = `
+                    <div class="col-span-full flex flex-col items-center justify-center py-12 text-slate-400 text-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
+                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-550">Ninguna alerta gestionada aún</p>
+                    </div>
+                `;
+            } else {
+                managedData.forEach(item => {
+                    const plan = DataService.planes.find(p => p.id === item.plan_id);
+                    const planNombre = plan ? plan.nombre : 'Plan Desconocido';
+                    
+                    const typeTranslations = {
+                        '1d_checkin': 'Check-in (Salida)',
+                        '1d_checkout': 'Check-out (Regreso)',
+                        '2d': 'Pre-Viaje (2 Días)',
+                        '3d': 'Pre-Viaje (3 Días)',
+                        '4d': 'Pre-Viaje (4 Días)'
+                    };
+                    const typeText = typeTranslations[item.tipo] || item.tipo;
+                    
+                    managedContainer.innerHTML += `
+                        <div class="bg-slate-50/30 border border-slate-200/40 p-4 rounded-2xl relative overflow-hidden group bg-white text-left opacity-75 hover:opacity-100 transition-opacity">
+                            <!-- Restore button -->
+                            <button data-action="unmark-managed" data-type="${item.tipo}" data-plan-id="${item.plan_id}" data-fecha-viaje="${UI.sanitize(item.fecha_viaje)}"
+                                title="Restaurar Alerta"
+                                class="absolute top-3 right-3 text-slate-400 hover:text-indigo-650 hover:bg-indigo-50 w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none">
+                                <i class="ph ph-arrow-counter-clockwise text-lg"></i>
+                            </button>
+
+                            <span class="inline-block px-2 py-0.5 mb-2.5 bg-emerald-50 border border-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-widest rounded-lg">
+                                <i class="ph ph-check mr-0.5"></i> ${typeText}
+                            </span>
+                            
+                            <h5 class="font-bold text-slate-800 text-sm leading-snug mb-1 pr-8">${UI.sanitize(planNombre)}</h5>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-3 flex items-center">
+                                <i class="ph ph-calendar-blank mr-1 text-slate-350"></i> ${UI.sanitize(item.fecha_viaje)}
+                            </p>
+                            
+                            <div class="text-[9px] font-semibold text-slate-500 pt-2 border-t border-slate-100/50 flex justify-between items-center">
+                                <span>Por: ${UI.sanitize(item.creado_por)}</span>
+                                <span>${new Date(item.created_at).toLocaleDateString('es-CO')}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
     }
 };

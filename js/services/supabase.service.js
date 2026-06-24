@@ -27,6 +27,7 @@ export const DataService = {
     b2b_negocios: [],
     adelantos_operativos: [],
     documentos_guardados: [],
+    alertas_gestionadas: [],
     db: {
         categories: ["Operador Turístico", "Alojamiento / Hotelería", "Transporte Especial", "Aseguradora Integral", "Restaurante y Eventos", "Guianza Local"],
         destinos: ["Barranquilla", "Cartagena", "Quindío", "Santa Marta", "La Guajira", "San Andrés"]
@@ -103,6 +104,22 @@ export const DataService = {
             console.warn("Table 'documentos_guardados' is missing or inaccessible. Fallback applied.", err);
         }
 
+        this.alertas_gestionadas = [];
+        try {
+            const { data, error } = await supabaseClient
+                .from('alertas_gestionadas')
+                .select('*');
+            if (!error && data) {
+                this.alertas_gestionadas = data;
+            } else if (error) {
+                console.warn("Table 'alertas_gestionadas' not found or error. Using local storage fallback.", error);
+                this.loadAlertasGestionadasLocal();
+            }
+        } catch (err) {
+            console.warn("Table 'alertas_gestionadas' is missing or inaccessible. Fallback applied.", err);
+            this.loadAlertasGestionadasLocal();
+        }
+
         Store.setState({
             planes: this.planes,
             clientes: this.clientes,
@@ -115,7 +132,8 @@ export const DataService = {
             b2b_negocios: this.b2b_negocios,
             ciudades: this.ciudades,
             adelantos_operativos: this.adelantos_operativos,
-            documentos_guardados: this.documentos_guardados
+            documentos_guardados: this.documentos_guardados,
+            alertas_gestionadas: this.alertas_gestionadas
         });
 
         this.autoClassifyReservas();
@@ -1163,6 +1181,76 @@ export const DataService = {
 
             await this.loadAll();
         } catch (e) { throw e; }
+    },
+
+    loadAlertasGestionadasLocal() {
+        try {
+            const localData = localStorage.getItem('crm_alertas_gestionadas');
+            this.alertas_gestionadas = localData ? JSON.parse(localData) : [];
+        } catch (e) {
+            console.error("Error loading local alerts:", e);
+            this.alertas_gestionadas = [];
+        }
+    },
+
+    saveAlertasGestionadasLocal() {
+        try {
+            localStorage.setItem('crm_alertas_gestionadas', JSON.stringify(this.alertas_gestionadas));
+        } catch (e) {
+            console.error("Error saving local alerts:", e);
+        }
+    },
+
+    async markAlertaGestionada(tipo, planId, fechaViaje) {
+        const userEmail = window.AuthModule?.currentUser?.email || 'Staff';
+        const payload = {
+            tipo,
+            plan_id: planId,
+            fecha_viaje: fechaViaje,
+            creado_por: userEmail
+        };
+
+        const exists = this.alertas_gestionadas.some(a => a.tipo === tipo && a.plan_id === planId && a.fecha_viaje === fechaViaje);
+        if (!exists) {
+            this.alertas_gestionadas.push({
+                ...payload,
+                id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(),
+                created_at: new Date().toISOString()
+            });
+            this.saveAlertasGestionadasLocal();
+        }
+
+        try {
+            const { error } = await supabaseClient.from('alertas_gestionadas').insert([payload]);
+            if (error && error.code !== '23505') {
+                console.warn("Supabase alerts insertion warning:", error);
+            }
+        } catch (e) {
+            console.warn("Supabase alerts insert exception:", e);
+        }
+
+        Store.setState({ alertas_gestionadas: this.alertas_gestionadas, lastUpdated: 'alertas_gestionadas' });
+    },
+
+    async removeAlertaGestionada(tipo, planId, fechaViaje) {
+        this.alertas_gestionadas = this.alertas_gestionadas.filter(
+            a => !(a.tipo === tipo && a.plan_id === planId && a.fecha_viaje === fechaViaje)
+        );
+        this.saveAlertasGestionadasLocal();
+
+        try {
+            const { error } = await supabaseClient
+                .from('alertas_gestionadas')
+                .delete()
+                .eq('tipo', tipo)
+                .eq('plan_id', planId)
+                .eq('fecha_viaje', fechaViaje);
+            if (error) console.warn("Supabase alerts deletion warning:", error);
+        } catch (e) {
+            console.warn("Supabase alerts delete exception:", e);
+        }
+
+        Store.setState({ alertas_gestionadas: this.alertas_gestionadas, lastUpdated: 'alertas_gestionadas' });
     }
 };
 
