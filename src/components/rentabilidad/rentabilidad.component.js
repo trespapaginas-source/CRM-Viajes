@@ -9,6 +9,7 @@ export const RentabilidadComponent = {
     currentPlanId: null,
     currentFecha: null,
     currentTab: 'activos',
+    currentViewType: 'grid',
     eventsBound: false,
 
     getClientRealPax(c) {
@@ -63,6 +64,8 @@ export const RentabilidadComponent = {
                 this.syncRatesWithCatalog();
             } else if (action === 'export-viajeros') {
                 this.exportViajerosCSV();
+            } else if (action === 'switch-rent-view') {
+                this.switchRentView(targetAction.dataset.viewType);
             }
         });
 
@@ -78,6 +81,9 @@ export const RentabilidadComponent = {
 
         const fDestino = document.getElementById('filter-rentabilidad-destino');
         if (fDestino) fDestino.addEventListener('change', () => this.filterGrid());
+
+        const fSearch = document.getElementById('filter-rentabilidad-search');
+        if (fSearch) fSearch.addEventListener('input', () => this.filterGrid());
 
         const selectTipoValor = document.getElementById('ng-tipo-valor');
         if (selectTipoValor) selectTipoValor.addEventListener('change', () => this.toggleGastoInput());
@@ -123,6 +129,31 @@ export const RentabilidadComponent = {
             activeBtn.classList.remove('border-transparent', 'text-slate-400');
             activeBtn.classList.add('border-primary-600', 'text-slate-900', 'bg-white');
         }
+        this.renderGrid();
+    },
+
+    switchRentView(viewType) {
+        this.currentViewType = viewType;
+        
+        // Update switcher buttons UI
+        const gridBtn = document.getElementById('rent-view-grid-btn');
+        const listBtn = document.getElementById('rent-view-list-btn');
+        if (gridBtn && listBtn) {
+            if (viewType === 'list') {
+                gridBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5";
+                gridBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+                
+                listBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-white text-slate-900 shadow-sm transition-all flex items-center gap-1.5";
+                listBtn.classList.remove('text-slate-500');
+            } else {
+                listBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5";
+                listBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+                
+                gridBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-white text-slate-900 shadow-sm transition-all flex items-center gap-1.5";
+                gridBtn.classList.remove('text-slate-500');
+            }
+        }
+        
         this.renderGrid();
     },
 
@@ -191,6 +222,14 @@ export const RentabilidadComponent = {
             const filterDestino = document.getElementById('filter-rentabilidad-destino')?.value.toLowerCase() || "";
             if (filterDestino && !(plan.destino || "").toLowerCase().includes(filterDestino)) return;
 
+            const filterSearch = document.getElementById('filter-rentabilidad-search')?.value.toLowerCase() || "";
+            if (filterSearch) {
+                const searchInPlan = plan.nombre.toLowerCase().includes(filterSearch);
+                const searchInDest = (plan.destino || "").toLowerCase().includes(filterSearch);
+                const searchInDate = cli.fecha_viaje.toLowerCase().includes(filterSearch);
+                if (!searchInPlan && !searchInDest && !searchInDate) return;
+            }
+
             const key = `${cli.plan_id}|${cli.fecha_viaje}`;
             if (!salidasMap.has(key)) {
                 salidasMap.set(key, { plan_id: cli.plan_id, plan_nombre: plan.nombre, fecha_viaje: cli.fecha_viaje, pax_total: 0, pax_servicio: 0, ingreso_bruto: 0, ingreso_retenido: 0, clientes: [] });
@@ -217,6 +256,13 @@ export const RentabilidadComponent = {
             grupo.clientes.push(cli);
         });
 
+        const view = this.currentViewType || 'grid';
+        if (view === 'list') {
+            grid.className = 'flex flex-col gap-3 w-full';
+        } else {
+            grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+        }
+
         if (salidasMap.size === 0) {
             grid.innerHTML = '<div class="col-span-full p-10 text-center text-slate-400 font-bold border-2 border-dashed border-slate-200 rounded-2xl">No hay salidas programadas con pasajeros activos.</div>';
             return;
@@ -230,8 +276,15 @@ export const RentabilidadComponent = {
             let isPast = false;
 
             if (data.fecha_viaje) {
-                const dateViaje = parseSpanishDate(data.fecha_viaje);
-                if (dateViaje && !isNaN(dateViaje) && dateViaje < today) {
+                let dateViaje = parseSpanishDate(data.fecha_viaje);
+                const parts = data.fecha_viaje.split(/\s+al\s+/i);
+                if (parts.length === 2) {
+                    const parsedEnd = parseSpanishDate(parts[1].trim());
+                    if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+                        dateViaje = parsedEnd;
+                    }
+                }
+                if (dateViaje && !isNaN(dateViaje.getTime()) && dateViaje < today) {
                     isPast = true;
                 }
             }
@@ -266,19 +319,42 @@ export const RentabilidadComponent = {
             const margen = data.ingreso_bruto - costoTotal;
             const isRentable = margen >= 0;
 
-            grid.innerHTML += `
-                <div data-action="open-financial-modal" data-plan-id="${data.plan_id}" data-fecha-viaje="${data.fecha_viaje}" class="bg-white rounded-2xl shadow-soft border border-slate-100 p-5 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden group">
-                    <div class="absolute -right-4 -top-4 w-16 h-16 ${isRentable ? 'bg-green-50' : 'bg-red-50'} rounded-full opacity-50 group-hover:scale-150 transition-transform"></div>
-                    <div class="flex justify-between items-start mb-3 relative z-10">
-                        <span class="text-[10px] font-black uppercase tracking-widest bg-slate-800 text-white px-2.5 py-1 rounded-md">${formatDoubleDate(data.fecha_viaje)}</span>
-                        <span class="text-[10px] font-black flex items-center ${isRentable ? 'text-green-600' : 'text-red-500'}"><i class="ph ${isRentable ? 'ph-trend-up' : 'ph-trend-down'} mr-1"></i> ${isRentable ? 'Rentable' : 'Pérdida'}</span>
-                    </div>
-                    <h4 class="font-black text-slate-800 text-lg leading-tight mb-4 relative z-10">${data.plan_nombre}</h4>
-                    <div class="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 relative z-10">
-                        <div><p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Inscritos</p><p class="text-sm font-black text-slate-700 flex items-center"><i class="ph ph-users text-slate-400 mr-1.5"></i> ${data.pax_total} Pax</p></div>
-                        <div class="text-right"><p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Margen Proyectado</p><p class="text-sm font-black ${isRentable ? 'text-green-600' : 'text-red-500'}">${formatCOP(margen)}</p></div>
-                    </div>
-                </div>`;
+            if (view === 'list') {
+                grid.innerHTML += `
+                    <div data-action="open-financial-modal" data-plan-id="${data.plan_id}" data-fecha-viaje="${data.fecha_viaje}" class="bg-white rounded-xl shadow-soft border border-slate-100 p-4 hover:shadow-md transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-slate-200">
+                        <div class="flex items-center gap-3.5">
+                            <span class="text-[9px] font-black uppercase tracking-widest bg-slate-800 text-white px-2.5 py-1 rounded-md shrink-0">${formatDoubleDate(data.fecha_viaje)}</span>
+                            <div>
+                                <h4 class="font-black text-slate-800 text-sm leading-tight group-hover:text-primary-600 transition-colors">${data.plan_nombre}</h4>
+                                <span class="text-[9px] font-black flex items-center mt-0.5 ${isRentable ? 'text-green-600' : 'text-red-500'}"><i class="ph ${isRentable ? 'ph-trend-up' : 'ph-trend-down'} mr-1"></i> ${isRentable ? 'Rentable' : 'Pérdida'}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-6 sm:gap-10">
+                            <div>
+                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Inscritos</p>
+                                <p class="text-xs font-black text-slate-700 flex items-center"><i class="ph ph-users text-slate-400 mr-1.5"></i> ${data.pax_total} Pax</p>
+                            </div>
+                            <div class="text-right min-w-[120px]">
+                                <p class="text-[8px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Margen Proyectado</p>
+                                <p class="text-xs font-black ${isRentable ? 'text-green-600' : 'text-red-500'}">${formatCOP(margen)}</p>
+                            </div>
+                        </div>
+                    </div>`;
+            } else {
+                grid.innerHTML += `
+                    <div data-action="open-financial-modal" data-plan-id="${data.plan_id}" data-fecha-viaje="${data.fecha_viaje}" class="bg-white rounded-2xl shadow-soft border border-slate-100 p-5 hover:shadow-md transition-shadow cursor-pointer relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 w-16 h-16 ${isRentable ? 'bg-green-50' : 'bg-red-50'} rounded-full opacity-50 group-hover:scale-150 transition-transform"></div>
+                        <div class="flex justify-between items-start mb-3 relative z-10">
+                            <span class="text-[10px] font-black uppercase tracking-widest bg-slate-800 text-white px-2.5 py-1 rounded-md">${formatDoubleDate(data.fecha_viaje)}</span>
+                            <span class="text-[10px] font-black flex items-center ${isRentable ? 'text-green-600' : 'text-red-500'}"><i class="ph ${isRentable ? 'ph-trend-up' : 'ph-trend-down'} mr-1"></i> ${isRentable ? 'Rentable' : 'Pérdida'}</span>
+                        </div>
+                        <h4 class="font-black text-slate-800 text-lg leading-tight mb-4 relative z-10">${data.plan_nombre}</h4>
+                        <div class="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 relative z-10">
+                            <div><p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Inscritos</p><p class="text-sm font-black text-slate-700 flex items-center"><i class="ph ph-users text-slate-400 mr-1.5"></i> ${data.pax_total} Pax</p></div>
+                            <div class="text-right"><p class="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Margen Proyectado</p><p class="text-sm font-black ${isRentable ? 'text-green-600' : 'text-red-500'}">${formatCOP(margen)}</p></div>
+                        </div>
+                    </div>`;
+            }
         });
 
         if (!hasCards) {
@@ -389,8 +465,15 @@ export const RentabilidadComponent = {
 
         const todayModal = new Date();
         todayModal.setHours(0,0,0,0);
-        const dateViajeModal = parseSpanishDate(fecha);
-        const isPastTrip = dateViajeModal && !isNaN(dateViajeModal) && dateViajeModal < todayModal;
+        let dateViajeModal = parseSpanishDate(fecha);
+        const parts = fecha.split(/\s+al\s+/i);
+        if (parts.length === 2) {
+            const parsedEnd = parseSpanishDate(parts[1].trim());
+            if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+                dateViajeModal = parsedEnd;
+            }
+        }
+        const isPastTrip = dateViajeModal && !isNaN(dateViajeModal.getTime()) && dateViajeModal < todayModal;
 
         clientesSalida.forEach(c => {
             const p = this.getClientRealPax(c);

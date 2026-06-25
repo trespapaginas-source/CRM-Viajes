@@ -5,6 +5,7 @@ import { formatCOP, formatShortDate } from '../../../js/utils/format.utils.js';
 
 export const PlanesComponent = {
     currentTab: 'locales',
+    currentViewType: 'grid',
     tempProveedores: [],
     tempSelectedCatalog: [],
     tempFechas: [],
@@ -41,6 +42,8 @@ export const PlanesComponent = {
 
             if (action === 'switch-planes-tab') {
                 this.switchPlanesTab(target.dataset.tabId);
+            } else if (action === 'switch-planes-view') {
+                this.switchPlanesView(target.dataset.viewType);
             } else if (action === 'add-temp-date') {
                 this.addDateToTempList();
             } else if (action === 'remove-temp-date') {
@@ -120,6 +123,11 @@ export const PlanesComponent = {
             filterDestino.addEventListener('change', () => this.filterGrid());
         }
 
+        const filterSearch = document.getElementById('filter-planes-search');
+        if (filterSearch) {
+            filterSearch.addEventListener('input', () => this.filterGrid());
+        }
+
         // Global delegate for dynamic checkboxes (toggleCatalogProduct)
         document.body.addEventListener('change', (e) => {
             if (e.target.classList.contains('catalog-checkbox')) {
@@ -141,6 +149,30 @@ export const PlanesComponent = {
             activeBtn.classList.remove('border-transparent', 'text-slate-400', 'hover:text-slate-700');
             activeBtn.classList.add('border-primary-600', 'text-slate-900', 'bg-white');
         }
+        this.renderGrid();
+    },
+
+    switchPlanesView(viewType) {
+        this.currentViewType = viewType;
+        
+        const gridBtn = document.getElementById('planes-view-grid-btn');
+        const listBtn = document.getElementById('planes-view-list-btn');
+        if (gridBtn && listBtn) {
+            if (viewType === 'list') {
+                gridBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5";
+                gridBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+                
+                listBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-white text-slate-900 shadow-sm transition-all flex items-center gap-1.5";
+                listBtn.classList.remove('text-slate-500');
+            } else {
+                listBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-all flex items-center gap-1.5";
+                listBtn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+                
+                gridBtn.className = "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-white text-slate-900 shadow-sm transition-all flex items-center gap-1.5";
+                gridBtn.classList.remove('text-slate-500');
+            }
+        }
+        
         this.renderGrid();
     },
 
@@ -200,19 +232,8 @@ export const PlanesComponent = {
             });
         }
     },
-
     filterGrid() {
-        const tipo = document.getElementById('filter-planes-tipo')?.value.toLowerCase() || "";
-        const destino = document.getElementById('filter-planes-destino')?.value.toLowerCase() || "";
-        const cards = document.querySelectorAll('#planes-grid > div');
-
-        cards.forEach(card => {
-            const cardTipo = card.getAttribute('data-tipo')?.toLowerCase() || "";
-            const cardDestino = card.getAttribute('data-destino')?.toLowerCase() || "";
-            const matchTipo = tipo === "" || cardTipo === tipo;
-            const matchDestino = destino === "" || cardDestino.includes(destino);
-            card.style.display = (matchTipo && matchDestino) ? "" : "none";
-        });
+        this.renderGrid();
     },
 
     renderGrid() {
@@ -220,51 +241,119 @@ export const PlanesComponent = {
         if (!mallaGrafica) return;
         mallaGrafica.innerHTML = '';
 
-        DataService.planes.forEach(planBase => {
+        const tipo = document.getElementById('filter-planes-tipo')?.value.toLowerCase() || "";
+        const destino = document.getElementById('filter-planes-destino')?.value.toLowerCase() || "";
+        const search = document.getElementById('filter-planes-search')?.value.toLowerCase() || "";
+
+        const filteredPlanes = DataService.planes.filter(planBase => {
             const esInternacional = planBase.categoria === 'Internacional';
-            if (this.currentTab === 'locales' && esInternacional) return;
-            if (this.currentTab === 'internacionales' && !esInternacional) return;
+            if (this.currentTab === 'locales' && esInternacional) return false;
+            if (this.currentTab === 'internacionales' && !esInternacional) return false;
 
+            const cardTipo = (planBase.tipo || '').toLowerCase();
+            const cardDestino = (planBase.destino || '').toLowerCase();
+            const cardNombre = (planBase.nombre || '').toLowerCase();
+
+            const matchTipo = tipo === "" || cardTipo === tipo;
+            const matchDestino = destino === "" || cardDestino.includes(destino);
+            const matchSearch = search === "" || cardNombre.includes(search) || cardDestino.includes(search);
+
+            return matchTipo && matchDestino && matchSearch;
+        });
+
+        const view = this.currentViewType || 'grid';
+        if (view === 'list') {
+            mallaGrafica.className = 'flex flex-col gap-3 w-full';
+        } else {
+            mallaGrafica.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+        }
+
+        if (filteredPlanes.length === 0) {
+            mallaGrafica.innerHTML = '<div class="col-span-full p-10 text-center text-slate-400 font-bold border-2 border-dashed border-slate-200 rounded-2xl">No se encontraron planes que coincidan con la búsqueda.</div>';
+            return;
+        }
+
+        filteredPlanes.forEach(planBase => {
             const marcoDiv = document.createElement('div');
-            marcoDiv.className = "bg-white/60 backdrop-blur-xl border border-white p-5 rounded-3xl shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-slate-300/50 hover:-translate-y-1 transition-all duration-300 relative group flex flex-col overflow-hidden";
-            marcoDiv.setAttribute('data-tipo', UI.sanitize(planBase.tipo || ''));
-            marcoDiv.setAttribute('data-destino', UI.sanitize(planBase.destino || ''));
 
-            marcoDiv.innerHTML = `
-                <div class="absolute inset-0 border border-white/80 rounded-3xl pointer-events-none"></div>
-                <div class="absolute -right-12 -top-12 w-48 h-48 bg-gradient-to-br from-white to-transparent rounded-full blur-2xl opacity-70 pointer-events-none"></div>
-                <div class="absolute top-4 right-4 flex space-x-1.5 z-50 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all">
-                    <button data-action="open-plan-form" data-plan-id="${planBase.id}" class="bg-white/50 backdrop-blur-md shadow-sm border border-white p-1.5 rounded-xl text-slate-500 hover:text-primary-600 transition-colors cursor-pointer relative" title="Editar"><i class="ph ph-pencil-simple text-base pointer-events-none"></i></button>
-                    <button data-action="delete-plan" data-plan-id="${planBase.id}" data-plan-name="${planBase.nombre.replace(/'/g, "\\'")}" class="btn-delete-protected bg-white/50 backdrop-blur-md shadow-sm border border-white p-1.5 rounded-xl text-red-400 hover:text-white hover:bg-red-500 transition-colors cursor-pointer relative" title="Eliminar Plan"><i class="ph ph-trash text-base pointer-events-none"></i></button>
-                </div>
-                <div class="mb-3 relative z-10">
-                    <span class="text-[9px] font-black uppercase tracking-wider bg-slate-800 text-white px-3 py-1.5 rounded-lg shadow-sm">${planBase.tipo}</span>
-                </div>
-                <h4 class="text-xl font-black text-slate-800 leading-tight mb-2 pr-12 relative z-10">${planBase.nombre}</h4>
-                <div class="space-y-2 mb-4 flex-1 relative z-10">
-                    <p class="text-xs text-slate-600 font-semibold flex items-center"><i class="ph ph-map-pin mr-2 text-primary-500 text-sm"></i> ${planBase.destino || 'Destino Abierto'}</p>
-                    <p class="text-xs text-slate-600 font-semibold flex items-center"><i class="ph ph-calendar-blank mr-2 text-slate-400 text-sm"></i>
-                        <span class="text-slate-800 font-bold tracking-wide leading-tight mt-0.5">
-                            ${planBase.fechas && planBase.fechas.length > 0
-                                ? `${planBase.fechas.length} salida(s) programada(s)`
-                                : (!planBase.fecha_entrada && !planBase.fecha_salida)
-                                    ? 'Fecha Abierta / Por Definir'
-                                    : (planBase.fecha_entrada === planBase.fecha_salida)
-                                        ? formatShortDate(planBase.fecha_entrada)
-                                        : formatShortDate(planBase.fecha_entrada) + ' al ' + formatShortDate(planBase.fecha_salida)}
-                        </span>
-                    </p>
-                </div>
-                <div class="flex justify-between items-end pt-4 border-t border-slate-200/50 mt-auto bg-white/40 backdrop-blur-sm -mx-5 -mb-5 px-5 pb-5 rounded-b-[1.35rem] relative z-10">
-                    <div>
-                        <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Tarifa / Pax</p>
-                        <button data-action="quick-update-price" data-plan-id="${planBase.id}" data-precio="${planBase.precio_persona}" class="text-2xl font-black text-primary-600 tracking-tight hover:underline drop-shadow-sm">${formatCOP(planBase.precio_persona)}</button>
+            if (view === 'list') {
+                marcoDiv.className = "bg-white rounded-xl shadow-soft border border-slate-100 p-4 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-slate-200 w-full";
+                
+                const dateText = planBase.fechas && planBase.fechas.length > 0
+                    ? `${planBase.fechas.length} salida(s)`
+                    : (!planBase.fecha_entrada && !planBase.fecha_salida)
+                        ? 'Fecha Abierta'
+                        : (planBase.fecha_entrada === planBase.fecha_salida)
+                            ? formatShortDate(planBase.fecha_entrada)
+                            : formatShortDate(planBase.fecha_entrada) + ' al ' + formatShortDate(planBase.fecha_salida);
+
+                marcoDiv.innerHTML = `
+                    <div class="flex items-center gap-3.5 flex-1 min-w-0">
+                        <span class="text-[9px] font-black uppercase tracking-widest bg-slate-800 text-white px-2.5 py-1 rounded-md shrink-0">${planBase.tipo}</span>
+                        <div class="min-w-0">
+                            <h4 class="font-black text-slate-800 text-sm leading-tight group-hover:text-primary-600 transition-colors truncate">${planBase.nombre}</h4>
+                            <p class="text-[10px] text-slate-500 flex items-center mt-0.5"><i class="ph ph-map-pin mr-1 text-primary-500"></i> ${planBase.destino || 'Destino Abierto'}</p>
+                        </div>
                     </div>
-                    <div class="text-right">
-                        <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Costos Prov.</p>
-                        <p class="text-base font-black text-slate-700">${formatCOP(planBase.costo_base)}</p>
+                    <div class="flex items-center gap-6 sm:gap-10 shrink-0">
+                        <div>
+                            <p class="text-[8px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Salidas</p>
+                            <p class="text-xs font-black text-slate-700 flex items-center"><i class="ph ph-calendar-blank text-slate-400 mr-1.5"></i> ${dateText}</p>
+                        </div>
+                        <div class="text-right min-w-[100px]">
+                            <p class="text-[8px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Tarifa / Pax</p>
+                            <button data-action="quick-update-price" data-plan-id="${planBase.id}" data-precio="${planBase.precio_persona}" class="text-sm font-black text-primary-600 hover:underline transition-colors">${formatCOP(planBase.precio_persona)}</button>
+                        </div>
+                        <div class="text-right min-w-[100px]">
+                            <p class="text-[8px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Costo Base</p>
+                            <p class="text-xs font-black text-slate-700">${formatCOP(planBase.costo_base)}</p>
+                        </div>
+                        <div class="flex space-x-1">
+                            <button data-action="open-plan-form" data-plan-id="${planBase.id}" class="bg-slate-50 shadow-sm border border-slate-200 p-1.5 rounded-lg text-slate-500 hover:text-primary-600 transition-colors cursor-pointer" title="Editar"><i class="ph ph-pencil-simple text-sm pointer-events-none"></i></button>
+                            <button data-action="delete-plan" data-plan-id="${planBase.id}" data-plan-name="${planBase.nombre.replace(/'/g, "\\'")}" class="btn-delete-protected bg-slate-50 shadow-sm border border-slate-200 p-1.5 rounded-lg text-red-400 hover:text-white hover:bg-red-500 transition-colors cursor-pointer" title="Eliminar"><i class="ph ph-trash text-sm pointer-events-none"></i></button>
+                        </div>
+                    </div>`;
+            } else {
+                marcoDiv.className = "bg-white/60 backdrop-blur-xl border border-white p-5 rounded-3xl shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-slate-300/50 hover:-translate-y-1 transition-all duration-300 relative group flex flex-col overflow-hidden";
+                marcoDiv.setAttribute('data-tipo', UI.sanitize(planBase.tipo || ''));
+                marcoDiv.setAttribute('data-destino', UI.sanitize(planBase.destino || ''));
+
+                marcoDiv.innerHTML = `
+                    <div class="absolute inset-0 border border-white/80 rounded-3xl pointer-events-none"></div>
+                    <div class="absolute -right-12 -top-12 w-48 h-48 bg-gradient-to-br from-white to-transparent rounded-full blur-2xl opacity-70 pointer-events-none"></div>
+                    <div class="absolute top-4 right-4 flex space-x-1.5 z-50 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all">
+                        <button data-action="open-plan-form" data-plan-id="${planBase.id}" class="bg-white/50 backdrop-blur-md shadow-sm border border-white p-1.5 rounded-xl text-slate-500 hover:text-primary-600 transition-colors cursor-pointer relative" title="Editar"><i class="ph ph-pencil-simple text-base pointer-events-none"></i></button>
+                        <button data-action="delete-plan" data-plan-id="${planBase.id}" data-plan-name="${planBase.nombre.replace(/'/g, "\\'")}" class="btn-delete-protected bg-white/50 backdrop-blur-md shadow-sm border border-white p-1.5 rounded-xl text-red-400 hover:text-white hover:bg-red-500 transition-colors cursor-pointer" title="Eliminar Plan"><i class="ph ph-trash text-base pointer-events-none"></i></button>
                     </div>
-                </div>`;
+                    <div class="mb-3 relative z-10">
+                        <span class="text-[9px] font-black uppercase tracking-wider bg-slate-800 text-white px-3 py-1.5 rounded-lg shadow-sm">${planBase.tipo}</span>
+                    </div>
+                    <h4 class="text-xl font-black text-slate-800 leading-tight mb-2 pr-12 relative z-10">${planBase.nombre}</h4>
+                    <div class="space-y-2 mb-4 flex-1 relative z-10">
+                        <p class="text-xs text-slate-600 font-semibold flex items-center"><i class="ph ph-map-pin mr-2 text-primary-500 text-sm"></i> ${planBase.destino || 'Destino Abierto'}</p>
+                        <p class="text-xs text-slate-600 font-semibold flex items-center"><i class="ph ph-calendar-blank mr-2 text-slate-400 text-sm"></i>
+                            <span class="text-slate-800 font-bold tracking-wide leading-tight mt-0.5">
+                                ${planBase.fechas && planBase.fechas.length > 0
+                                    ? `${planBase.fechas.length} salida(s) programada(s)`
+                                    : (!planBase.fecha_entrada && !planBase.fecha_salida)
+                                        ? 'Fecha Abierta / Por Definir'
+                                        : (planBase.fecha_entrada === planBase.fecha_salida)
+                                            ? formatShortDate(planBase.fecha_entrada)
+                                            : formatShortDate(planBase.fecha_entrada) + ' al ' + formatShortDate(planBase.fecha_salida)}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="flex justify-between items-end pt-4 border-t border-slate-200/50 mt-auto bg-white/40 backdrop-blur-sm -mx-5 -mb-5 px-5 pb-5 rounded-b-[1.35rem] relative z-10">
+                        <div>
+                            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Tarifa / Pax</p>
+                            <button data-action="quick-update-price" data-plan-id="${planBase.id}" data-precio="${planBase.precio_persona}" class="text-2xl font-black text-primary-600 tracking-tight hover:underline drop-shadow-sm">${formatCOP(planBase.precio_persona)}</button>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Costos Prov.</p>
+                            <p class="text-base font-black text-slate-700">${formatCOP(planBase.costo_base)}</p>
+                        </div>
+                    </div>`;
+            }
             mallaGrafica.appendChild(marcoDiv);
         });
     },

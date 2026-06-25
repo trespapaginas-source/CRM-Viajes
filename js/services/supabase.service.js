@@ -162,10 +162,16 @@ export const DataService = {
             if (st === 'devolución' || st === 'cancelado o devolución' || st === 'cancelados' || st === 'reprogramado' || st === 'desistió') {
                 return;
             }
-
             if (c.fecha_viaje) {
-                const dateViaje = parseSpanishDate(c.fecha_viaje);
-                if (dateViaje && !isNaN(dateViaje)) {
+                let dateViaje = parseSpanishDate(c.fecha_viaje);
+                const parts = c.fecha_viaje.split(/\s+al\s+/i);
+                if (parts.length === 2) {
+                    const parsedEnd = parseSpanishDate(parts[1].trim());
+                    if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+                        dateViaje = parsedEnd;
+                    }
+                }
+                if (dateViaje && !isNaN(dateViaje.getTime())) {
                     const isPast = dateViaje < today;
                     
                     const precioTotal = parseFloat(c.precio_total || 0);
