@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -19,7 +21,13 @@ const MIME_TYPES = {
     '.webp': 'image/webp'
 };
 
-const RESEND_API_KEY = 're_ami8ZT68_3Ug7UbRWfz1eL6ouMkXDc8mD';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const ALERT_RECIPIENTS = (process.env.ALERT_RECIPIENTS || 'vivemarketingdigital@gmail.com,trespa.paginas@gmail.com,luismendezramirez@hotmail.es')
+    .split(',')
+    .map(e => e.trim())
+    .filter(Boolean);
+const SANDBOX_RECIPIENT = process.env.SANDBOX_RECIPIENT || 'trespa.paginas@gmail.com';
+
 
 const sendResendEmail = async (alerts) => {
     // Build HTML content
@@ -107,6 +115,7 @@ const sendResendEmail = async (alerts) => {
         </div>
     `;
 
+
     const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -115,7 +124,7 @@ const sendResendEmail = async (alerts) => {
         },
         body: JSON.stringify({
             from: 'onboarding@resend.dev',
-            to: ['vivemarketingdigital@gmail.com', 'trespa.paginas@gmail.com', 'luismendezramirez@hotmail.es'],
+            to: ALERT_RECIPIENTS,
             subject: '🚨 CRM Vive Travel: Alerta de Salidas Próximas',
             html: htmlContent
         })
@@ -124,7 +133,7 @@ const sendResendEmail = async (alerts) => {
     if (!response.ok) {
         const errText = await response.text();
         if (response.status === 403 && errText.includes('You can only send testing emails to your own email address')) {
-            console.warn("Resend Sandbox detected. Retrying send to verified sandbox owner (trespa.paginas@gmail.com)...");
+            console.warn(`Resend Sandbox detected. Retrying send to verified sandbox owner (${SANDBOX_RECIPIENT})...`);
             const retryResponse = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
@@ -133,7 +142,7 @@ const sendResendEmail = async (alerts) => {
                 },
                 body: JSON.stringify({
                     from: 'onboarding@resend.dev',
-                    to: ['trespa.paginas@gmail.com'],
+                    to: [SANDBOX_RECIPIENT],
                     subject: '🚨 CRM Vive Travel: Alerta de Salidas Próximas (Sandbox Mode)',
                     html: htmlContent
                 })
@@ -159,6 +168,30 @@ const server = http.createServer((req, res) => {
             console.log(`\n=======================================================\n[BROWSER CLIENT ERROR]: ${body}\n=======================================================\n`);
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.end('ok');
+        });
+        return;
+    }
+
+    // Handler for browser diagnostic data dumps
+    if (req.method === 'POST' && req.url === '/log-diagnostics') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const scratchDir = path.join(__dirname, 'scratch');
+                if (!fs.existsSync(scratchDir)) {
+                    fs.mkdirSync(scratchDir);
+                }
+                const dumpPath = path.join(scratchDir, 'abonos_dump.json');
+                fs.writeFileSync(dumpPath, body, 'utf8');
+                console.log(`\n[DIAGNOSTICS] Received diagnostic dump. Saved to ${dumpPath}.\n`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success' }));
+            } catch (err) {
+                console.error("Error saving diagnostics dump:", err);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'error', message: err.message }));
+            }
         });
         return;
     }
@@ -190,14 +223,35 @@ const server = http.createServer((req, res) => {
 
     // Decodificar URL para manejar espacios y caracteres especiales en las rutas
     let filePath = path.join(__dirname, decodeURIComponent(req.url));
+
+    // ERR-006: Prevenir Path Traversal
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(path.resolve(__dirname))) {
+        res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>403 Forbidden</h1>', 'utf-8');
+        return;
+    }
+    filePath = resolvedPath;
     
     // Si es un directorio, servir index.html por defecto
     if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
         filePath = path.join(filePath, 'index.html');
     }
 
+    const basename = path.basename(filePath);
+    if (basename.startsWith('.') || ['package.json', 'package-lock.json', 'server.js'].includes(basename)) {
+        res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>403 Forbidden</h1>', 'utf-8');
+        return;
+    }
+
     const extname = String(path.extname(filePath)).toLowerCase();
-    const contentType = MIME_TYPES[extname] || 'application/octet-stream';
+    const contentType = MIME_TYPES[extname];
+    if (!contentType) {
+        res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>403 Forbidden</h1>', 'utf-8');
+        return;
+    }
 
     fs.readFile(filePath, (error, content) => {
         if (error) {
@@ -230,6 +284,7 @@ server.listen(PORT, () => {
     console.log(` Para detener el servidor presiona: Ctrl + C`);
     console.log(`=======================================================`);
 
-    // Abre el navegador automáticamente en Windows
-    exec(`start ${url}`);
+    // Abre el navegador automáticamente según la plataforma
+    const openCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+    exec(`${openCmd} ${url}`);
 });

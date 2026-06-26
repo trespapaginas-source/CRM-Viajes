@@ -91,3 +91,64 @@ document.addEventListener('input', (e) => {
         window.UI.formatCurrencyElement(e.target);
     }
 });
+
+// ── 4. SUSCRIPCIÓN PARA ADVERTENCIAS DEL SISTEMA ─────────────────
+import { Store } from '../src/core/store.js';
+
+Store.subscribe((state) => {
+    const bannerContainer = document.getElementById('system-warning-banners');
+    if (!bannerContainer) return;
+
+    const rol = window.AuthModule?.userProfile?.rol;
+    const isAdmin = rol === 'administrador' || rol === 'super_administrador';
+    
+    let html = '';
+    let hasWarnings = false;
+
+    // 1. Advertencia de Tabla de Historial Faltante (Solo visible para Admin/SuperAdmin)
+    if (state.historyTableMissing && isAdmin) {
+        hasWarnings = true;
+        html += `
+            <div class="bg-rose-50 border border-rose-100/80 text-rose-800 p-4 rounded-2xl flex items-start gap-3 shadow-[0_1px_2px_rgba(244,63,94,0.05)]">
+                <i class="ph ph-shield-warning text-rose-600 text-lg shrink-0 mt-0.5 animate-pulse"></i>
+                <div class="flex-1">
+                    <p class="text-[10px] font-black text-rose-800 uppercase tracking-wider">Advertencia de Seguridad e Historial</p>
+                    <p class="text-xs font-semibold text-slate-800 mt-0.5">
+                        La tabla <code class="bg-rose-100/60 px-1.5 py-0.5 rounded font-mono text-[10px]">historial_reservas</code> no existe en la base de datos Supabase. Se han deshabilitado los registros de auditoría de actividad. Contacte al administrador principal.
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+
+    // 2. Advertencia de Capacidad de Carga
+    if (state.limitWarnings) {
+        const warnings = [];
+        if (state.limitWarnings.clientes) warnings.push('Clientes (límite: 10.000)');
+        if (state.limitWarnings.abonos) warnings.push('Abonos (límite: 20.000)');
+        if (state.limitWarnings.gastos) warnings.push('Gastos (límite: 10.000)');
+
+        if (warnings.length > 0) {
+            hasWarnings = true;
+            html += `
+                <div class="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl flex items-start gap-3 shadow-[0_1px_2px_rgba(245,158,11,0.05)]">
+                    <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5"></i>
+                    <div class="flex-1">
+                        <p class="text-[10px] font-black text-amber-800 uppercase tracking-wider">Advertencia de Capacidad de Datos</p>
+                        <p class="text-xs font-semibold text-slate-800 mt-0.5">
+                            Se ha completado el límite máximo de carga para: <strong class="text-slate-900">${warnings.join(', ')}</strong>. Algunos registros antiguos podrían no ser visibles. Contacte al administrador para archivar datos históricos de años anteriores.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    if (hasWarnings) {
+        bannerContainer.innerHTML = html;
+        bannerContainer.classList.remove('hidden');
+    } else {
+        bannerContainer.innerHTML = '';
+        bannerContainer.classList.add('hidden');
+    }
+});

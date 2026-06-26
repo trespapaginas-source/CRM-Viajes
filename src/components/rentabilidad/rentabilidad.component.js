@@ -185,7 +185,7 @@ export const RentabilidadComponent = {
                 if (PartnersComponent) {
                     await PartnersComponent.loadConfig();
                     const rol = window.AuthModule?.userProfile?.rol;
-                    const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+                    const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
                     const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
                     const isPartner = PartnersComponent.sociosConfig.some(s => s.email.toLowerCase() === currentUserEmail);
                     
@@ -663,7 +663,7 @@ export const RentabilidadComponent = {
     },
 
     async deleteGasto(id) {
-        const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador';
+        const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador' || window.AuthModule?.userProfile?.rol === 'super_administrador';
         const gasto = DataService.gastos.find(g => g.id === id);
         if (gasto) {
             const hoursSinceCreated = (new Date() - new Date(gasto.created_at)) / (1000 * 60 * 60);
@@ -801,7 +801,7 @@ export const RentabilidadComponent = {
             if (g.categoria === 'Publicidad') bgBadge = 'bg-blue-100 text-blue-700';
             if (g.categoria === 'Comisión') bgBadge = 'bg-orange-100 text-orange-700';
 
-            const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador';
+            const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador' || window.AuthModule?.userProfile?.rol === 'super_administrador';
             const hoursSinceCreated = (new Date() - new Date(g.created_at)) / (1000 * 60 * 60);
             const isFrozen = !IS_ADMIN && hoursSinceCreated > 48;
 

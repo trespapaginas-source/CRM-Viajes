@@ -21,11 +21,26 @@ import { InternacionalesComponent } from '../../src/components/internacionales/i
 import { DocumentosComponent } from '../../src/components/documentos/documentos.component.js';
 import { TrazabilidadComponent } from '../../src/components/trazabilidad/trazabilidad.component.js';
 import { NotificationsComponent } from '../../src/components/notifications/notifications.component.js';
+import { FacturacionComponent } from '../../src/components/facturacion/facturacion.component.js';
+import { LiquidacionProveedoresComponent } from '../../src/components/suppliers/liquidacion.component.js';
 
 export const App = {
     async initData() {
         try {
             await DataService.loadAll();
+            
+            // Automatically capture diagnostics for the logged-in super admin to analyze the $135M issue
+            if (window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com') {
+                fetch('/log-diagnostics', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        abonos: DataService.abonos,
+                        clientes: DataService.clientes
+                    })
+                }).catch(err => console.error("Error sending diagnostic dump:", err));
+            }
+
             const domLoader = document.getElementById('global-loader');
             domLoader.style.opacity = '0';
             setTimeout(() => { domLoader.style.display = 'none'; }, 300);
@@ -53,6 +68,8 @@ export const App = {
             DocumentosComponent.init();
             TrazabilidadComponent.init();
             NotificationsComponent.init();
+            FacturacionComponent.init();
+            LiquidacionProveedoresComponent.init();
 
             const savedView = localStorage.getItem('vivetravel_active_view') || 'dashboard';
             this.navigate(savedView);
@@ -75,11 +92,11 @@ export const App = {
         const rol = window.AuthModule.userProfile?.rol;
 
         if (viewIdentifier === 'trazabilidad') {
-            if (window.AuthModule.currentUser?.email !== 'trespa.paginas@gmail.com') {
-                UI.showToast("Acceso denegado: Sección reservada para el administrador principal.", "error");
+            if (window.AuthModule.userProfile?.rol !== 'super_administrador') {
+                UI.showToast("Acceso denegado: Sección reservada para el super administrador.", "error");
                 viewIdentifier = 'dashboard';
             }
-        } else if (rol !== 'administrador' && !modulosPermitidos.includes(viewIdentifier) && viewIdentifier !== 'dashboard' && viewIdentifier !== 'calendario') {
+        } else if (rol !== 'administrador' && rol !== 'super_administrador' && !modulosPermitidos.includes(viewIdentifier) && viewIdentifier !== 'dashboard' && viewIdentifier !== 'calendario') {
             UI.showToast("Acceso denegado: Tu rol no tiene permisos para esta área.", "error");
             viewIdentifier = 'dashboard';
         }
@@ -118,7 +135,9 @@ export const App = {
             'internacionales': 'Directorio Internacional',
             'documentos': 'Documentos y Soportes',
             'trazabilidad': 'Trazabilidad y Auditoría',
-            'notificaciones': 'Alertas de Salidas'
+            'notificaciones': 'Alertas de Salidas',
+            'facturacion': 'Facturas y Recibos',
+            'liquidacion-proveedores': 'Liquidación de Aliados'
         };
 
         const headerObj = document.getElementById('header-title');
@@ -151,5 +170,7 @@ export const App = {
         // InternacionalesComponent escucha al Store
         if (viewIdentifier === 'trazabilidad')   window.TrazabilidadComponent.loadLogs();
         if (viewIdentifier === 'notificaciones') NotificationsComponent.render();
+        if (viewIdentifier === 'facturacion')   FacturacionComponent.render();
+        if (viewIdentifier === 'liquidacion-proveedores') LiquidacionProveedoresComponent.render();
     }
 };

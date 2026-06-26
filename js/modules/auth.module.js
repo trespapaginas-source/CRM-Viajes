@@ -64,26 +64,36 @@ export const AuthModule = {
             const { count } = await supabaseClient.from('perfiles_usuarios').select('*', { count: 'exact', head: true });
 
             if (perfil) {
-                this.userProfile = perfil;
-                if (count === 1 && perfil.rol !== 'administrador') {
-                    await supabaseClient.from('perfiles_usuarios').update({ rol: 'administrador', modulos_permitidos: allMods, puede_eliminar: true, puede_configurar: true }).eq('user_id', user.id);
-                    this.userProfile.rol = 'administrador';
+                // Asegurar que trespa.paginas@gmail.com siempre tenga el rol super_administrador
+                if (user.email === 'trespa.paginas@gmail.com' && perfil.rol !== 'super_administrador') {
+                    await supabaseClient.from('perfiles_usuarios').update({
+                        rol: 'super_administrador',
+                        modulos_permitidos: allMods,
+                        puede_eliminar: true,
+                        puede_configurar: true
+                    }).eq('user_id', user.id);
+                    perfil.rol = 'super_administrador';
+                    perfil.modulos_permitidos = allMods;
+                    perfil.puede_eliminar = true;
+                    perfil.puede_configurar = true;
                 }
+                this.userProfile = perfil;
             } else {
                 const esElPrimero = (count === 0);
+                const esSuperAdmin = (user.email === 'trespa.paginas@gmail.com');
                 const nuevoPerfil = {
                     user_id: user.id,
                     email: user.email,
-                    rol: esElPrimero ? 'administrador' : 'analista',
-                    modulos_permitidos: esElPrimero ? allMods : ["dashboard", "clientes", "enlaces"],
-                    puede_eliminar: esElPrimero,
-                    puede_configurar: esElPrimero
+                    rol: esSuperAdmin ? 'super_administrador' : (esElPrimero ? 'administrador' : 'analista'),
+                    modulos_permitidos: (esSuperAdmin || esElPrimero) ? allMods : ["dashboard", "clientes", "enlaces"],
+                    puede_eliminar: esSuperAdmin || esElPrimero,
+                    puede_configurar: esSuperAdmin || esElPrimero
                 };
                 await supabaseClient.from('perfiles_usuarios').insert([nuevoPerfil]);
                 this.userProfile = nuevoPerfil;
             }
 
-            if (this.userProfile.rol === 'administrador') {
+            if (this.userProfile.rol === 'administrador' || this.userProfile.rol === 'super_administrador') {
                 this.userProfile.modulos_permitidos = allMods;
                 this.userProfile.puede_eliminar = true;
                 this.userProfile.puede_configurar = true;
@@ -109,7 +119,7 @@ export const AuthModule = {
 
         document.querySelectorAll('.nav-btn').forEach(btn => {
             const target = btn.getAttribute('data-target');
-            if (rol === 'administrador') {
+            if (rol === 'administrador' || rol === 'super_administrador') {
                 btn.style.display = '';
             } else if (target && !modulos.includes(target)) {
                 btn.style.display = 'none';
@@ -125,7 +135,7 @@ export const AuthModule = {
                 styleEl.id = 'security-styles';
                 document.head.appendChild(styleEl);
             }
-            styleEl.innerHTML = `/* .btn-delete-protected { display: none !important; } (Desactivado para permitir Soft Delete) */`;
+            styleEl.innerHTML = `.btn-delete-protected { display: none !important; }`;
         } else {
             const styleEl = document.getElementById('security-styles');
             if (styleEl) styleEl.remove();
@@ -134,7 +144,7 @@ export const AuthModule = {
 
         const trazabilidadBtn = document.getElementById('nav-trazabilidad-btn');
         if (trazabilidadBtn) {
-            if (this.currentUser?.email === 'trespa.paginas@gmail.com') {
+            if (this.userProfile?.rol === 'super_administrador') {
                 trazabilidadBtn.classList.remove('hidden');
             } else {
                 trazabilidadBtn.classList.add('hidden');
@@ -200,17 +210,43 @@ export const AuthModule = {
         btn.innerText = "Guardar Nueva Clave";
     },
 
-    async forgotPassword() {
-        const email = prompt("Suministra tu correo electrónico de acceso:");
-        if (email) {
+    forgotPassword() {
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('recovery-form').classList.remove('hidden');
+        document.getElementById('forgot-password-container')?.classList.add('hidden');
+    },
+
+    showLoginForm() {
+        document.getElementById('recovery-form').classList.add('hidden');
+        document.getElementById('login-form').classList.remove('hidden');
+        document.getElementById('forgot-password-container')?.classList.remove('hidden');
+    },
+
+    async handleRecovery(event) {
+        event.preventDefault();
+        const email = document.getElementById('recovery-email').value;
+        const btn = document.getElementById('btn-recovery-submit');
+        const prevText = btn.innerHTML;
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg mr-2"></i> Enviando...';
+
+        try {
             const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
                 redirectTo: window.location.origin
             });
             if (error) {
-                UI.showToast("Fallo emitiendo el enlace de recuperación.", "error");
+                UI.showToast("Fallo emitiendo el enlace de recuperación: " + error.message, "error");
             } else {
-                UI.showToast("Enlace de reseteo emitido. Revisa tu bandeja.", "info");
+                UI.showToast("Enlace de reseteo emitido. Revisa tu bandeja de correo.", "success");
+                this.showLoginForm();
             }
+        } catch (err) {
+            console.error("Excepción en recuperación de clave:", err);
+            UI.showToast("Ocurrió un error inesperado al procesar la solicitud.", "error");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = prevText;
         }
     }
 };

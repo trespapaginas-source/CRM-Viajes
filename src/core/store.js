@@ -15,9 +15,12 @@ export const Store = {
         b2b_servicios: [],
         b2b_negocios: [],
         categories: ["Operador Turístico", "Alojamiento / Hotelería", "Transporte Especial", "Aseguradora Integral", "Restaurante y Eventos", "Guianza Local"],
-        destinos: ["Barranquilla", "Cartagena", "Quindío", "Santa Marta", "La Guajira", "San Andrés"]
+        destinos: ["Barranquilla", "Cartagena", "Quindío", "Santa Marta", "La Guajira", "San Andrés"],
+        limitWarnings: { clientes: false, abonos: false, gastos: false },
+        historyTableMissing: false
     },
     listeners: [],
+    _pendingNotify: null,
 
     subscribe(listener) {
         this.listeners.push(listener);
@@ -31,12 +34,21 @@ export const Store = {
         this.listeners.forEach(listener => listener(this.state));
     },
 
+    notifyDebounced() {
+        if (this._pendingNotify) return;
+        this._pendingNotify = Promise.resolve().then(() => {
+            this._pendingNotify = null;
+            this.notify();
+        });
+    },
+
     setState(newState) {
         this.state = { ...this.state, ...newState };
-        this.notify();
+        this.notifyDebounced();
     },
 
     getState() {
         return this.state;
     }
 };
+

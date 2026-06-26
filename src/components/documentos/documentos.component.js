@@ -633,6 +633,124 @@ const DocumentosComponent = {
         UI.showToast("Datos de la reserva y abonos cargados exitosamente.", "success");
     },
 
+    loadSingleAbonoReceipt: function (abonoId) {
+        if (!abonoId) return;
+        
+        const abono = DataService.abonos.find(a => a.id === abonoId);
+        if (!abono) {
+            UI.showToast("Abono no encontrado en el sistema.", "error");
+            return;
+        }
+
+        const c = DataService.clientes.find(item => item.id === abono.cliente_id);
+        if (!c) {
+            UI.showToast("Pasajero no encontrado para este abono.", "error");
+            return;
+        }
+
+        this.resetActiveDoc();
+        this.activeDoc.type = 'soporte';
+        this.activeDoc.data.titulo_documento = 'RECIBO DE CAJA';
+        
+        const shortAbonoId = abono.id.substring(0, 8).toUpperCase();
+        this.activeDoc.data.pago_referencia = `RC-${shortAbonoId}`;
+        this.activeDoc.data.sello_texto = 'CONFIRMADO';
+        this.activeDoc.data.sello_subtexto = 'RECIBO DE CAJA';
+
+        this.activeDoc.data.cliente_nombre = `${c.nombre} ${c.apellido || ''}`.trim();
+        this.activeDoc.data.cliente_id = c.documento || '';
+        this.activeDoc.data.cliente_tel = c.telefono || '';
+        this.activeDoc.data.cliente_email = c.email || '';
+        this.activeDoc.data.crm_cliente_id = c.id || '';
+        this.activeDoc.data.pax = c.pax || 1;
+
+        const plan = DataService.planes.find(p => p.id === c.plan_id);
+        if (plan) {
+            this.activeDoc.data.destino = plan.destino || plan.nombre;
+
+            let duracionCalculada = '';
+            const isPasadia = plan.tipo && (plan.tipo.toLowerCase().includes('pasadía') || plan.tipo.toLowerCase().includes('pasadia'));
+            if (isPasadia) {
+                duracionCalculada = 'Pasadía';
+            } else {
+                if (c.fecha_viaje) {
+                    const range = this.parseRange(c.fecha_viaje);
+                    if (range) {
+                        duracionCalculada = this.calculateDuration(range.start, range.end, plan.tipo);
+                    }
+                }
+            }
+            
+            const dText = duracionCalculada || plan.duracion || '4 Días / 3 Noches';
+            this.activeDoc.data.duracion = dText;
+            const dMatch = dText.match(/(\d+)\s*D[íi]as\s*\/\s*(\d+)\s*Noches/i);
+            if (dMatch) {
+                this.activeDoc.data.dias = parseInt(dMatch[1]);
+                this.activeDoc.data.noches = parseInt(dMatch[2]);
+            } else if (dText.toLowerCase().includes('pasadía') || dText.toLowerCase().includes('pasadia')) {
+                this.activeDoc.data.dias = 1;
+                this.activeDoc.data.noches = 0;
+            }
+
+            let startObj = null;
+            let endObj = null;
+            if (c.fecha_viaje) {
+                const range = this.parseRange(c.fecha_viaje);
+                if (range) {
+                    startObj = range.start;
+                    endObj = range.end;
+                }
+            }
+            if (startObj && endObj) {
+                const formatToISO = (date) => {
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${day}`;
+                };
+                this.activeDoc.data.fecha_ida = formatToISO(startObj);
+                this.activeDoc.data.fecha_regreso = formatToISO(endObj);
+                const formatToShort = (date) => {
+                    const m = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${day}/${m}/${date.getFullYear()}`;
+                };
+                this.activeDoc.data.fechas = `${formatToShort(startObj)} al ${formatToShort(endObj)}`;
+            } else {
+                this.activeDoc.data.fechas = c.fecha_viaje || '';
+            }
+
+            this.activeDoc.data.pasajeros = `${c.pax || 1} Viajero(s)`;
+            if (plan.servicios_incluidos) {
+                this.activeDoc.data.servicios_principales = JSON.parse(JSON.stringify(plan.servicios_incluidos));
+            }
+        }
+
+        const paxNum = Number(c.pax) || 1;
+        this.activeDoc.data.paquete_valor = Math.round((Number(c.precio_total) || 0) / paxNum);
+
+        let dateStr = '';
+        if (abono.created_at) {
+            dateStr = new Date(abono.created_at).toLocaleDateString('es-ES');
+        } else {
+            dateStr = new Date().toLocaleDateString('es-ES');
+        }
+
+        this.activeDoc.data.abonos = [{
+            fecha: dateStr,
+            monto: Number(abono.monto) || 0
+        }];
+
+        this.activeDoc.data.metodo_pago = abono.metodo || 'Abono';
+
+        this.fillDOMFromActiveDoc();
+        this.renderEditorLists();
+        this.recalculate();
+        this.renderPreview();
+
+        UI.showToast("Recibo de caja generado para el abono.", "success");
+    },
+
     loadFromPlan: function (id) {
         if (!id) return;
         const plan = DataService.planes.find(p => p.id == id);

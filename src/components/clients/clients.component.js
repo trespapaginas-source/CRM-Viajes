@@ -3,7 +3,7 @@
 // Extraído quirúrgicamente de app.js líneas 1543-2457
 import { DataService, supabaseClient } from '../../../js/services/supabase.service.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, formatShortDate, calcularFinanzas, updateFinancialUI } from '../../../js/utils/format.utils.js';
+import { formatCOP, formatShortDate, calcularFinanzas, updateFinancialUI, distributeAmount } from '../../../js/utils/format.utils.js';
 import { Store } from '../../core/store.js';
 
 export const ClientsComponent = {
@@ -27,6 +27,12 @@ export const ClientsComponent = {
         this.populateFilters();
         this.renderTable();
         this.bindEvents();
+
+        window.emitirReciboAbono = (abonoId) => {
+            this.closeFormModal();
+            window.DocumentosComponent.loadSingleAbonoReceipt(abonoId);
+            window.App.navigate('documentos');
+        };
 
         // Reactividad: Suscribir al Store
         Store.subscribe(() => {
@@ -144,6 +150,8 @@ export const ClientsComponent = {
                 this.promptEditAbono(target.dataset.abonoId, target.dataset.clienteId, target.dataset.monto, target.dataset.estado);
             } else if (target.dataset.action === 'delete-abono') {
                 this.promptDeleteAbono(target.dataset.abonoId, target.dataset.clienteId);
+            } else if (target.dataset.action === 'receipt-abono') {
+                window.emitirReciboAbono(target.dataset.abonoId);
             } else if (target.dataset.action === 'quick-abono') {
                 this.saveQuickAbono(target.dataset.clienteId);
             } else if (target.dataset.action === 'edit-client-master') {
@@ -409,6 +417,14 @@ export const ClientsComponent = {
                 UI.setCurrencyValue('cf-precio-total', consolidatedPrice);
                 
                 document.getElementById('cf-estado').value = c.estado;
+                // ERR-023 FIX: Inicializar dataset de cambio manual desde la BD
+                const estadoSelectEl = document.getElementById('cf-estado');
+                if (estadoSelectEl) {
+                    estadoSelectEl.dataset.manualChange = c.estado_manual ? 'true' : 'false';
+                    estadoSelectEl.removeEventListener('change', this._onEstadoManualChange);
+                    this._onEstadoManualChange = () => { estadoSelectEl.dataset.manualChange = 'true'; };
+                    estadoSelectEl.addEventListener('change', this._onEstadoManualChange);
+                }
                 document.getElementById('cf-alergias').value = c.alergias || '';
                 document.getElementById('cf-requerimientos').value = c.requerimientos || '';
                 document.getElementById('cf-contacto').value = c.contacto_emergencia || '';
@@ -467,6 +483,15 @@ export const ClientsComponent = {
 
             this.onTipoPagoChange();
             this.calculateTotals();
+
+            // ERR-023 FIX: Reset dataset y listener para clientes nuevos
+            const estadoSelectNew = document.getElementById('cf-estado');
+            if (estadoSelectNew) {
+                estadoSelectNew.dataset.manualChange = 'false';
+                estadoSelectNew.removeEventListener('change', this._onEstadoManualChange);
+                this._onEstadoManualChange = () => { estadoSelectNew.dataset.manualChange = 'true'; };
+                estadoSelectNew.addEventListener('change', this._onEstadoManualChange);
+            }
         }
         UI.openModal('client-form-modal', 'client-form-bg', 'client-form-content');
     },
@@ -609,14 +634,26 @@ export const ClientsComponent = {
             if (formEsNuevo) {
                 tA = UI.parseCurrency(document.getElementById('cf-abono-inicial')?.value);
             } else {
-                tA = DataService.abonos.filter(a => a.cliente_id === document.getElementById('cf-id').value && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                // ERR-022 FIX: Para titulares de grupo, sumar abonos del grupo completo
+                const clienteId = document.getElementById('cf-id').value;
+                const cliente = DataService.clientes.find(c => c.id === clienteId);
+                if (cliente && !cliente.parent_id) {
+                    // Es titular: buscar acompañantes y sumar todos los abonos del grupo
+                    const companions = DataService.clientes.filter(c => c.parent_id === clienteId && !c.deleted_at);
+                    const groupIds = [clienteId, ...companions.map(c => c.id)];
+                    tA = DataService.abonos.filter(a => groupIds.includes(a.cliente_id) && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                } else {
+                    tA = DataService.abonos.filter(a => a.cliente_id === clienteId && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                }
             }
 
             const fin = calcularFinanzas(tA, tN);
             updateFinancialUI({ tarifa_total_negociada: tN, total_abonado: fin.abonado });
 
+            // ERR-023 FIX: No sobrescribir estados manuales del operador
             const est = document.getElementById('cf-estado');
-            if (est && !['en caja', 'devolución', 'reprogramado', 'realizadas', 'desistió'].includes(est.value)) {
+            const isManualChange = est && est.dataset && est.dataset.manualChange === 'true';
+            if (est && !isManualChange && !['en caja', 'devolución', 'reprogramado', 'realizadas', 'desistió'].includes(est.value)) {
                 if (fin.porcentaje >= 100) est.value = 'confirmado';
                 else est.value = 'pendiente de pago';
             }
@@ -650,7 +687,7 @@ export const ClientsComponent = {
             return;
         }
 
-        const IS_ADMIN = window.AuthModule.userProfile?.rol === 'administrador';
+        const IS_ADMIN = window.AuthModule.userProfile?.rol === 'administrador' || window.AuthModule.userProfile?.rol === 'super_administrador';
 
         abs.forEach(mov => {
             const fHuman = new Date(mov.created_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -670,12 +707,24 @@ export const ClientsComponent = {
             const isChildAbono = mov.parent_abono_id !== undefined && mov.parent_abono_id !== null;
             
             let actionButtons = '';
+            const receiptBtn = `<button type="button" data-action="receipt-abono" data-abono-id="${mov.id}" class="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-bold hover:bg-emerald-200 transition-colors"><i class="ph ph-file-text"></i> Recibo</button>`;
             if (isChildAbono) {
-                actionButtons = '<span class="text-[9px] text-indigo-500 font-black bg-indigo-50 px-2.5 py-1.5 rounded-lg border border-indigo-100/50 flex items-center shadow-sm"><i class="ph ph-users mr-1"></i> Pago Grupal</span>';
+                actionButtons = `
+                    <div class="flex items-center space-x-1">
+                        ${receiptBtn}
+                        <span class="text-[9px] text-indigo-500 font-black bg-indigo-50 px-2 py-1 rounded border border-indigo-100/50 flex items-center shadow-sm"><i class="ph ph-users mr-1"></i> Grupo</span>
+                    </div>
+                `;
             } else if (isFrozen) {
-                actionButtons = '<span class="text-[9px] text-slate-500 font-black bg-slate-200/60 px-2.5 py-1.5 rounded-lg border border-slate-300 shadow-inner flex items-center"><i class="ph ph-lock-key mr-1.5 text-sm"></i> Congelado (48h)</span>';
+                actionButtons = `
+                    <div class="flex items-center space-x-1">
+                        ${receiptBtn}
+                        <span class="text-[9px] text-slate-500 font-black bg-slate-200/60 px-2 py-1 rounded border border-slate-300 shadow-inner flex items-center"><i class="ph ph-lock-key mr-1"></i> 48h</span>
+                    </div>
+                `;
             } else {
                 actionButtons = `
+                    ${receiptBtn}
                     <button type="button" data-action="edit-abono" data-abono-id="${mov.id}" data-cliente-id="${mov.cliente_id}" data-monto="${mov.monto}" data-estado="${mov.estado_pago}" class="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold hover:bg-blue-200 transition-colors"><i class="ph ph-pencil-simple"></i> Editar</button>
                     <button type="button" data-action="delete-abono" data-abono-id="${mov.id}" data-cliente-id="${mov.cliente_id}" class="btn-delete-protected text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded font-bold hover:bg-red-200 transition-colors"><i class="ph ph-trash"></i> Borrar</button>
                 `;
@@ -701,7 +750,7 @@ export const ClientsComponent = {
         if (!aId) return;
 
         // Doble validación de seguridad por si vulneran el DOM
-        const IS_ADMIN = window.AuthModule.userProfile?.rol === 'administrador';
+        const IS_ADMIN = window.AuthModule.userProfile?.rol === 'administrador' || window.AuthModule.userProfile?.rol === 'super_administrador';
         const abono = DataService.abonos.find(a => a.id === aId);
         if (abono) {
             const hoursSinceCreated = (new Date() - new Date(abono.created_at)) / (1000 * 60 * 60);
@@ -718,7 +767,7 @@ export const ClientsComponent = {
         if (!aId) return;
 
         // Doble validación de seguridad por si vulneran el DOM
-        const IS_ADMIN = window.AuthModule.userProfile?.rol === 'administrador';
+        const IS_ADMIN = window.AuthModule.userProfile?.rol === 'administrador' || window.AuthModule.userProfile?.rol === 'super_administrador';
         const abono = DataService.abonos.find(a => a.id === aId);
         if (abono) {
             const hoursSinceCreated = (new Date() - new Date(abono.created_at)) / (1000 * 60 * 60);
@@ -852,6 +901,9 @@ export const ClientsComponent = {
         const cli = DataService.clientes.find(x => x.id === cId);
         const val = UI.parseCurrency(document.getElementById('qa-monto').value);
         const met = document.getElementById('qa-metodo').value;
+        // ERR-017 FIX: Leer estado del pago del selector en vez de forzar 'confirmed'
+        const statusSelect = document.getElementById('qa-status');
+        const sts = statusSelect ? statusSelect.value : 'confirmed';
 
         if (isNaN(val) || val <= 0) {
             return UI.showToast("Ingresa un monto válido.", "error");
@@ -860,7 +912,7 @@ export const ClientsComponent = {
         // Check de sobrepago
         const tAbo = DataService.abonos.filter(a => a.cliente_id === cId && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
         const dr = Math.max((Number(cli.precio_total) || 0) - tAbo, 0);
-        if (val > dr && dr > 0) {
+        if (val > dr && dr > 0 && sts === 'confirmed') {
             UI.showToast(`Atención: Estás ingresando un monto mayor a la deuda.`, "info");
         }
 
@@ -873,12 +925,11 @@ export const ClientsComponent = {
         btn.disabled = true;
 
         try {
-            // Para el abono rápido del panel, forzamos confirmed por UX
             await DataService.saveAbono({
                 cliente_id: cId,
                 monto: val,
                 metodo: met,
-                estado_pago: 'confirmed',
+                estado_pago: sts,
                 usuario_email: window.AuthModule.currentUser?.email || 'Staff',
                 destinatario_id: destId
             });
@@ -1017,8 +1068,9 @@ export const ClientsComponent = {
             const etiquetaEl = document.getElementById('cf-etiqueta');
             const paxVal = parseInt(document.getElementById('cf-pax').value) || 1;
 
-            // División equitativa del precio total del grupo
-            const splitPrice = Math.floor(pTot / paxVal);
+            // ERR-012 FIX: División equitativa del precio total del grupo sin pérdida de centavos
+            const distributedPrices = distributeAmount(pTot, paxVal);
+            const splitPrice = distributedPrices[0]; // Precio del titular (puede incluir residuo)
 
             const obj = {
                 nombre: document.getElementById('cf-nombre').value,
@@ -1032,14 +1084,16 @@ export const ClientsComponent = {
                 plan_id: pId,
                 pax: paxVal,
                 estado: estadoEl,
-                precio_total: splitPrice, // Guardar precio individual dividido
+                precio_total: distributedPrices[0], // ERR-012 FIX: Precio distribuido exacto para titular
                 fecha_viaje: document.getElementById('cf-fecha-viaje')?.value || 'Fecha Abierta',
                 alergias: document.getElementById('cf-alergias').value,
                 requerimientos: document.getElementById('cf-requerimientos').value,
                 contacto_emergencia: contactoEl ? contactoEl.value : '',
                 etiqueta: etiquetaEl ? etiquetaEl.value : 'normal',
                 costo_base: costoBaseCongelado,
-                proveedores_vinculados: provsVinculadosCongelados
+                proveedores_vinculados: provsVinculadosCongelados,
+                // ERR-004/023 FIX: Persistir flag de estado manual
+                estado_manual: document.getElementById('cf-estado')?.dataset?.manualChange === 'true'
             };
 
             if (publicUrl) {
@@ -1058,8 +1112,8 @@ export const ClientsComponent = {
                 obj.saldo_restante = splitPrice;
             }
 
-            // 1. Guardar cliente titular en BD
-            const res = await DataService.saveCliente(obj);
+            // 1. Guardar cliente titular en BD (ERR-013 FIX: skipLoadAll para batch)
+            const res = await DataService.saveCliente(obj, true);
 
             // 2. Guardar/actualizar acompañantes activos y gestionar removidos
             const companionsData = this.gatherCompanionsData();
@@ -1110,7 +1164,8 @@ export const ClientsComponent = {
                         plan_id: obj.plan_id,
                         pax: 1,
                         estado: obj.estado,
-                        precio_total: splitPrice,
+                        // ERR-012 FIX: Cada acompañante recibe su precio distribuido exacto
+                        precio_total: distributedPrices[companionsData.indexOf(comp) + 1] !== undefined ? distributedPrices[companionsData.indexOf(comp) + 1] : distributedPrices[distributedPrices.length - 1],
                         fecha_viaje: obj.fecha_viaje,
                         alergias: comp.alergias,
                         requerimientos: comp.requerimientos,
@@ -1126,7 +1181,8 @@ export const ClientsComponent = {
                         compObj.abono_acumulado = 0;
                         compObj.saldo_restante = splitPrice;
                     }
-                    const savedComp = await DataService.saveCliente(compObj);
+                    // ERR-013 FIX: skipLoadAll para cada acompañante del batch
+                    const savedComp = await DataService.saveCliente(compObj, true);
                     if (savedComp) {
                         savedCompanions.push(savedComp);
                     }
@@ -1172,8 +1228,9 @@ export const ClientsComponent = {
             }
 
             this.populateFilters();
+            // ERR-013 FIX: Un único loadAll() de consolidación al terminar toda la operación
             if (res && res.id) {
-                await DataService.loadAll(); 
+                await DataService.loadAll();
                 this.refreshUIAfterAbonoChange(res.id);
             } else {
                 this.renderTable();
@@ -1281,6 +1338,24 @@ export const ClientsComponent = {
                                 </button>
                                 <button onclick="ClientsComponent.desagruparCliente('${c.id}', this)" class="text-[10px] text-rose-600 font-bold hover:underline flex items-center">
                                     <i class="ph ph-user-minus mr-1"></i> Desagrupar / Separar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // ERR-029 FIX: El titular fue eliminado o no existe
+                titularAlertHtml = `
+                    <div class="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 shadow-[0_1px_2px_rgba(245,158,11,0.05)] mb-4">
+                        <i class="ph ph-warning-circle text-amber-600 text-lg shrink-0 mt-0.5 auto-pulse"></i>
+                        <div class="flex-1">
+                            <p class="text-[10px] font-black text-amber-800 uppercase tracking-wider">Titular de Grupo no Encontrado</p>
+                            <p class="text-xs font-semibold text-slate-800 mt-0.5">
+                                Este viajero está asociado a un titular que no existe o fue eliminado de la base de datos.
+                            </p>
+                            <div class="flex gap-4 mt-2">
+                                <button onclick="ClientsComponent.desagruparCliente('${c.id}', this)" class="text-[10px] text-rose-600 font-bold hover:underline flex items-center">
+                                    <i class="ph ph-user-minus mr-1"></i> Desagrupar / Hacer Individual
                                 </button>
                             </div>
                         </div>
@@ -1516,6 +1591,13 @@ export const ClientsComponent = {
                                     <option value="Nequi/Daviplata">Nequi/Daviplata</option>
                                 </select>
                             </div>
+                            <div>
+                                <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-0.5">Estado del Pago</label>
+                                <select id="qa-status" class="w-full border border-slate-200 bg-white rounded-lg px-3 py-2.5 text-xs font-semibold outline-none shadow-sm text-slate-700 cursor-pointer">
+                                    <option value="confirmed">Confirmado (Ok)</option>
+                                    <option value="pending">Pendiente por Verificar</option>
+                                </select>
+                            </div>
                         </div>
                         
                         <button type="button" data-action="quick-abono" data-cliente-id="${id}" id="btn-quick-abono" class="w-full bg-slate-900 text-white font-black py-2.5 rounded-lg shadow-sm text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer">
@@ -1547,7 +1629,15 @@ export const ClientsComponent = {
             btnEdit.setAttribute('data-action', 'edit-client-master');
             btnEdit.setAttribute('data-cliente-id', id);
         }
-        document.getElementById('btn-delete-client-modal').setAttribute('onclick', `promptGlobalDelete('${id}', 'cliente', '${c.nombre.replace(/'/g, "\\'")} ${c.apellido.replace(/'/g, "\\'")}')`);
+        const btnDelete = document.getElementById('btn-delete-client-modal');
+        if (btnDelete) {
+            btnDelete.removeAttribute('onclick');
+            const newBtnDelete = btnDelete.cloneNode(true);
+            btnDelete.parentNode.replaceChild(newBtnDelete, btnDelete);
+            newBtnDelete.addEventListener('click', () => {
+                window.promptGlobalDelete(id, 'cliente', `${c.nombre || ''} ${c.apellido || ''}`);
+            });
+        }
         UI.openModal('client-detail-modal', 'cdm-bg', 'cdm-content');
         this.loadAndRenderClientHistory(id);
     },
@@ -1670,19 +1760,51 @@ export const ClientsComponent = {
     // EXPORTACIÓN SELECTIVA A CSV (EXCEL)
     // =========================================
     exportToCSV() {
-        const rows = document.querySelectorAll('.client-row, .client-card');
-        const visibleRows = [...rows].filter(r => {
-            if (r.style.display === 'none') return false;
-            const panel = r.closest('div[id^="clients-panel-"]');
-            if (panel && panel.classList.contains('hidden')) return false;
+        const activeTab = this.currentTab || 'activas';
+        const searchInput = document.getElementById('buscador-clientes-rapido')?.value.toLowerCase().trim() || '';
+
+        // Valores de filtros universales
+        const ufSearch = document.getElementById('uf-search')?.value.toLowerCase().trim() || '';
+        const ufPlanName = document.getElementById('uf-plan')?.value || '';
+        const ufFecha = document.getElementById('uf-fecha')?.value || '';
+        const ufEstado = document.getElementById('uf-estado')?.value || '';
+        const ufCiudad = document.getElementById('uf-ciudad')?.value.toLowerCase().trim() || '';
+
+        // Filtrar en memoria utilizando exactamente las mismas reglas que la tabla visual
+        const filtered = DataService.clientes.filter(cli => {
+            if (cli.deleted_at) return false;
+
+            // 1. Filtrar por Tab activa
+            const tabName = this.getClientTabMapping(cli);
+            if (tabName !== activeTab) return false;
+
+            const plan = DataService.planes.find(p => p.id === cli.plan_id);
+            const pNom = plan ? plan.nombre : '';
+
+            // 2. Filtrar por buscador rápido
+            if (searchInput) {
+                const textContent = `${cli.nombre || ''} ${cli.apellido || ''} ${cli.documento || ''} ${cli.telefono || ''} ${pNom} ${cli.ciudad || ''} ${cli.estado || ''} ${cli.etiqueta || ''}`.toLowerCase();
+                if (!textContent.includes(searchInput)) return false;
+            }
+
+            // 3. Filtrar por filtros universales
+            if (ufSearch) {
+                const textContent = `${cli.nombre || ''} ${cli.apellido || ''} ${cli.documento || ''} ${cli.telefono || ''} ${pNom} ${cli.ciudad || ''} ${cli.estado || ''} ${cli.etiqueta || ''}`.toLowerCase();
+                if (!textContent.includes(ufSearch)) return false;
+            }
+            if (ufPlanName && pNom !== ufPlanName) return false;
+            if (ufFecha && !(cli.fecha_viaje || '').includes(ufFecha)) return false;
+            if (ufEstado && cli.estado !== ufEstado) return false;
+            if (ufCiudad && !(cli.ciudad || '').toLowerCase().includes(ufCiudad)) return false;
+
             return true;
         });
 
-        if (visibleRows.length === 0) {
-            return UI.showToast("No hay registros visibles para exportar. Aplica filtros o verifica los datos.", "error");
+        if (filtered.length === 0) {
+            return UI.showToast("No hay registros que coincidan con la vista actual para exportar.", "error");
         }
 
-        // Sanitizador CSV: Escapa comillas dobles, elimina saltos de línea, envuelve en comillas si contiene coma
+        // Sanitizador CSV: Escapa comillas dobles, elimina saltos de línea, envuelve en comillas si contiene coma/punto y coma
         const csvSafe = (val) => {
             if (val === null || val === undefined) return '';
             let s = String(val).replace(/\r?\n/g, ' ').replace(/\t/g, ' ').trim();
@@ -1693,31 +1815,53 @@ export const ClientsComponent = {
             return s;
         };
 
-        // Cabeceras estrictas
-        const headers = ['Nombre', 'Celular', 'Plan Elegido', 'Fecha de Salida', 'Valor Total', 'Saldo Pendiente'];
+        // Cabeceras expandidas
+        const headers = [
+            'ID', 'Nombre', 'Apellido', 'Documento', 'Celular', 'Email', 'Plan Elegido',
+            'Fecha de Salida', 'Pax', 'Tipo Relación', 'Valor Total', 'Abonos Recaudados', 'Saldo Pendiente', 'Estado'
+        ];
         const csvRows = [headers.join(',')];
 
-        visibleRows.forEach(row => {
-            const clienteId = row.getAttribute('data-id');
-            const cli = DataService.clientes.find(c => c.id === clienteId);
-            if (!cli) return;
-
+        filtered.forEach(cli => {
             const plan = DataService.planes.find(p => p.id === cli.plan_id);
             const pNom = plan ? plan.nombre : 'Sin Plan';
 
-            // Cálculo financiero directo desde memoria (sin reconsultar BD)
-            const totalAbo = DataService.abonos
-                .filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded')
-                .reduce((s, a) => s + (Number(a.monto) || 0), 0);
-            const fin = calcularFinanzas(totalAbo, cli.precio_total);
+            let totalAbo = 0;
+            let targetPrice = cli.precio_total || 0;
+            let tipoRelacion = 'Individual';
+
+            if (cli.parent_id) {
+                tipoRelacion = 'Acompañante';
+                totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                targetPrice = cli.precio_total || 0;
+            } else if ((cli.pax || 1) > 1) {
+                tipoRelacion = 'Titular de Grupo';
+                const comps = DataService.clientes.filter(c => c.parent_id === cli.id && !c.deleted_at);
+                const groupIds = [cli.id, ...comps.map(c => c.id)];
+                totalAbo = DataService.abonos.filter(a => groupIds.includes(a.cliente_id) && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                targetPrice = (cli.precio_total || 0) * (cli.pax || 1);
+            } else {
+                totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                targetPrice = cli.precio_total || 0;
+            }
+
+            const fin = calcularFinanzas(totalAbo, targetPrice);
 
             csvRows.push([
-                csvSafe(`${cli.nombre || ''} ${cli.apellido || ''}`),
+                csvSafe(cli.id),
+                csvSafe(cli.nombre || ''),
+                csvSafe(cli.apellido || ''),
+                csvSafe(cli.documento || ''),
                 csvSafe(cli.telefono || ''),
+                csvSafe(cli.email || ''),
                 csvSafe(pNom),
                 csvSafe(cli.fecha_viaje || 'Sin Fecha'),
-                csvSafe(formatCOP(cli.precio_total || 0)),
-                csvSafe(formatCOP(fin.saldo))
+                csvSafe(cli.pax || 1),
+                csvSafe(tipoRelacion),
+                csvSafe(formatCOP(targetPrice)),
+                csvSafe(formatCOP(fin.abonado)),
+                csvSafe(formatCOP(fin.saldo)),
+                csvSafe(cli.estado || '')
             ].join(','));
         });
 
@@ -1736,7 +1880,7 @@ export const ClientsComponent = {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        UI.showToast(`${visibleRows.length} reservas exportadas exitosamente.`, "success");
+        UI.showToast(`${filtered.length} reservas exportadas exitosamente a CSV.`, "success");
     },
 
     // ── RESERVAS GRUPALES Y ACOMPAÑANTES ──────────────────────────────

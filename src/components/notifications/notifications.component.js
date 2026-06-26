@@ -64,7 +64,7 @@ export const NotificationsComponent = {
     async sendEmailAlerts(force = false) {
         // Only run for administrators
         const userProfile = window.AuthModule?.userProfile;
-        if (!userProfile || userProfile.rol !== 'administrador') {
+        if (!userProfile || (userProfile.rol !== 'administrador' && userProfile.rol !== 'super_administrador')) {
             if (force) UI.showToast("Acceso denegado: Solo administradores pueden enviar correos.", "error");
             return;
         }

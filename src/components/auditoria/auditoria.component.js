@@ -27,7 +27,7 @@ export const AuditoriaComponent = {
     },
 
     openAuditoriaModal: async function() {
-        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+        if (window.AuthModule?.userProfile?.rol !== 'super_administrador') {
             window.UI.showToast("Acceso denegado: No tienes permisos para gestionar la papelera.", "error");
             return;
         }
@@ -114,7 +114,7 @@ export const AuditoriaComponent = {
     },
 
     restoreRecord: async function(table, id) {
-        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+        if (window.AuthModule?.userProfile?.rol !== 'super_administrador') {
             window.UI.showToast("Acción denegada: Tu cuenta no tiene permisos para restaurar registros.", "error");
             return;
         }
@@ -148,7 +148,7 @@ export const AuditoriaComponent = {
     },
 
     hardDeleteRecord: async function(table, id) {
-        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+        if (window.AuthModule?.userProfile?.rol !== 'super_administrador') {
             window.UI.showToast("Acción denegada: Tu cuenta no tiene permisos para destruir registros.", "error");
             return;
         }

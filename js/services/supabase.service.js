@@ -4,7 +4,7 @@
 // Extraído de app.js líneas 1–5 y 283–527
 // REGLA: Las llamadas a ClientsModule/DashboardModule usan window.*
 // ============================================================
-import { parseSpanishDate } from '../utils/format.utils.js';
+import { parseSpanishDate, distributeAmount } from '../utils/format.utils.js';
 import { Store } from '../../src/core/store.js';
 
 const { createClient } = supabase; // CDN global
@@ -28,6 +28,7 @@ export const DataService = {
     adelantos_operativos: [],
     documentos_guardados: [],
     alertas_gestionadas: [],
+    proveedores_liquidaciones: [],
     db: {
         categories: ["Operador Turístico", "Alojamiento / Hotelería", "Transporte Especial", "Aseguradora Integral", "Restaurante y Eventos", "Guianza Local"],
         destinos: ["Barranquilla", "Cartagena", "Quindío", "Santa Marta", "La Guajira", "San Andrés"]
@@ -46,26 +47,39 @@ export const DataService = {
         // sin romper las relaciones de datos actuales.
         const [resPlanes, resClientes, resProv, resAbo, resGastos, resSeguimientos, resB2BAli, resB2BServ, resB2BNeg] = await Promise.all([
             supabaseClient.from('planes').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(500),
-            supabaseClient.from('clientes').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(2000),
+            supabaseClient.from('clientes').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(10000),
             supabaseClient.from('proveedores').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(1000),
             // Nota: Abonos se trae ordenado descendente para obtener los más recientes,
             // y luego se invierte el array para mantener la compatibilidad (ascending: true) del UI.
-            supabaseClient.from('abonos').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(5000),
-            supabaseClient.from('gastos_salidas').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(3000),
+            supabaseClient.from('abonos').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(20000),
+            supabaseClient.from('gastos_salidas').select('*').is('deleted_at', null).order('created_at', { ascending: false }).limit(10000),
             supabaseClient.from('seguimientos').select('*').order('created_at', { ascending: false }).limit(2000),
             supabaseClient.from('b2b_aliados').select('*').order('created_at', { ascending: false }).limit(1000),
             supabaseClient.from('b2b_servicios_catalogo').select('*').order('created_at', { ascending: false }).limit(1000),
             supabaseClient.from('b2b_negocios').select('*').order('created_at', { ascending: false }).limit(2000)
         ]);
 
+        const limitWarnings = {
+            clientes: resClientes.data ? resClientes.data.length === 10000 : false,
+            abonos: resAbo.data ? resAbo.data.length === 20000 : false,
+            gastos: resGastos.data ? resGastos.data.length === 10000 : false
+        };
+
+        let historyTableMissing = false;
+        try {
+            const { error: histTestErr } = await supabaseClient.from('historial_reservas').select('id').limit(1);
+            if (histTestErr && histTestErr.code === '42P01') {
+                historyTableMissing = true;
+            }
+        } catch (e) {
+            historyTableMissing = true;
+        }
+
         if (resPlanes.data) this.planes = resPlanes.data;
+        // ERR-003 FIX: Se elimina el mapeo forzado de estados cancelados.
+        // Los estados se cargan exactamente como están en la base de datos.
         if (resClientes.data) {
-            this.clientes = resClientes.data.map(c => {
-                if (c.estado && (c.estado.toLowerCase() === 'cancelado o devolución' || c.estado.toLowerCase() === 'cancelados')) {
-                    c.estado = 'en caja';
-                }
-                return c;
-            });
+            this.clientes = resClientes.data;
         }
         if (resProv.data) this.proveedores = resProv.data;
         // Restauramos el orden ascendente original para los abonos
@@ -120,6 +134,20 @@ export const DataService = {
             this.loadAlertasGestionadasLocal();
         }
 
+        this.proveedores_liquidaciones = [];
+        try {
+            const { data, error } = await supabaseClient
+                .from('proveedores_liquidaciones')
+                .select('*')
+                .is('deleted_at', null)
+                .order('fecha', { ascending: false });
+            if (!error && data) {
+                this.proveedores_liquidaciones = data;
+            }
+        } catch (err) {
+            console.warn("Table 'proveedores_liquidaciones' is missing or inaccessible. Fallback applied.", err);
+        }
+
         Store.setState({
             planes: this.planes,
             clientes: this.clientes,
@@ -133,7 +161,10 @@ export const DataService = {
             ciudades: this.ciudades,
             adelantos_operativos: this.adelantos_operativos,
             documentos_guardados: this.documentos_guardados,
-            alertas_gestionadas: this.alertas_gestionadas
+            alertas_gestionadas: this.alertas_gestionadas,
+            proveedores_liquidaciones: this.proveedores_liquidaciones,
+            limitWarnings: limitWarnings,
+            historyTableMissing: historyTableMissing
         });
 
         this.autoClassifyReservas();
@@ -162,6 +193,12 @@ export const DataService = {
             if (st === 'devolución' || st === 'cancelado o devolución' || st === 'cancelados' || st === 'reprogramado' || st === 'desistió') {
                 return;
             }
+
+            // ERR-004 FIX: Respetar estados asignados manualmente por operadores
+            if (c.estado_manual === true) {
+                return;
+            }
+
             if (c.fecha_viaje) {
                 let dateViaje = parseSpanishDate(c.fecha_viaje);
                 const parts = c.fecha_viaje.split(/\s+al\s+/i);
@@ -202,7 +239,12 @@ export const DataService = {
                         c.estado = targetState;
                         hasChanges = true;
                         this.registrarHistorial(c.id, 'estado (automatizado)', estadoAnterior, targetState);
-                        supabaseClient.from('clientes').update({ estado: targetState }).eq('id', c.id).then();
+                        // ERR-004 FIX: Reemplazar fire-and-forget .then() por manejo controlado de errores
+                        supabaseClient.from('clientes').update({ estado: targetState }).eq('id', c.id)
+                            .then(({ error }) => {
+                                if (error) console.error(`Error actualizando estado automático del cliente ${c.id}:`, error);
+                            })
+                            .catch(err => console.error(`Excepción actualizando estado automático del cliente ${c.id}:`, err));
                     }
                 }
             }
@@ -213,7 +255,24 @@ export const DataService = {
         }
     },
 
+    // ERR-019 FIX: Ciudades con timeout, deduplicación (upsert) y fallback robusto
     async loadCiudades() {
+        // Fallback: capitales principales de Colombia
+        const CIUDADES_FALLBACK = [
+            { id: '11001', departamento: 'CUNDINAMARCA', municipio: 'BOGOTÁ D.C.' },
+            { id: '05001', departamento: 'ANTIOQUIA', municipio: 'MEDELLÍN' },
+            { id: '76001', departamento: 'VALLE DEL CAUCA', municipio: 'CALI' },
+            { id: '08001', departamento: 'ATLÁNTICO', municipio: 'BARRANQUILLA' },
+            { id: '13001', departamento: 'BOLÍVAR', municipio: 'CARTAGENA' },
+            { id: '47001', departamento: 'MAGDALENA', municipio: 'SANTA MARTA' },
+            { id: '63001', departamento: 'QUINDÍO', municipio: 'ARMENIA' },
+            { id: '88001', departamento: 'SAN ANDRÉS', municipio: 'SAN ANDRÉS' },
+            { id: '44001', departamento: 'LA GUAJIRA', municipio: 'RIOHACHA' },
+            { id: '15001', departamento: 'BOYACÁ', municipio: 'TUNJA' },
+            { id: '68001', departamento: 'SANTANDER', municipio: 'BUCARAMANGA' },
+            { id: '54001', departamento: 'NORTE DE SANTANDER', municipio: 'CÚCUTA' }
+        ];
+
         try {
             const { data } = await supabaseClient.from('ciudades').select('*').limit(2);
             if (data && data.length > 0) {
@@ -221,25 +280,31 @@ export const DataService = {
                 this.ciudades = fullData.data || [];
             } else {
                 try {
-                    const response = await fetch('https://www.datos.gov.co/resource/gdxc-w37w.json?$limit=1200');
+                    // Timeout de 5 segundos para la API externa
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    const response = await fetch('https://www.datos.gov.co/resource/gdxc-w37w.json?$limit=1200', { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
                     const jsonData = await response.json();
                     const mapeoCiudades = jsonData.map(c => ({
                         id: c.cod_mpio,
                         departamento: c.dpto,
                         municipio: c.nom_mpio
                     }));
+                    // Usar upsert para evitar duplicados en reintentos
                     for (let i = 0; i < mapeoCiudades.length; i += 300) {
-                        await supabaseClient.from('ciudades').insert(mapeoCiudades.slice(i, i + 300));
+                        await supabaseClient.from('ciudades').upsert(mapeoCiudades.slice(i, i + 300), { onConflict: 'id' });
                     }
                     this.ciudades = mapeoCiudades;
                 } catch (err) {
-                    console.error("Falla API DIVIPOLA:", err);
-                    this.ciudades = [];
+                    console.warn("API DIVIPOLA no disponible. Usando ciudades de fallback.", err.name === 'AbortError' ? '(Timeout)' : err);
+                    this.ciudades = CIUDADES_FALLBACK;
                 }
             }
         } catch (err) {
-            console.error("Error consultando ciudades en Supabase:", err);
-            this.ciudades = [];
+            console.error("Error consultando ciudades en Supabase. Usando fallback.", err);
+            this.ciudades = CIUDADES_FALLBACK;
         }
         
         const dl = document.getElementById('ciudades-list');
@@ -315,7 +380,8 @@ export const DataService = {
         }
     },
 
-    async saveCliente(datosParaGuardar) {
+    // ERR-013 FIX: Añadido flag skipLoadAll para evitar N llamadas a loadAll al guardar grupos
+    async saveCliente(datosParaGuardar, skipLoadAll = false) {
         try {
             let resultadoDB;
             if (!datosParaGuardar.id) {
@@ -386,14 +452,53 @@ export const DataService = {
                 }
             }
             if (resultadoDB.error) throw resultadoDB.error;
-            await this.loadAll();
+            if (!skipLoadAll) {
+                await this.loadAll();
+            }
             return resultadoDB.data ? resultadoDB.data[0] : null;
         } catch (e) { throw e; }
     },
 
+    // ERR-032 FIX: Implementación real de recalculación de saldos contables
     async recalculateClientBalances(clienteId) {
-        // Delegado a Triggers de Supabase (retrocompatibilidad)
-        return true;
+        try {
+            const cliente = this.clientes.find(c => c.id === clienteId);
+            if (!cliente) return true;
+
+            // ERR-014 FIX: Consultar abonos reales en Supabase directamente
+            const { data: realAbonos, error: abonosError } = await supabaseClient
+                .from('abonos')
+                .select('monto, estado_pago')
+                .eq('cliente_id', clienteId)
+                .is('deleted_at', null);
+
+            if (abonosError) throw abonosError;
+
+            const abonosConfirmados = (realAbonos || []).filter(
+                a => a.estado_pago !== 'pending' && a.estado_pago !== 'refunded'
+            );
+            const totalAbonado = abonosConfirmados.reduce((sum, a) => sum + (parseFloat(a.monto) || 0), 0);
+            const precioTotal = parseFloat(cliente.precio_total) || 0;
+            const saldoRestante = Math.max(precioTotal - totalAbonado, 0);
+
+            const { error } = await supabaseClient.from('clientes').update({
+                abono_acumulado: totalAbonado,
+                saldo_restante: saldoRestante
+            }).eq('id', clienteId);
+
+            if (error) {
+                // Fallback silencioso si las columnas aún no existen
+                if (error.code === '42703') {
+                    console.warn('Columnas abono_acumulado/saldo_restante no existen. Recalculación omitida.');
+                } else {
+                    console.error('Error en recalculateClientBalances:', error);
+                }
+            }
+            return true;
+        } catch (e) {
+            console.error('Excepción en recalculateClientBalances:', e);
+            return false;
+        }
     },
 
     async saveAbono(datosParaGuardar) {
@@ -421,7 +526,9 @@ export const DataService = {
             if (companions.length > 0) {
                 // DISTRIBUCIÓN GRUPAL EQUITATIVA
                 const totalIntegrantes = companions.length + 1;
-                const splitAmount = Math.floor(datosParaGuardar.monto / totalIntegrantes);
+                // ERR-012 FIX: Distribución exacta sin pérdida de centavos
+                const amountsDistributed = distributeAmount(datosParaGuardar.monto, totalIntegrantes);
+                const splitAmount = amountsDistributed[0]; // Para validación de duplicados usar monto del titular
 
                 // Validar duplicados para el titular con el monto dividido
                 const posiblesDuplicados = this.abonos.filter(a =>
@@ -432,7 +539,8 @@ export const DataService = {
 
                 if (posiblesDuplicados.length > 0 && splitAmount > 0) {
                     const diffMin = (new Date() - new Date(posiblesDuplicados[posiblesDuplicados.length - 1].created_at || new Date())) / 1000 / 60;
-                    if (diffMin < 2) {
+                    // ERR-027 FIX: Ventana anti-duplicados extendida a 30 minutos
+                    if (diffMin < 30) {
                         await this.registrarHistorial(
                             datosParaGuardar.cliente_id, 
                             'Alerta Antifraude: Intento de Abono Duplicado (Grupal)', 
@@ -446,10 +554,10 @@ export const DataService = {
                       }
                 }
 
-                // Insertar abono padre (Titular)
+                // Insertar abono padre (Titular) con su monto distribuido exacto
                 const parentPayload = {
                     cliente_id: datosParaGuardar.cliente_id,
-                    monto: splitAmount,
+                    monto: amountsDistributed[0],
                     metodo: datosParaGuardar.metodo,
                     estado_pago: datosParaGuardar.estado_pago,
                     usuario_email: datosParaGuardar.usuario_email || 'Staff'
@@ -462,14 +570,14 @@ export const DataService = {
                     datosParaGuardar.cliente_id,
                     'Registro de Abono Principal (Grupal)',
                     'N/A',
-                    `Abono de $${splitAmount} (Total: $${datosParaGuardar.monto}) vía ${datosParaGuardar.metodo}`,
+                    `Abono de $${amountsDistributed[0]} (Total: $${datosParaGuardar.monto}) vía ${datosParaGuardar.metodo}`,
                     'CREACION'
                 );
 
-                // Insertar abonos hijos (Acompañantes) en lote (batch)
-                const childrenPayloads = companions.map(comp => ({
+                // Insertar abonos hijos (Acompañantes) en lote (batch) con distribución exacta
+                const childrenPayloads = companions.map((comp, idx) => ({
                     cliente_id: comp.id,
-                    monto: splitAmount,
+                    monto: amountsDistributed[idx + 1], // idx+1 porque el [0] es del titular
                     metodo: datosParaGuardar.metodo,
                     estado_pago: datosParaGuardar.estado_pago,
                     usuario_email: datosParaGuardar.usuario_email || 'Staff',
@@ -479,12 +587,12 @@ export const DataService = {
                 const resChildren = await supabaseClient.from('abonos').insert(childrenPayloads);
                 if (resChildren.error) throw resChildren.error;
 
-                for (const comp of companions) {
+                for (let i = 0; i < companions.length; i++) {
                     await this.registrarHistorial(
-                        comp.id,
+                        companions[i].id,
                         'Registro de Abono Hijo (Distribución Grupal)',
                         'N/A',
-                        `Abono recibido de $${splitAmount} (Origen: Titular)`,
+                        `Abono recibido de $${amountsDistributed[i + 1]} (Origen: Titular)`,
                         'CREACION'
                     );
                 }
@@ -505,7 +613,8 @@ export const DataService = {
 
                 if (posiblesDuplicados.length > 0 && datosParaGuardar.monto > 0) {
                     const diffMin = (new Date() - new Date(posiblesDuplicados[posiblesDuplicados.length - 1].created_at || new Date())) / 1000 / 60;
-                    if (diffMin < 2) {
+                    // ERR-027 FIX: Ventana anti-duplicados extendida a 30 minutos
+                    if (diffMin < 30) {
                         await this.registrarHistorial(
                             targetClientId, 
                             'Alerta Antifraude: Intento de Abono Duplicado', 
@@ -762,6 +871,15 @@ export const DataService = {
             const origenCli = this.clientes.find(c => c.id === origenId);
             const origenNombre = origenCli ? `${origenCli.nombre} ${origenCli.apellido}` : 'Pasajero';
 
+            // ERR-015 FIX: Validar que el cliente origen tenga saldo suficiente
+            const totalAbonadoOrigen = this.abonos
+                .filter(a => a.cliente_id === origenId && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded')
+                .reduce((sum, a) => sum + (parseFloat(a.monto) || 0), 0);
+            if (monto > totalAbonadoOrigen) {
+                window.UI.showToast(`Fondos insuficientes. El saldo abonado es de $${Math.floor(totalAbonadoOrigen)} pero intentas transferir $${monto}.`, 'error');
+                throw new Error('INSUFFICIENT_FUNDS');
+            }
+
             // 1. Obtener nombres de destinatarios para registrar descripción en el origen
             const destinosClis = destinosIds.map(id => this.clientes.find(c => c.id === id)).filter(Boolean);
             const destinosNombres = destinosClis.map(c => `${c.nombre} ${c.apellido}`).join(', ');
@@ -785,11 +903,11 @@ export const DataService = {
                 'MODIFICACION'
             );
 
-            // 3. Insertar abono positivo (o abonos divididos) en el o los destinos
-            const splitAmount = Math.floor(monto / destinosIds.length);
-            const childrenPayloads = destinosIds.map(destId => ({
+            // 3. ERR-015 FIX: Distribución exacta sin pérdida de centavos
+            const amountsForDestinos = distributeAmount(monto, destinosIds.length);
+            const childrenPayloads = destinosIds.map((destId, idx) => ({
                 cliente_id: destId,
-                monto: splitAmount,
+                monto: amountsForDestinos[idx],
                 metodo: `Transferencia de Saldo (Ingreso) recibido de ${origenNombre}`,
                 estado_pago: 'confirmed',
                 usuario_email: user
@@ -798,12 +916,12 @@ export const DataService = {
             const { error: errorDestinos } = await supabaseClient.from('abonos').insert(childrenPayloads);
             if (errorDestinos) throw errorDestinos;
 
-            for (const destId of destinosIds) {
+            for (let i = 0; i < destinosIds.length; i++) {
                 await this.registrarHistorial(
-                    destId,
+                    destinosIds[i],
                     'Transferencia de Saldo (Ingreso)',
                     'N/A',
-                    `Ingreso de $${splitAmount} recibido de ${origenNombre}`,
+                    `Ingreso de $${amountsForDestinos[i]} recibido de ${origenNombre}`,
                     'MODIFICACION'
                 );
             }
@@ -1257,6 +1375,60 @@ export const DataService = {
         }
 
         Store.setState({ alertas_gestionadas: this.alertas_gestionadas, lastUpdated: 'alertas_gestionadas' });
+    },
+
+    async saveProveedorLiquidation(payload) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Staff';
+            let res;
+            if (!payload.id) {
+                const dbPayload = {
+                    proveedor_id: payload.proveedor_id,
+                    monto: Number(payload.monto),
+                    fecha: payload.fecha,
+                    comprobante: payload.comprobante,
+                    detalles: payload.detalles,
+                    usuario_email: user
+                };
+                res = await supabaseClient.from('proveedores_liquidaciones').insert([dbPayload]).select();
+                if (res.error) throw res.error;
+                if (res.data && res.data[0]) {
+                    const prov = this.proveedores.find(p => p.id === payload.proveedor_id);
+                    await this.registrarHistorial(null, 'Liquidación Registrada', 'N/A', `Pago de $${payload.monto} registrado para el proveedor ${prov ? prov.nombre : payload.proveedor_id}`, 'CREACION', { proveedor_id: payload.proveedor_id, liquidacion_id: res.data[0].id });
+                }
+            } else {
+                const { id, ...datosMapeados } = payload;
+                res = await supabaseClient.from('proveedores_liquidaciones').update(datosMapeados).eq('id', id).select();
+                if (res.error) throw res.error;
+            }
+            await this.loadAll();
+            return res.data ? res.data[0] : null;
+        } catch (e) {
+            console.error("Error en saveProveedorLiquidation:", e);
+            throw e;
+        }
+    },
+
+    async deleteProveedorLiquidation(id, motivo) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            const liq = this.proveedores_liquidaciones.find(l => l.id === id);
+            if (liq) {
+                const prov = this.proveedores.find(p => p.id === liq.proveedor_id);
+                await this.registrarHistorial(null, 'Liquidación Eliminada', `Liquidación de $${liq.monto} a ${prov ? prov.nombre : liq.proveedor_id}`, `Eliminado por ${user}. Motivo: ${motivo}`, 'ELIMINACION', { liquidacion_id: id, motivo });
+            }
+            const { error } = await supabaseClient.from('proveedores_liquidaciones')
+                .update({ 
+                    deleted_at: new Date().toISOString(), 
+                    deleted_by: user 
+                })
+                .eq('id', id);
+            if (error) throw error;
+            await this.loadAll();
+        } catch (e) {
+            console.error("Error en deleteProveedorLiquidation:", e);
+            throw e;
+        }
     }
 };
 

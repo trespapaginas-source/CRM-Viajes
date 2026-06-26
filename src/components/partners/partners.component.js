@@ -49,46 +49,40 @@ export const PartnersComponent = {
             { email: 'vivemarketingdigital@outlook.com', nombre: 'Jean Fontalvo', porcentaje: 32 }
         ];
 
-        // Migration patch para actualizar los correos de prueba antiguos si quedaron guardados
-        const patchSocios = (socios) => {
-            socios.forEach(s => {
-                // Prevenir que el primer socio adopte dinámicamente el correo de otro administrador
-                if (s.nombre.includes('Leo') || s.porcentaje === 18) {
-                    s.email = 'trespa.paginas@gmail.com';
-                }
-                if (s.email === 'luis@travelers.com') s.email = 'luismendezramirez@hotmail.es';
-                if (s.email === 'jean@travelers.com' || s.email === 'vivemarketingdigital@outlook.com' || s.nombre.includes('Gean') || s.nombre.includes('Jean')) {
-                    s.email = 'vivemarketingdigital@outlook.com';
-                    s.nombre = 'Jean Fontalvo';
-                }
-            });
-        };
-
-        const saved = localStorage.getItem('trv_socios');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed.length > 0 && !(parsed.length === 1 && parsed[0].porcentaje === 100)) {
-                patchSocios(parsed);
-                this.sociosConfig = parsed;
-                this._configLoaded = true;
-                return;
-            }
-        }
-
+        // 1. Intentar cargar configuración de socios desde Supabase (Fuente de Verdad)
         try {
             const { data, error } = await supabaseClient.from('socios_config').select('*').order('created_at', { ascending: true });
             if (!error && data && data.length > 0) {
                 this.sociosConfig = data.map(s => ({ id: s.id, nombre: s.nombre, email: s.email, porcentaje: Number(s.porcentaje) }));
-                patchSocios(this.sociosConfig);
                 this._configLoaded = true;
                 return;
             }
         } catch (e) {
-            console.warn('Fallback: no se pudo cargar configuración de socios de BD', e);
+            console.warn('Advertencia: No se pudo cargar la configuración de socios de Supabase, intentando fallback.', e);
         }
 
+        // 2. Fallback: Cargar desde localStorage (si existe y tiene datos válidos)
+        const saved = localStorage.getItem('trv_socios');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed.length > 0 && !(parsed.length === 1 && parsed[0].porcentaje === 100)) {
+                    this.sociosConfig = parsed;
+                    this._configLoaded = true;
+                    return;
+                }
+            } catch (err) {
+                console.error("Error al deserializar socios desde localStorage:", err);
+            }
+        }
+
+        // 3. Fallback Final: Cargar configuración por defecto
         this.sociosConfig = [...defaultSocios];
         this._configLoaded = true;
+    },
+
+    isSuperAdmin() {
+        return window.AuthModule?.userProfile?.rol === 'super_administrador';
     },
 
     async init() {
@@ -96,7 +90,7 @@ export const PartnersComponent = {
         await this.loadConfig();
 
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const isPartner = this.sociosConfig.some(s => s.email.toLowerCase() === currentUserEmail);
 
@@ -112,7 +106,7 @@ export const PartnersComponent = {
         await this.loadFondosFlotantes();
         
         const adminSettings = document.getElementById('pvm-admin-settings');
-        if (currentUserEmail === 'trespa.paginas@gmail.com') {
+        if (this.isSuperAdmin()) {
             if (adminSettings) adminSettings.classList.remove('hidden');
             this.renderPartnersEditor();
         } else {
@@ -546,29 +540,25 @@ export const PartnersComponent = {
     },
 
     addNewPartnerRow() { 
-        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
-        if (currentUserEmail !== 'trespa.paginas@gmail.com') return;
+        if (!this.isSuperAdmin()) return;
         this.sociosConfig.push({ nombre: 'Nuevo Socio', email: '', porcentaje: 0 }); 
         this.renderPartnersEditor(); 
     },
     
     updatePartnerField(idx, field, value) { 
-        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
-        if (currentUserEmail !== 'trespa.paginas@gmail.com') return;
+        if (!this.isSuperAdmin()) return;
         if (field === 'porcentaje') value = parseFloat(value) || 0; 
         this.sociosConfig[idx][field] = value; 
     },
     
     removePartner(idx) { 
-        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
-        if (currentUserEmail !== 'trespa.paginas@gmail.com') return;
+        if (!this.isSuperAdmin()) return;
         this.sociosConfig.splice(idx, 1); 
         this.renderPartnersEditor(); 
     },
 
     async saveSettings() {
-        const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
-        if (currentUserEmail !== 'trespa.paginas@gmail.com') {
+        if (!this.isSuperAdmin()) {
             return UI.showToast("No tienes permiso para modificar la configuración de socios.", "error");
         }
         const total = this.sociosConfig.reduce((acc, s) => acc + s.porcentaje, 0);
@@ -825,7 +815,7 @@ export const PartnersComponent = {
 
     renderDistributionUI(viajes, gIngresos, gCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo = 0, isDeficit = false, deficitAmount = 0, totalRecaudadoRango = 0, totalAdelantadoActivoRango = 0) {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const me = this.sociosConfig.find(s => s.email.toLowerCase() === currentUserEmail);
         const miPorcentaje = me ? me.porcentaje : 0;
@@ -1202,7 +1192,7 @@ export const PartnersComponent = {
         const dateEnd = strEnd ? new Date(`${strEnd}T23:59:59`) : new Date('2099-12-31T23:59:59');
 
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         const filtered = this.corporateExpenses.filter(g => {
             const d = new Date(`${g.fecha}T00:00:00`);
@@ -1297,7 +1287,7 @@ export const PartnersComponent = {
     renderSaldosAndHistory() {
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         const allTrips = this.getAllTrips();
         const hoy = new Date();
@@ -1611,7 +1601,7 @@ export const PartnersComponent = {
 
     renderHistoryList() {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         
         const histFilter = document.getElementById('pvm-history-filter-partner');
@@ -1701,7 +1691,7 @@ export const PartnersComponent = {
 
     renderRentabilidadAnalisis() {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
 
         const allTrips = this.getAllTrips();
@@ -1903,7 +1893,7 @@ export const PartnersComponent = {
 
     renderPlanesRendimiento() {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         const allTrips = this.getAllTrips();
 
@@ -1960,7 +1950,7 @@ export const PartnersComponent = {
 
     showMonthlyDetail(month) {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         const allTrips = this.getAllTrips();
         const hoy = new Date();
@@ -2081,7 +2071,7 @@ export const PartnersComponent = {
     openMovimientoModal(email, tipo) {
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         if (!isAdmin && email.toLowerCase() !== currentUserEmail) {
             return UI.showToast("No tienes permiso para registrar movimientos de otros socios.", "error");
@@ -2151,7 +2141,7 @@ export const PartnersComponent = {
 
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         if (!isAdmin && email.toLowerCase() !== currentUserEmail) {
             return UI.showToast("No tienes permiso para registrar movimientos de otros socios.", "error");
@@ -2250,7 +2240,7 @@ export const PartnersComponent = {
 
     async handleDeleteMovimiento(id) {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         if (!isAdmin) {
             return UI.showToast("No tienes permiso para eliminar movimientos.", "error");
@@ -2374,7 +2364,7 @@ export const PartnersComponent = {
 
     async handleDeleteGastoCorp(id) {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         if (!isAdmin) {
             return UI.showToast("No tienes permiso para eliminar gastos corporativos.", "error");
@@ -2564,7 +2554,7 @@ export const PartnersComponent = {
 
     renderAdelantosPanel() {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         // 1. Cargar dropdowns del formulario
         const clientSearch = document.getElementById('pvm-adelanto-cliente-search');
@@ -2856,7 +2846,7 @@ export const PartnersComponent = {
 
     renderAdelantosList() {
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
         const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
 
         const filtroEstado = document.getElementById('pvm-adelantos-filtro-estado')?.value || 'todos';
@@ -3035,7 +3025,7 @@ export const PartnersComponent = {
         }
         const userEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         // Flujo inicial: si lo hace admin, puede registrarlo directamente ejecutado. Si es asesor, se registra como solicitado.
         const targetEstado = isAdmin ? (fileInput.files.length > 0 ? 'ejecutado' : 'aprobado') : 'solicitado';
@@ -3536,7 +3526,7 @@ export const PartnersComponent = {
         const aplicados = activeFondos.filter(f => f.estado === 'aplicado_reserva').reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
 
         const rol = window.AuthModule?.userProfile?.rol;
-        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+        const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
         if (document.getElementById('pvm-fondos-kpi-total')) {
             document.getElementById('pvm-fondos-kpi-total').innerText = isAdmin ? formatCOP(totalActivos) : '***';
@@ -3578,7 +3568,7 @@ export const PartnersComponent = {
             tb.parentElement.classList.remove('hidden');
 
             const rol = window.AuthModule?.userProfile?.rol;
-            const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario';
+            const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
 
             filtered.forEach(f => {
                 const isDisponible = f.estado === 'disponible';

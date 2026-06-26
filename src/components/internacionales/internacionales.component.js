@@ -482,7 +482,7 @@ export const InternacionalesComponent = {
     async deleteInternacional(id) {
         if (!confirm("¿Está seguro de eliminar esta reserva internacional?")) return;
         
-        const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador';
+        const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador' || window.AuthModule?.userProfile?.rol === 'super_administrador';
         if (!IS_ADMIN) {
             return UI.showToast("Acción denegada: Solo administradores pueden eliminar reservas.", "error");
         }

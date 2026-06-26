@@ -145,3 +145,24 @@ export function formatDoubleDate(dateStr) {
     return `${part1} al ${part2}`;
 }
 
+/**
+ * Distribuye un monto entero entre N partes sin perder centavos.
+ * El residuo (total % count) se reparte de 1 en 1 a los primeros elementos.
+ * Ejemplo: distributeAmount(1000003, 4) → [250001, 250001, 250001, 250000]
+ * @param {number} total - Monto total a distribuir (entero positivo)
+ * @param {number} count - Cantidad de partes (>= 1)
+ * @returns {number[]} Array de montos que suman exactamente `total`
+ */
+export function distributeAmount(total, count) {
+    if (count <= 0) return [];
+    if (count === 1) return [total];
+    total = Math.floor(total);
+    const base = Math.floor(total / count);
+    const remainder = total - (base * count);
+    const result = [];
+    for (let i = 0; i < count; i++) {
+        result.push(base + (i < remainder ? 1 : 0));
+    }
+    return result;
+}
+

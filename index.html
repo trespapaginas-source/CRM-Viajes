@@ -168,7 +168,32 @@
                 </button>
             </form>
 
-            <div class="mt-8 text-center relative z-10">
+            <form id="recovery-form" class="space-y-5 relative z-10 hidden" onsubmit="AuthModule.handleRecovery(event)">
+                <div class="mb-4 text-center">
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-1.5">Recuperar Acceso</h3>
+                    <p class="text-[9px] text-slate-400 font-bold leading-relaxed uppercase tracking-wider">Ingresa tu email para restablecer la clave</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-widest">Correo Electrónico</label>
+                    <div class="relative">
+                        <i class="ph ph-envelope-simple absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400 text-lg"></i>
+                        <input type="email" id="recovery-email" required placeholder="admin@vivetravel.co"
+                            class="w-full pl-11 pr-4 py-3 bg-white/60 border border-slate-200/60 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900 outline-none transition-all shadow-sm">
+                    </div>
+                </div>
+                <button type="submit" id="btn-recovery-submit"
+                    class="w-full bg-slate-900 text-white font-black py-3.5 rounded-xl shadow-soft hover:bg-slate-800 transition-all flex justify-center items-center mt-4 uppercase tracking-[0.15em] text-[11px]">
+                    Enviar Enlace <i class="ph ph-paper-plane-tilt ml-2 text-lg"></i>
+                </button>
+                <div class="text-center mt-4">
+                    <button type="button" onclick="AuthModule.showLoginForm()"
+                        class="text-[10px] font-bold text-slate-400 hover:text-slate-800 uppercase tracking-widest transition-colors">
+                        Volver al Inicio
+                    </button>
+                </div>
+            </form>
+
+            <div id="forgot-password-container" class="mt-8 text-center relative z-10">
                 <button type="button" onclick="AuthModule.forgotPassword()"
                     class="text-[10px] font-bold text-slate-400 hover:text-slate-800 uppercase tracking-widest transition-colors">
                     ¿Olvidaste tu contraseña?
@@ -256,6 +281,12 @@
                     <span class="font-bold text-sm">Rentabilidad</span>
                 </a>
 
+                <a href="#" data-target="facturacion"
+                    class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group">
+                    <i class="ph ph-receipt text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity"></i>
+                    <span class="font-bold text-sm">Facturas y Recibos</span>
+                </a>
+
                 <a href="#" data-target="trazabilidad" id="nav-trazabilidad-btn"
                     class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group hidden">
                     <i class="ph ph-shield-checkered text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity text-indigo-500"></i>
@@ -266,6 +297,12 @@
                     class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group">
                     <i class="ph ph-buildings text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity"></i>
                     <span class="font-bold text-sm">Aliados</span>
+                </a>
+
+                <a href="#" data-target="liquidacion-proveedores"
+                    class="nav-btn flex items-center px-4 py-2.5 rounded-xl text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 transition-all group">
+                    <i class="ph ph-coins text-xl mr-3 opacity-60 group-hover:opacity-100 transition-opacity"></i>
+                    <span class="font-bold text-sm">Liquidación Aliados</span>
                 </a>
 
                 <a href="#" data-target="alianzas"
@@ -347,6 +384,7 @@
 
 
             <div class="flex-1 overflow-y-auto min-h-0 p-4 md:p-6 lg:p-8 relative scroll-smooth bg-slate-50/50" id="main-scroll-area">
+                <div id="system-warning-banners" class="max-w-7xl mx-auto mb-6 space-y-3 hidden"></div>
 
                 <section id="view-dashboard" class="view-section active fade-in max-w-7xl mx-auto">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -1425,6 +1463,151 @@
                     </div>
 
                     <div id="rentabilidad-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
+                </section>
+
+                <!-- SECTION: FACTURACION Y RECIBOS -->
+                <section id="view-facturacion" class="view-section max-w-7xl mx-auto">
+                    <div class="mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                        <div>
+                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Facturas y Recibos</h3>
+                            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Auditoría contable y emisión de soportes oficiales</p>
+                        </div>
+                        <div id="facturacion-audit-btn-container" class="hidden">
+                            <button type="button" id="btn-facturacion-diagnose" class="px-4 py-2.5 bg-gradient-to-r from-slate-850 to-slate-950 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 hover:-translate-y-0.5 border border-slate-700/50">
+                                <i class="ph ph-shield-check text-base text-emerald-400"></i>
+                                <span>Auditoría de Recaudado</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPIs Facturacion -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-sm">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Recaudado Confirmado</span>
+                                <i class="ph ph-hand-coins text-emerald-500 text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tight" id="facturacion-kpi-total">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Total abonos confirmados en el sistema</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-sm">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Comprobantes Emitidos</span>
+                                <i class="ph ph-receipt text-blue-500 text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tight" id="facturacion-kpi-transacciones">0 Recibos</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Transacciones procesadas</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl p-5 border border-slate-100 flex flex-col justify-between min-h-[110px] shadow-sm">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-medium text-slate-500">Ticket Promedio Abono</span>
+                                <i class="ph ph-calculator text-indigo-500 text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-black text-slate-900 tracking-tight" id="facturacion-kpi-promedio">$0</h3>
+                                <p class="text-[10px] text-slate-400 mt-1">Valor medio por abono individual</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros Facturacion -->
+                    <div class="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 items-center mb-6">
+                        <div class="relative flex-1 w-full">
+                            <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="text" id="facturacion-search" placeholder="Buscar por pasajero, documento o recibo..."
+                                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-slate-900 focus:bg-white outline-none shadow-inner transition-all text-slate-700">
+                        </div>
+                        <div class="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto">
+                            <select id="facturacion-filter-metodo"
+                                class="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer shadow-sm transition-all min-w-[150px]">
+                                <option value="">Todos los métodos</option>
+                            </select>
+                            <select id="facturacion-filter-estado"
+                                class="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer shadow-sm transition-all min-w-[130px]">
+                                <option value="">Todos los estados</option>
+                                <option value="confirmed" selected>Confirmado</option>
+                                <option value="pending">Pendiente</option>
+                                <option value="refunded">Reembolso</option>
+                            </select>
+                            <div class="flex items-center gap-1">
+                                <input type="date" id="facturacion-date-start" class="border border-slate-200 rounded-xl px-2 py-2 text-xs font-semibold bg-white text-slate-600 outline-none shadow-sm">
+                                <span class="text-xs text-slate-400 font-bold">a</span>
+                                <input type="date" id="facturacion-date-end" class="border border-slate-200 rounded-xl px-2 py-2 text-xs font-semibold bg-white text-slate-600 outline-none shadow-sm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Transacciones -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/50 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[800px]">
+                                <thead class="bg-slate-50/60 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                    <tr>
+                                        <th class="py-3 px-4">Ref Recibo</th>
+                                        <th class="py-3 px-4">Pasajero Titular</th>
+                                        <th class="py-3 px-4">Plan / Fecha Emisión</th>
+                                        <th class="py-3 px-4">Monto / Método</th>
+                                        <th class="py-3 px-4">Estado</th>
+                                        <th class="py-3 px-4 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="facturacion-table-body" class="divide-y divide-slate-50 bg-white">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION: LIQUIDACION PROVEEDORES -->
+                <section id="view-liquidacion-proveedores" class="view-section max-w-7xl mx-auto">
+                    <div class="mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4">
+                        <div>
+                            <h3 class="text-2xl font-black text-slate-800 tracking-tight">Liquidación de Aliados</h3>
+                            <p class="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Control de saldos devengados y pagos a proveedores logísticos</p>
+                        </div>
+                    </div>
+
+                    <!-- Filtros Liquidacion -->
+                    <div class="flex flex-col md:flex-row gap-3 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 items-center mb-6">
+                        <div class="relative flex-1 w-full">
+                            <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                            <input type="text" id="liquidacion-search" placeholder="Buscar por aliado o categoría..."
+                                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-slate-900 focus:bg-white outline-none shadow-inner transition-all text-slate-700">
+                        </div>
+                        <div class="flex flex-wrap md:flex-nowrap gap-2 w-full md:w-auto">
+                            <select id="liquidacion-filter-ciudad"
+                                class="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer shadow-sm transition-all min-w-[180px]">
+                                <option value="">Todas las ciudades</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Saldos de Aliados -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/50 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[900px]">
+                                <thead class="bg-slate-50/60 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                    <tr>
+                                        <th class="py-3.5 px-4">Aliado Comercial</th>
+                                        <th class="py-3.5 px-4">Ubicación</th>
+                                        <th class="py-3.5 px-4">Costo Owed</th>
+                                        <th class="py-3.5 px-4">Liquidado Paid</th>
+                                        <th class="py-3.5 px-4">Saldo Pendiente</th>
+                                        <th class="py-3.5 px-4">Estado</th>
+                                        <th class="py-3.5 px-4 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="liquidacion-table-body" class="divide-y divide-slate-50 bg-white">
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -5699,6 +5882,103 @@
                 <button type="button" data-action="close-client-merge" class="flex-1 border border-slate-200 text-slate-500 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white hover:bg-slate-50 hover:text-slate-700 transition-all">Cancelar</button>
                 <button type="button" id="btn-execute-merge" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-1.5">
                     <i class="ph ph-users-three text-sm"></i> Unir en Grupo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTRAR LIQUIDACION PROVEEDOR -->
+    <div id="liq-form-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-2 md:p-4">
+        <div id="liq-form-bg" class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300"></div>
+        <div id="liq-form-content" class="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl opacity-0 scale-95 transition-all duration-300 overflow-hidden border border-white flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <h3 class="text-base font-black text-slate-800 tracking-tight" id="liq-modal-title">
+                    <i class="ph ph-hand-coins text-blue-600 mr-2 text-xl"></i> Registrar Liquidación
+                </h3>
+                <button type="button" id="btn-close-liq-modal" class="text-slate-400 hover:text-red-500 bg-white p-2 rounded-xl shadow-sm border border-slate-200 transition-all"><i class="ph ph-x text-base"></i></button>
+            </div>
+            
+            <form id="liq-form" class="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1 animate-fade-in">
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Monto a Liquidar ($) *</label>
+                    <input type="text" id="liq-monto" required min="1" inputmode="numeric" placeholder="0"
+                        class="currency-input w-full px-4 py-3 border border-slate-200/60 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Fecha de Transferencia *</label>
+                    <input type="date" id="liq-fecha" required
+                        class="w-full px-4 py-3 border border-slate-200/60 rounded-xl text-sm font-bold text-slate-850 outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Notas / Conciliación</label>
+                    <textarea id="liq-detalles" rows="2" placeholder="Escribe detalles del pago (ej. Pago de salida del 15 de Oct, etc.)"
+                        class="w-full px-4 py-3 border border-slate-200/60 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50 transition-all shadow-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Comprobante de Pago</label>
+                    <div class="relative border-2 border-dashed border-slate-200 hover:border-slate-400 rounded-2xl p-4 text-center cursor-pointer transition-colors bg-slate-50/50">
+                        <input type="file" id="liq-file" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+                        <div class="space-y-1">
+                            <i class="ph ph-upload-simple text-slate-400 text-2xl mx-auto block"></i>
+                            <span id="liq-file-label" class="text-xs font-bold text-slate-500 block">Subir captura del soporte...</span>
+                            <span class="text-[9px] text-slate-400 block">Formatos: JPG, PNG. Comprimido automáticamente.</span>
+                        </div>
+                    </div>
+                    <div id="liq-file-preview" class="hidden mt-3 p-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                        <img id="liq-file-thumb" src="" alt="Soporte" class="w-12 h-12 object-cover rounded-lg border border-slate-200">
+                        <button type="button" onclick="LiquidacionProveedoresComponent.clearFileInput()" class="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><i class="ph ph-trash text-lg"></i></button>
+                    </div>
+                </div>
+            </form>
+            
+            <div class="p-4 border-t border-slate-100 flex gap-3 bg-white shrink-0">
+                <button type="button" onclick="LiquidacionProveedoresComponent.closeLiquidationModal()"
+                    class="flex-1 px-4 py-3 rounded-xl font-bold text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 transition-all">Cancelar</button>
+                <button type="button" id="btn-save-liq"
+                    class="flex-1 bg-slate-900 text-white font-black px-4 py-3 rounded-xl shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center uppercase tracking-widest text-[10px]">
+                    <i class="ph ph-floppy-disk mr-2 text-lg"></i> Guardar Pago
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL AUDITORIA LIQUIDACION PROVEEDOR -->
+    <div id="liq-audit-modal" class="fixed inset-0 z-[70] hidden flex items-center justify-center p-2 md:p-4">
+        <div id="audit-bg" class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300"></div>
+        <div id="audit-content" class="relative w-full max-w-lg bg-white rounded-[2rem] shadow-2xl opacity-0 scale-95 transition-all duration-300 overflow-hidden border border-white flex flex-col max-h-[95vh]">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <h3 class="text-base font-black text-slate-800 tracking-tight" id="audit-modal-title">
+                    <i class="ph ph-eye text-slate-800 mr-2 text-xl"></i> Auditoría Financiera
+                </h3>
+                <button type="button" id="btn-close-audit-modal" class="text-slate-400 hover:text-red-500 bg-white p-2 rounded-xl shadow-sm border border-slate-200 transition-all"><i class="ph ph-x text-base"></i></button>
+            </div>
+
+            <!-- Tab Switcher en Auditoría -->
+            <div class="flex items-center gap-1 bg-slate-50 p-1.5 border-b border-slate-100 shrink-0">
+                <button id="audit-tab-btn-viajeros" class="flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-transparent">
+                    <i class="ph ph-users mr-1"></i> Viajeros Vinculados
+                </button>
+                <button id="audit-tab-btn-pagos" class="flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-transparent">
+                    <i class="ph ph-clock mr-1"></i> Historial Pagos
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-5">
+                <!-- Panel Viajeros -->
+                <div id="audit-sec-viajeros" class="space-y-3">
+                    <div id="audit-viajeros-list" class="space-y-2"></div>
+                </div>
+
+                <!-- Panel Historial Pagos -->
+                <div id="audit-sec-pagos" class="hidden space-y-3">
+                    <div id="audit-pagos-list" class="space-y-2"></div>
+                </div>
+            </div>
+            
+            <div class="p-4 border-t border-slate-100 flex bg-slate-50/50 shrink-0">
+                <button type="button" onclick="LiquidacionProveedoresComponent.closeAuditModal()"
+                    class="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md hover:bg-slate-800 transition-all text-center">
+                    Cerrar Detalle
                 </button>
             </div>
         </div>

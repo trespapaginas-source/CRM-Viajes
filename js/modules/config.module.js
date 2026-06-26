@@ -36,9 +36,8 @@ export const ConfigModule = {
             perfiles.forEach(p => {
                 const isMe = p.user_id === window.AuthModule.currentUser?.id;
                 const miEtiqueta = isMe ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[9px] font-bold border border-green-200 ml-2">Tú</span>' : '';
-
-                const selectorRol = isMe
-                    ? `<span class="text-xs font-black text-slate-800 uppercase bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">${p.rol}</span>`
+                const selectorRol = (isMe || p.rol === 'super_administrador')
+                    ? `<span class="text-xs font-black text-slate-800 uppercase bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">${p.rol === 'super_administrador' ? '👑 Super Admin' : p.rol}</span>`
                     : `<select onchange="ConfigModule.updateUserRole('${p.user_id}', this.value)" class="border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer bg-white">
                         <option value="administrador" ${p.rol === 'administrador' ? 'selected' : ''}>👑 Administrador (Master)</option>
                         <option value="socio_mayoritario" ${p.rol === 'socio_mayoritario' ? 'selected' : ''}>📈 Socio Mayoritario</option>

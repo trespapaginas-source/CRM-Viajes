@@ -463,7 +463,7 @@ export const TrazabilidadComponent = {
     },
 
     async restoreRecord(table, id) {
-        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+        if (window.AuthModule?.userProfile?.rol !== 'super_administrador') {
             window.UI.showToast("Acción denegada: Tu cuenta no tiene permisos para restaurar registros.", "error");
             return;
         }
@@ -498,7 +498,7 @@ export const TrazabilidadComponent = {
     },
 
     async hardDeleteRecord(table, id) {
-        if (window.AuthModule?.currentUser?.email !== 'trespa.paginas@gmail.com') {
+        if (window.AuthModule?.userProfile?.rol !== 'super_administrador') {
             window.UI.showToast("Acción denegada: Tu cuenta no tiene permisos para destruir registros.", "error");
             return;
         }
@@ -620,8 +620,8 @@ export const TrazabilidadComponent = {
 
     async resolverAprobacion(solId, estado) {
         const adminEmail = window.AuthModule?.currentUser?.email;
-        if (adminEmail !== 'trespa.paginas@gmail.com') {
-            window.UI.showToast("Acción denegada: Solo el administrador principal puede resolver solicitudes de cambio.", "error");
+        if (window.AuthModule?.userProfile?.rol !== 'super_administrador') {
+            window.UI.showToast("Acción denegada: Solo el super administrador puede resolver solicitudes de cambio.", "error");
             return;
         }
 
