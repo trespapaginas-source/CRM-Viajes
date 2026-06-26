@@ -1208,6 +1208,8 @@ export const ClientsComponent = {
                         finalDestId = savedCompanions[idx].id;
                     }
                 }
+                // Cargar todo para asegurar que el cache local de clientes tenga los acompañantes recién creados y permita la división/distribución equitativa.
+                await DataService.loadAll();
 
                 await DataService.saveAbono({
                     cliente_id: res.id,
