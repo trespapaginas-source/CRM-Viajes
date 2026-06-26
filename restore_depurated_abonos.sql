@@ -15,7 +15,8 @@ SET
     deleted_at = NULL,
     deleted_by = NULL,
     motivo_eliminacion = NULL
-WHERE deleted_by = 'script_depuracion_masiva_admin@vtravel.com';
+WHERE deleted_by = 'script_depuracion_masiva_admin@vtravel.com'
+  AND (motivo_eliminacion LIKE '%Duplicado grupal%' OR motivo_eliminacion LIKE '%Duplicados grupales%');
 
 -- 2. Recalcular abono_acumulado y saldo_restante para todos los clientes activos
 WITH abonos_calc AS (
