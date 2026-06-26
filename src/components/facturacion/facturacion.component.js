@@ -706,9 +706,9 @@ export const FacturacionComponent = {
             );
             if (groupAbonos.length <= 1) return;
 
-            // Safety: Only flag if total group abonos exceed the stored plan price
+            // Safety: Only flag if total group abonos exceed the stored plan price * number of members
             const totalGroupAbonos = groupAbonos.reduce((sum, a) => sum + (parseFloat(a.monto) || 0), 0);
-            const groupPrice = parseFloat(titular.precio_total) || 0;
+            const groupPrice = (parseFloat(titular.precio_total) || 0) * members.length;
             if (groupPrice > 0 && totalGroupAbonos <= groupPrice + 1000) return;
 
             const checked = new Set();

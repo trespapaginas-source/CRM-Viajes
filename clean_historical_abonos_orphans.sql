@@ -67,14 +67,21 @@ WITH grupo_info AS (
     FROM clientes c
     WHERE c.deleted_at IS NULL
 ),
-grupo_precios AS (
-    -- Precio del plan por grupo (tomado del titular o primer miembro)
-    SELECT DISTINCT ON (group_root_id)
-        group_root_id,
-        precio_total AS group_price
+grupo_sizes AS (
+    -- Contar el número de integrantes de cada grupo
+    SELECT group_root_id, COUNT(*) AS members_count
     FROM grupo_info
-    WHERE precio_total IS NOT NULL AND precio_total > 0
-    ORDER BY group_root_id, cliente_id
+    GROUP BY group_root_id
+),
+grupo_precios AS (
+    -- Precio del plan por grupo (precio individual * número de integrantes)
+    SELECT DISTINCT ON (gi.group_root_id)
+        gi.group_root_id,
+        gi.precio_total * gs.members_count AS group_price
+    FROM grupo_info gi
+    JOIN grupo_sizes gs ON gi.group_root_id = gs.group_root_id
+    WHERE gi.precio_total IS NOT NULL AND gi.precio_total > 0
+    ORDER BY gi.group_root_id, gi.cliente_id
 ),
 grupo_abonos_total AS (
     -- Total de abonos activos confirmados por grupo (sin parent_abono_id)
