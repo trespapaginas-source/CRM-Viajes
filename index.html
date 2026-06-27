@@ -4554,13 +4554,35 @@
                         </div>
                     </div>
 
+                    <!-- Month Sub-tabs Navigation -->
+                    <div id="pvm-saldos-months-nav" class="bg-slate-100/50 p-2 rounded-xl flex gap-1.5 overflow-x-auto custom-scrollbar shrink-0 mb-4 border border-slate-200">
+                        <!-- Filled dynamically by JS -->
+                    </div>
+
+                    <!-- Fixed Expenses Coverage Progress Bar Container -->
+                    <div id="pvm-saldos-fixed-coverage-container" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm mb-4">
+                        <!-- Filled dynamically by JS -->
+                    </div>
+
                     <div id="pvm-saldos-kpis-container" class="mb-4"></div>
-                    <div>
-                        <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
-                            <i class="ph ph-hand-coins mr-1.5 text-sm"></i> Bóveda y Saldos Disponibles (Histórico Devengado Neto)
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="pvm-saldos-grid">
-                            <!-- Rendered dynamically by JS -->
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center">
+                                <i class="ph ph-globe mr-1.5 text-sm"></i> Consolidado Histórico Global (Tarjetas Principales)
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="pvm-saldos-global-grid">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 flex items-center" id="pvm-saldos-month-header">
+                                <i class="ph ph-calendar mr-1.5 text-sm"></i> Rendimiento del Mes (Tarjetas Mensuales)
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="pvm-saldos-month-grid">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
                         </div>
                     </div>
 
@@ -4768,6 +4790,14 @@
                                 <div>
                                     <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1 mb-1 block">Concepto / Descripción (Requerido)</label>
                                     <textarea id="pvm-gasto-corp-concepto" required rows="2" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-slate-900 shadow-sm" placeholder="Ej: Pago arriendo oficina Mayo 2026..."></textarea>
+                                </div>
+
+                                <div class="bg-indigo-50/30 p-2.5 rounded-lg border border-indigo-100/50">
+                                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                                        <input type="checkbox" id="pvm-gasto-corp-es-recurrente" class="rounded text-indigo-600 focus:ring-slate-900 h-4 w-4 border-slate-200 bg-white">
+                                        <span class="text-[9px] font-black text-slate-700 uppercase tracking-wider">¿Es Gasto Recurrente / Fijo?</span>
+                                    </label>
+                                    <p class="text-[8px] text-slate-400 pl-6 mt-1 leading-normal">Los gastos fijos/recurrentes se activan automáticamente cada mes y deben cubrirse con la utilidad bruta del mes antes de distribuir disponible a socios.</p>
                                 </div>
 
                                 <div>

@@ -16,6 +16,7 @@ export const PartnersComponent = {
     fallbackFondosActive: false,
     porcentajeRetencion: 10,
     currentAdelantoDistribute: false,
+    selectedSaldosMonth: null,
 
     getClientRealPax(c) {
         const companionsCount = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at).length;
@@ -86,6 +87,7 @@ export const PartnersComponent = {
     },
 
     async init() {
+        this.selectedSaldosMonth = new Date().toISOString().substring(0, 7);
         this.bindEvents();
         await this.loadConfig();
 
@@ -179,6 +181,27 @@ export const PartnersComponent = {
                 UI.closeModal('pvm-movimiento-modal', 'pvm-mov-bg', 'pvm-mov-content');
             } else if (action === 'pvm-switch-tab') {
                 this.switchTab(target.dataset.tab);
+            } else if (action === 'pvm-select-saldos-month') {
+                this.selectedSaldosMonth = target.dataset.month;
+                this.renderSaldosAndHistory();
+            } else if (action === 'pvm-global-withdrawal') {
+                const email = target.dataset.email;
+                const totalDisp = parseFloat(target.dataset.disponible || 0);
+                if (totalDisp <= 0) {
+                    UI.showToast("No tienes saldo disponible para retirar.", "error");
+                } else {
+                    const monto = prompt(`¿Cuánto deseas retirar del saldo global acumulado (Disponible: ${formatCOP(totalDisp)})?`, String(Math.floor(totalDisp)));
+                    if (monto !== null) {
+                        const parsedMonto = UI.parseCurrency(monto);
+                        if (isNaN(parsedMonto) || parsedMonto <= 0) {
+                            UI.showToast("El monto ingresado no es válido.", "error");
+                        } else if (parsedMonto > totalDisp) {
+                            UI.showToast(`No puedes retirar más del saldo disponible (${formatCOP(totalDisp)}).`, "error");
+                        } else {
+                            this.handleGlobalWithdrawal(email, parsedMonto);
+                        }
+                    }
+                }
             } else if (action === 'filter-partner-withdrawals') {
                 this.filterPartnerWithdrawals(target.dataset.email);
             } else if (action === 'pvm-open-movimiento') {
@@ -1042,6 +1065,216 @@ export const PartnersComponent = {
         }
     },
 
+    renderSaldosMonthTabs() {
+        const nav = document.getElementById('pvm-saldos-months-nav');
+        if (!nav) return;
+        nav.innerHTML = '';
+
+        // Agency started in April 2026
+        const startDate = new Date('2026-04-01T00:00:00');
+        const endDate = new Date();
+        
+        const months = [];
+        let curr = new Date(startDate);
+        while (curr <= endDate) {
+            const y = curr.getFullYear();
+            const m = String(curr.getMonth() + 1).padStart(2, '0');
+            const ym = `${y}-${m}`;
+            months.push({
+                ym,
+                label: curr.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+            });
+            curr.setMonth(curr.getMonth() + 1);
+        }
+
+        // Generate sub-tab buttons
+        months.forEach(m => {
+            const isSelected = m.ym === this.selectedSaldosMonth;
+            const btnClass = isSelected
+                ? "px-3 py-1.5 rounded-lg text-xs font-black bg-slate-900 text-white shadow-sm transition-all whitespace-nowrap cursor-pointer"
+                : "px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 transition-all whitespace-nowrap cursor-pointer";
+            
+            nav.innerHTML += `
+                <button type="button" data-action="pvm-select-saldos-month" data-month="${m.ym}" class="${btnClass}">
+                    ${m.label.charAt(0).toUpperCase() + m.label.slice(1)}
+                </button>
+            `;
+        });
+    },
+
+    async handleGlobalWithdrawal(email, totalWithdrawal) {
+        try {
+            const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
+            const rol = window.AuthModule?.userProfile?.rol;
+            const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
+
+            if (!isAdmin && email.toLowerCase() !== currentUserEmail) {
+                return UI.showToast("No tienes permiso para registrar retiros de otros socios.", "error");
+            }
+
+            const partner = this.sociosConfig.find(s => s.email.toLowerCase() === email.toLowerCase());
+            if (!partner) return UI.showToast("Socio no encontrado", "error");
+
+            // Safety check for float pool
+            const pendingFloatExpenses = (this.corporateExpenses || [])
+                .filter(g => g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pendiente')
+                .reduce((sum, g) => sum + (Number(g.monto) || 0), 0);
+            const totalFloatPool = (this.fondosFlotantes || [])
+                .filter(f => f.estado === 'disponible')
+                .reduce((sum, f) => sum + (Number(f.monto) || 0), 0) - pendingFloatExpenses;
+
+            // Calculate global totals to check liquidity first
+            const allTrips = this.getAllTrips();
+            const hoy = new Date();
+            hoy.setHours(23, 59, 59, 999);
+            const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
+            const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+            const histGC = this.corporateExpenses
+                .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
+                .reduce((acc, g) => acc + g.monto, 0);
+            const histGC_Reserva = this.corporateExpenses
+                .filter(g => g.origen_fondos === 'Fondo de Reserva')
+                .reduce((acc, g) => acc + g.monto, 0);
+
+            let histUN = 0;
+            let histRetenidoFondo = 0;
+            if (histUB > histGC) {
+                const histUN_Operacion = histUB - histGC;
+                histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
+                histUN = histUN_Operacion - histRetenidoFondo;
+            }
+
+            let totalSociosDisp = 0;
+            this.sociosConfig.forEach(soc => {
+                const ganado = histUN * (soc.porcentaje / 100);
+                const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+                const retirado = this.movements
+                    .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
+                    .reduce((acc, m) => acc + m.monto, 0);
+                totalSociosDisp += ((ganado + reserve) - retirado);
+            });
+
+            let totalReservaUtilizada = 0;
+            this.sociosConfig.forEach(soc => {
+                const ganado = histUN * (soc.porcentaje / 100);
+                const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+                const retirado = this.movements
+                    .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
+                    .reduce((acc, m) => acc + m.monto, 0);
+                
+                const excess = Math.max(0, retirado - ganado);
+                const reserveUsed = Math.min(reserve, excess);
+                totalReservaUtilizada += reserveUsed;
+            });
+
+            const balanceF = histUB > histGC 
+                ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
+                : -(histGC - histUB);
+            const cajaTeoricaPre = balanceF + totalSociosDisp;
+
+            if ((cajaTeoricaPre - totalWithdrawal) < totalFloatPool) {
+                return UI.showToast(`Operación bloqueada: Mantener el fondo de clientes en custodia requiere un respaldo de ${formatCOP(totalFloatPool)} en caja. Caja estimada restante: ${formatCOP(cajaTeoricaPre - totalWithdrawal)}.`, "error");
+            }
+
+            // FIFO Algorithm across all months starting from April 2026
+            const startDate = new Date('2026-04-01T00:00:00');
+            const endDate = new Date();
+            let curr = new Date(startDate);
+            let remainingWithdrawal = totalWithdrawal;
+            
+            // Collect months in order
+            const monthsList = [];
+            while (curr <= endDate) {
+                const y = curr.getFullYear();
+                const m = String(curr.getMonth() + 1).padStart(2, '0');
+                monthsList.push(`${y}-${m}`);
+                curr.setMonth(curr.getMonth() + 1);
+            }
+
+            let registeredCount = 0;
+
+            // Iterate month by month and deduct
+            for (const ym of monthsList) {
+                if (remainingWithdrawal <= 0.01) break;
+
+                // Calculate available for partner in month `ym`
+                // 1. Month trips & margins
+                const monthTrips = allTrips.filter(t => {
+                    const y = t.dateObj.getFullYear();
+                    const m = String(t.dateObj.getMonth() + 1).padStart(2, '0');
+                    return t.dateObj <= hoy && `${y}-${m}` === ym;
+                });
+                const monthUB = monthTrips.reduce((acc, t) => acc + t.margen, 0);
+
+                // 2. Month expenses
+                const parts = ym.split('-');
+                const y = parseInt(parts[0]);
+                const mIdx = parseInt(parts[1]);
+                const startM = new Date(y, mIdx - 1, 1);
+                const endM = new Date(y, mIdx, 0, 23, 59, 59, 999);
+
+                const monthExpenses = this.corporateExpenses.filter(g => {
+                    const date = new Date(g.fecha);
+                    const isCreatedBeforeOrInMonth = date <= endM;
+                    const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
+                    
+                    if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
+                    
+                    if (g.es_recurrente) return true;
+                    return date >= startM && date <= endM;
+                });
+
+                const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+                const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+
+                let monthUN = 0;
+                let monthRetencionFondo = 0;
+                if (monthUB > monthFixedGC) {
+                    const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
+                    monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
+                    monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
+                }
+
+                const ganadoSocio = monthUN * (partner.porcentaje / 100);
+                const reserveShare = monthRetencionFondo * (partner.porcentaje / 100);
+                const totalRetirado = this.movements
+                    .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase() && m.fecha.substring(0, 7) === ym)
+                    .reduce((acc, m) => acc + m.monto, 0);
+
+                const disponibleMes = (ganadoSocio + reserveShare) - totalRetirado;
+
+                if (disponibleMes > 0.01) {
+                    const deduction = Math.min(remainingWithdrawal, disponibleMes);
+                    
+                    // Register withdrawal for this month (set date to last day of this month)
+                    const lastDayStr = endM.toISOString().substring(0, 10);
+                    const res = await this.saveMovement(
+                        partner.email, 
+                        'retiro', 
+                        deduction, 
+                        lastDayStr, 
+                        `Retiro Total Express (FIFO) - Porción de ${ym}`
+                    );
+                    if (res.success) {
+                        remainingWithdrawal -= deduction;
+                        registeredCount++;
+                    }
+                }
+            }
+
+            if (registeredCount > 0) {
+                UI.showToast(`Retiro express completado con éxito (${registeredCount} meses liquidados).`, "success");
+                await this.loadMovements();
+                this.calculateDistribution();
+            } else {
+                UI.showToast("No se encontraron saldos disponibles en meses anteriores para retirar.", "info");
+            }
+        } catch (err) {
+            console.error("Error in handleGlobalWithdrawal:", err);
+            UI.showToast("Excepción al procesar el retiro.", "error");
+        }
+    },
+
     async saveMovement(socioEmail, tipo, monto, fecha, concepto) {
         const userEmail = window.AuthModule?.currentUser?.email || 'unknown@travelers.com';
         const newMov = {
@@ -1122,7 +1355,7 @@ export const PartnersComponent = {
         }
     },
 
-    async saveCorporateExpense(concepto, categoria, monto, fecha, comprobante = '', origenFondos = 'Utilidad de la Agencia', estadoPago = 'pagado') {
+    async saveCorporateExpense(concepto, categoria, monto, fecha, comprobante = '', origenFondos = 'Utilidad de la Agencia', estadoPago = 'pagado', esRecurrente = false) {
         const userEmail = window.AuthModule?.currentUser?.email || 'unknown@travelers.com';
         const newGasto = {
             id: crypto.randomUUID ? crypto.randomUUID() : (Math.random().toString(36).substring(2) + Date.now().toString(36)),
@@ -1134,6 +1367,7 @@ export const PartnersComponent = {
             usuario_email: userEmail,
             origen_fondos: origenFondos,
             estado_pago: estadoPago,
+            es_recurrente: esRecurrente,
             created_at: new Date().toISOString()
         };
 
@@ -1279,11 +1513,6 @@ export const PartnersComponent = {
                         <td class="py-1.5 px-3 whitespace-nowrap text-[10px] text-slate-400 font-bold">${UI.sanitize(g.usuario_email)}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-center">${actionBtnHtml}</td>
                     </tr>
-                `;
-            });
-        }
-    },
-
     renderSaldosAndHistory() {
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const rol = window.AuthModule?.userProfile?.rol;
@@ -1293,33 +1522,118 @@ export const PartnersComponent = {
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
 
-        // Historical Realized margins
-        const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
-        const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+        // Render monthly tabs first
+        this.renderSaldosMonthTabs();
 
-        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
-        const histGC = this.corporateExpenses
+        // 1. Global / Historical calculations
+        const histRealizedTripsGlobal = allTrips.filter(t => t.dateObj <= hoy);
+        const histUBGlobal = histRealizedTripsGlobal.reduce((acc, t) => acc + t.margen, 0);
+
+        const histGCGlobal = this.corporateExpenses
             .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
             .reduce((acc, g) => acc + g.monto, 0);
 
-        // Corporate expenses funded by the Reserve Fund
-        const histGC_Reserva = this.corporateExpenses
+        const histGC_ReservaGlobal = this.corporateExpenses
             .filter(g => g.origen_fondos === 'Fondo de Reserva')
             .reduce((acc, g) => acc + g.monto, 0);
 
-        // Net Profit (devengado histórico total)
-        // Aplicando la misma jerarquía de prioridad:
-        let histUN = 0;
-        let histRetenidoFondo = 0;
-        if (histUB > histGC) {
-            const histUN_Operacion = histUB - histGC;
-            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
-            histUN = histUN_Operacion - histRetenidoFondo;
+        let histUNGlobal = 0;
+        let histRetenidoFondoGlobal = 0;
+        if (histUBGlobal > histGCGlobal) {
+            const histUN_OperacionGlobal = histUBGlobal - histGCGlobal;
+            histRetenidoFondoGlobal = histUN_OperacionGlobal * (this.porcentajeRetencion / 100);
+            histUNGlobal = histUN_OperacionGlobal - histRetenidoFondoGlobal;
         }
 
-        // Future trips margin
-        const futureTrips = allTrips.filter(t => t.dateObj > hoy);
-        const futureUB = futureTrips.reduce((acc, t) => acc + t.margen, 0);
+        // 2. Selected Month calculations
+        const [ySelected, mSelected] = this.selectedSaldosMonth.split('-').map(Number);
+        const startM = new Date(ySelected, mSelected - 1, 1);
+        const endM = new Date(ySelected, mSelected, 0, 23, 59, 59, 999);
+        const monthLabel = startM.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+        // Update local month subheader title
+        const monthHeader = document.getElementById('pvm-saldos-month-header');
+        if (monthHeader) {
+            monthHeader.innerHTML = `<i class="ph ph-calendar mr-1.5 text-sm"></i> Rendimiento de ${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} (Tarjetas Mensuales)`;
+        }
+
+        // Monthly Realized margins
+        const monthRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
+        const monthUB = monthRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+
+        // Filter month corporate expenses applying the recurrence rule
+        const monthExpenses = this.corporateExpenses.filter(g => {
+            const date = new Date(g.fecha);
+            const isCreatedBeforeOrInMonth = date <= endM;
+            const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
+            
+            if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
+            
+            if (g.es_recurrente) {
+                return true; // Recurring expenses apply to their month of registration and all future months
+            } else {
+                return date >= startM && date <= endM; // Non-recurring expenses apply only to their month of registration
+            }
+        });
+
+        // Split corporate expenses of this month
+        const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+        const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+        const monthTotalGC = monthFixedGC + monthVariableGC;
+
+        // Coverage percentage of Fixed/Recurring Expenses
+        let fixedCoveragePct = 100;
+        if (monthFixedGC > 0) {
+            fixedCoveragePct = Math.min(100, Math.round((monthUB / monthFixedGC) * 100));
+        }
+
+        // Render fixed coverage bar container
+        const coverageContainer = document.getElementById('pvm-saldos-fixed-coverage-container');
+        if (coverageContainer) {
+            if (monthFixedGC > 0) {
+                coverageContainer.classList.remove('hidden');
+                const isSaneado = fixedCoveragePct >= 100;
+                const barColor = isSaneado ? 'bg-emerald-500' : 'bg-amber-500';
+                const badge = isSaneado 
+                    ? `<span class="px-2 py-0.5 rounded text-[8px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 uppercase tracking-wider">Saneado 100%</span>`
+                    : `<span class="px-2 py-0.5 rounded text-[8px] font-black bg-amber-50 text-amber-600 border border-amber-100 uppercase tracking-wider">Falta Cobertura</span>`;
+                
+                coverageContainer.innerHTML = `
+                    <div class="flex justify-between items-center mb-1.5">
+                        <div>
+                            <p class="text-[9px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="ph ph-shield-check text-base text-slate-400"></i> Cobertura de Gastos Fijos del Mes (${monthLabel})
+                            </p>
+                            <p class="text-[8px] text-slate-400 font-bold mt-0.5">Margen de viajes realizados: ${formatCOP(monthUB)} / Gastos recurrentes obligatorios: ${formatCOP(monthFixedGC)}</p>
+                        </div>
+                        ${badge}
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div class="${barColor} h-1.5 rounded-full transition-all duration-500" style="width: ${fixedCoveragePct}%"></div>
+                    </div>
+                    ${!isSaneado ? `
+                        <p class="text-[8px] font-bold text-rose-500 mt-2 flex items-center gap-1">
+                            <i class="ph ph-warning-circle text-xs shrink-0"></i> Las utilidades y el disponible del mes están congelados hasta cubrir la meta de gastos fijos.
+                        </p>
+                    ` : `
+                        <p class="text-[8px] font-bold text-emerald-600 mt-2 flex items-center gap-1">
+                            <i class="ph ph-check-circle text-xs shrink-0"></i> Gastos fijos 100% cubiertos. Utilidades liberadas para distribución en este mes.
+                        </p>
+                    `}
+                `;
+            } else {
+                coverageContainer.classList.add('hidden');
+            }
+        }
+
+        // Net Profit & Reserve of the month
+        let monthUN = 0;
+        let monthRetencionFondo = 0;
+        if (monthUB >= monthFixedGC) {
+            const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
+            monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
+            monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
+        }
 
         const fallbackBanner = document.getElementById('pvm-saldos-fallback-banner');
         if (fallbackBanner) {
@@ -1327,29 +1641,29 @@ export const PartnersComponent = {
             else fallbackBanner.classList.add('hidden');
         }
 
-        // Render global historical KPIs at the top
+        // Render local month KPIs at the top
         const kpisContainer = document.getElementById('pvm-saldos-kpis-container');
         if (kpisContainer) {
             kpisContainer.innerHTML = `
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
                         <div>
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Utilidad Bruta Histórica (Realizada)</span>
-                            <span class="text-sm font-black text-slate-800 mt-0.5 tracking-tight">${formatCOP(histUB)}</span>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Utilidad Bruta del Mes (Realizada)</span>
+                            <span class="text-sm font-black text-slate-800 mt-0.5 tracking-tight">${formatCOP(monthUB)}</span>
                         </div>
                         <div class="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-500"><i class="ph ph-chart-line-up text-base"></i></div>
                     </div>
                     <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
                         <div>
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Gastos Corporativos Totales</span>
-                            <span class="text-sm font-black text-rose-500 mt-0.5 tracking-tight">${formatCOP(histGC)}</span>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Gastos Corporativos del Mes</span>
+                            <span class="text-sm font-black text-rose-500 mt-0.5 tracking-tight">${formatCOP(monthTotalGC)}</span>
                         </div>
                         <div class="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500"><i class="ph ph-trend-down text-base"></i></div>
                     </div>
                     <div class="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
                         <div>
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Utilidad Neta Distribuible a Socios</span>
-                            <span class="text-sm font-black text-emerald-600 mt-0.5 tracking-tight">${formatCOP(histUN)}</span>
+                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Utilidad Neta del Mes</span>
+                            <span class="text-sm font-black text-emerald-600 mt-0.5 tracking-tight">${formatCOP(monthUN)}</span>
                         </div>
                         <div class="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><i class="ph ph-hand-coins text-base"></i></div>
                     </div>
@@ -1357,113 +1671,45 @@ export const PartnersComponent = {
             `;
         }
 
-        const grid = document.getElementById('pvm-saldos-grid');
-        if (grid) {
-            grid.innerHTML = '';
+        // 3. Render Global Cards (Tarjetas Principales)
+        const globalGrid = document.getElementById('pvm-saldos-global-grid');
+        if (globalGrid) {
+            globalGrid.innerHTML = '';
             this.sociosConfig.forEach(soc => {
                 const esMio = soc.email.toLowerCase() === currentUserEmail;
                 const puedeVerDinero = isAdmin || esMio;
 
-                const ganadoHistorico = histUN * (soc.porcentaje / 100);
-                const reserveShare = histRetenidoFondo * (soc.porcentaje / 100);
+                const ganadoHistorico = histUNGlobal * (soc.porcentaje / 100);
+                const reserveShare = histRetenidoFondoGlobal * (soc.porcentaje / 100);
                 const totalRetirado = this.movements
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                     .reduce((acc, m) => acc + m.monto, 0);
                 
-                // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
                 const disponible = (ganadoHistorico + reserveShare) - totalRetirado;
-                const proyectadoSocio = futureUB * (soc.porcentaje / 100);
 
                 const ganadoFormat = puedeVerDinero ? formatCOP(ganadoHistorico) : '***';
                 const reserveShareFormat = puedeVerDinero ? formatCOP(reserveShare) : '***';
                 const retiradoFormat = puedeVerDinero ? formatCOP(totalRetirado) : '***';
                 const disponibleFormat = puedeVerDinero ? formatCOP(disponible) : '***';
-                const proyectadoFormat = puedeVerDinero ? formatCOP(proyectadoSocio) : '***';
 
                 const cardClass = esMio 
-                    ? 'border-2 border-indigo-500 bg-indigo-50/30' 
+                    ? 'border-2 border-indigo-500 bg-indigo-50/30 shadow-md' 
                     : 'border border-slate-200 bg-white';
 
                 let buttonsHtml = '';
-                if (isAdmin) {
+                if (puedeVerDinero && disponible > 0.01) {
                     buttonsHtml = `
-                        <div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="retiro" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
-                                <i class="ph ph-hand-coins text-xs"></i> Retiro
-                            </button>
-                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="corte" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
-                                <i class="ph ph-scissors text-xs"></i> Corte Caja
-                            </button>
-                        </div>
-                    `;
-                } else if (esMio) {
-                    buttonsHtml = `
-                        <div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="retiro" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
-                                <i class="ph ph-hand-coins text-xs"></i> Registrar Retiro
-                            </button>
-                        </div>
+                        <button type="button" data-action="pvm-global-withdrawal" data-email="${soc.email}" data-disponible="${disponible}" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-2 rounded-xl text-[9px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 mt-3 shadow-md">
+                            <i class="ph ph-hand-coins text-xs"></i> Retiro Total (Express)
+                        </button>
                     `;
                 }
 
-                // Generar Tooltip descriptivo de la fórmula
-                const tooltipTitle = `Fórmula de Cálculo:\n(Utilidad Bruta Realizada: ${formatCOP(histUB)} - Gastos Corporativos: ${formatCOP(histGC)}) * 90% (Neta Distribuible) * ${soc.porcentaje}% (Socio Share) = ${formatCOP(ganadoHistorico)}\n\n¿De dónde viene este dinero?\nRepresenta tu ganancia neta consolidada (90%) sobre los viajes ya realizados y cobrados, descontando los gastos fijos corporativos del negocio.`;
-                const reserveShareTooltip = `Fórmula de Cálculo:\nUtilidad de Operación (${formatCOP(histUB - histGC)}) * 10% Retención * ${soc.porcentaje}% (Socio Share) = ${formatCOP(reserveShare)}\n\n¿Qué es esto?\nEs tu participación en el Fondo de Reserva acumulado. Este saldo actúa como garantía para cubrir tus sobre-retiros antes de entrar en déficit real.`;
-                const futureTooltipTitle = `Fórmula de Cálculo:\nUtilidad de Viajes Futuros: ${formatCOP(futureUB)} * ${soc.porcentaje}% (Socio Share) = ${formatCOP(proyectadoSocio)}\n\n¿De dónde viene este dinero?\nProviene de la utilidad proyectada de las reservas asociadas a viajes con fechas de salida futuras.\n\n¿Qué debe ocurrir para ganarlo?\n1. Que se realicen las salidas programadas (sin cancelaciones).\n2. Que los viajeros completen sus saldos pendientes por pagar.\n3. Que no ocurran gastos imprevistos que disminuyan el margen de cada viaje.`;
+                const tooltipTitle = `Fórmula de Ganancia Histórica:\n(Utilidad Bruta Realizada Global: ${formatCOP(histUBGlobal)} - Gastos Corporativos Globales: ${formatCOP(histGCGlobal)}) * 90% * ${soc.porcentaje}% = ${formatCOP(ganadoHistorico)}`;
+                const reserveShareTooltip = `Fórmula de Reserva Histórica:\nUtilidad Operativa Global (${formatCOP(histUBGlobal - histGCGlobal)}) * 10% * ${soc.porcentaje}% = ${formatCOP(reserveShare)}`;
 
-                // Generar HTML de la barra de progreso visual de retiros vs ganado
-                let progressHtml = '';
-                if (puedeVerDinero) {
-                    const totalCupo = ganadoHistorico + reserveShare;
-                    if (totalCupo > 0) {
-                        const pct = Math.min(100, Math.round((totalRetirado / totalCupo) * 100));
-                        const isExceeded = totalRetirado > totalCupo;
-                        const barColor = isExceeded ? 'bg-rose-500' : 'bg-indigo-500';
-                        const textLabel = isExceeded 
-                            ? `Sobre-retirado: ${Math.round((totalRetirado / totalCupo) * 100)}%` 
-                            : `Retirado: ${pct}%`;
-                        progressHtml = `
-                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
-                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                                    <span>Progreso de Retiros</span>
-                                    <span class="${isExceeded ? 'text-rose-500 font-black' : 'text-slate-500'}">${textLabel}</span>
-                                </div>
-                                <div class="w-full bg-slate-100 rounded-full h-1">
-                                    <div class="${barColor} h-1 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        const hasWithdrawn = totalRetirado > 0;
-                        progressHtml = `
-                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
-                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                                    <span>Progreso de Retiros</span>
-                                    <span class="${hasWithdrawn ? 'text-rose-500 font-black' : 'text-slate-500'}">${hasWithdrawn ? 'Excedido (Sin Utilidades)' : 'Sin Retiros'}</span>
-                                </div>
-                                <div class="w-full bg-slate-100 rounded-full h-1">
-                                    <div class="${hasWithdrawn ? 'bg-rose-500 w-full' : 'bg-slate-300 w-0'} h-1 rounded-full transition-all duration-500"></div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-
-                // Generar insignias de estado del saldo disponible
-                let statusBadgeHtml = '';
-                if (puedeVerDinero) {
-                    if (disponible > 0) {
-                        statusBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 uppercase tracking-wider ml-1.5">Superávit</span>`;
-                    } else if (disponible < 0) {
-                        statusBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-rose-50 text-rose-600 border border-rose-100 uppercase tracking-wider ml-1.5">Déficit</span>`;
-                    } else {
-                        statusBadgeHtml = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-black bg-slate-50 text-slate-500 border border-slate-200 uppercase tracking-wider ml-1.5">Al Día</span>`;
-                    }
-                }
-                const disponibleColor = disponible >= 0 ? 'text-emerald-600' : 'text-rose-500';
-
-                grid.innerHTML += `
-                    <div class="rounded-xl p-4 shadow-sm flex flex-col justify-between ${cardClass}">
+                globalGrid.innerHTML += `
+                    <div class="rounded-xl p-4 flex flex-col justify-between ${cardClass}">
                         <div>
                             <div class="flex justify-between items-start mb-2">
                                 <div class="flex items-center gap-2">
@@ -1491,36 +1737,27 @@ export const PartnersComponent = {
                                     </span>
                                     <span class="text-slate-700 font-semibold">${reserveShareFormat}</span>
                                 </div>
-                                <div class="flex justify-between text-[10px] hover:bg-slate-100/50 cursor-pointer p-0.5 -mx-0.5 rounded transition-colors" 
-                                     data-action="filter-partner-withdrawals" data-email="${soc.email}" title="Hacer clic para ver desglose de transacciones abajo">
-                                    <span class="text-slate-500 font-medium flex items-center gap-0.5">Total Retirado/Corte: <i class="ph ph-magnifying-glass text-[10px] text-indigo-400"></i></span>
-                                    <span class="text-slate-600 font-bold underline decoration-dotted decoration-indigo-400">${retiradoFormat}</span>
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-slate-500 font-medium">Retirado Histórico:</span>
+                                    <span class="text-slate-600 font-bold">${retiradoFormat}</span>
                                 </div>
                                 <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-100 items-center">
-                                    <span class="text-slate-700 font-black flex items-center">Disponible Real: ${statusBadgeHtml}</span>
-                                    <span class="${disponibleColor} font-black">${disponibleFormat}</span>
-                                </div>
-                                <div class="flex justify-between text-[10px] pt-1.5 border-t border-slate-100">
-                                    <span class="text-slate-500 font-medium flex items-center">
-                                        Proyectado Futuro:
-                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${futureTooltipTitle}" onclick="alert(this.getAttribute('title'))"></i>` : ''}
-                                    </span>
-                                    <span class="text-indigo-600 font-black">${proyectadoFormat}</span>
+                                    <span class="text-slate-700 font-black">Disponible Real Global:</span>
+                                    <span class="${disponible >= 0 ? 'text-emerald-600' : 'text-rose-500'} font-black">${disponibleFormat}</span>
                                 </div>
                             </div>
-                            ${progressHtml}
                         </div>
                         ${buttonsHtml}
                     </div>
                 `;
             });
 
+            // Reserve Fund Card
             if (isAdmin) {
-                // Calculate how much of the reserve fund is used by each partner to cover over-withdrawals
                 let totalReservaUtilizada = 0;
                 this.sociosConfig.forEach(soc => {
-                    const ganado = histUN * (soc.porcentaje / 100);
-                    const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+                    const ganado = histUNGlobal * (soc.porcentaje / 100);
+                    const reserve = histRetenidoFondoGlobal * (soc.porcentaje / 100);
                     const retirado = this.movements
                         .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                         .reduce((acc, m) => acc + m.monto, 0);
@@ -1530,18 +1767,17 @@ export const PartnersComponent = {
                     totalReservaUtilizada += reserveUsed;
                 });
 
-                // disponible of the reserve fund is the retained amount minus reserve corporate expenses and minus what was used by partners
-                const fondoDisponible = histUB > histGC 
-                    ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
-                    : -(histGC - histUB);
+                const fondoDisponible = histUBGlobal > histGCGlobal 
+                    ? Math.max(0, histRetenidoFondoGlobal - histGC_ReservaGlobal - totalReservaUtilizada) 
+                    : -(histGCGlobal - histUBGlobal);
+                
                 const balanceColorClass = fondoDisponible >= 0 ? 'text-emerald-600' : 'text-rose-500';
                 
-                const retencionTooltip = `Retención Acumulada:\n${formatCOP(histRetenidoFondo)}\n\n¿Qué es esto?\nEs la retención acumulada del 10% calculada sobre la utilidad de operación (Utilidad Bruta de Viajes Realizados - Gastos Corporativos). Este dinero está guardado físicamente en caja y no ha sido utilizado.`;
-                const gastosTooltip = `Gastos con Reserva:\n${formatCOP(histGC_Reserva)}\n\n¿De dónde se pagaron?\nGastos corporativos pagados directamente utilizando el Fondo de Reserva.`;
-                const disponibleTooltip = `Saldo Disponible del Fondo:\n${formatCOP(fondoDisponible)}\n\n¿Cómo se calcula?\nEs la Retención Acumulada (${formatCOP(histRetenidoFondo)}) menos Gastos con Reserva (${formatCOP(histGC_Reserva)}) y menos la reserva utilizada por los socios para cubrir sus sobre-retiros (${formatCOP(totalReservaUtilizada)}).`;
+                const retencionTooltip = `Retención Acumulada:\n${formatCOP(histRetenidoFondoGlobal)}`;
+                const disponibleTooltip = `Saldo Disponible del Fondo:\n${formatCOP(fondoDisponible)}\n\n(Retención: ${formatCOP(histRetenidoFondoGlobal)} - Gastos Reserva: ${formatCOP(histGC_ReservaGlobal)} - Reserva Socios: ${formatCOP(totalReservaUtilizada)})`;
 
-                grid.innerHTML += `
-                    <div class="rounded-xl p-4 shadow-sm flex flex-col justify-between border border-dashed border-slate-300 bg-slate-50/50">
+                globalGrid.innerHTML += `
+                    <div class="rounded-xl p-4 flex flex-col justify-between border border-dashed border-slate-300 bg-slate-50/50">
                         <div>
                             <div class="flex justify-between items-start mb-2">
                                 <div class="flex items-center gap-2">
@@ -1560,14 +1796,11 @@ export const PartnersComponent = {
                                         Retención Acumulada:
                                         <i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${retencionTooltip}" onclick="alert(this.getAttribute('title'))"></i>
                                     </span>
-                                    <span class="text-slate-800 font-bold">${formatCOP(histRetenidoFondo)}</span>
+                                    <span class="text-slate-800 font-bold">${formatCOP(histRetenidoFondoGlobal)}</span>
                                 </div>
                                 <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium flex items-center">
-                                        Gastos con Reserva:
-                                        <i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${gastosTooltip}" onclick="alert(this.getAttribute('title'))"></i>
-                                    </span>
-                                    <span class="text-slate-600 font-bold">${formatCOP(histGC_Reserva)}</span>
+                                    <span class="text-slate-500 font-medium">Gastos con Reserva:</span>
+                                    <span class="text-slate-600 font-bold">${formatCOP(histGC_ReservaGlobal)}</span>
                                 </div>
                                 <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-200">
                                     <span class="text-slate-700 font-black flex items-center">
@@ -1576,14 +1809,138 @@ export const PartnersComponent = {
                                     </span>
                                     <span class="${balanceColorClass} font-black">${formatCOP(fondoDisponible)}</span>
                                 </div>
-                                <div class="text-[8px] text-slate-500 font-semibold leading-tight pt-1.5 border-t border-slate-100 mt-1">
-                                    * Nota: Los gastos corporativos se descontaron antes de la retención. El Saldo Disponible es dinero neto guardado, libre y 100% utilizable.
-                                </div>
                             </div>
                         </div>
                     </div>
                 `;
             }
+        }
+
+        // 4. Render Monthly Cards (Tarjetas del Mes)
+        const monthGrid = document.getElementById('pvm-saldos-month-grid');
+        if (monthGrid) {
+            monthGrid.innerHTML = '';
+            this.sociosConfig.forEach(soc => {
+                const esMio = soc.email.toLowerCase() === currentUserEmail;
+                const puedeVerDinero = isAdmin || esMio;
+
+                const ganadoMonth = monthUN * (soc.porcentaje / 100);
+                const reserveShareMonth = monthRetencionFondo * (soc.porcentaje / 100);
+                const totalRetiradoMonth = this.movements
+                    .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase() && m.fecha.substring(0, 7) === this.selectedSaldosMonth)
+                    .reduce((acc, m) => acc + m.monto, 0);
+                
+                const disponibleMonth = (ganadoMonth + reserveShareMonth) - totalRetiradoMonth;
+
+                const ganadoFormat = puedeVerDinero ? formatCOP(ganadoMonth) : '***';
+                const reserveShareFormat = puedeVerDinero ? formatCOP(reserveShareMonth) : '***';
+                const retiradoFormat = puedeVerDinero ? formatCOP(totalRetiradoMonth) : '***';
+                const disponibleFormat = puedeVerDinero ? formatCOP(disponibleMonth) : '***';
+
+                const cardClass = esMio 
+                    ? 'border-2 border-indigo-500 bg-indigo-50/30 shadow-md' 
+                    : 'border border-slate-200 bg-white';
+
+                let buttonsHtml = '';
+                if (isAdmin) {
+                    buttonsHtml = `
+                        <div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="retiro" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
+                                <i class="ph ph-hand-coins text-xs"></i> Retiro
+                            </button>
+                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="corte" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
+                                <i class="ph ph-scissors text-xs"></i> Corte Caja
+                            </button>
+                        </div>
+                    `;
+                } else if (esMio) {
+                    buttonsHtml = `
+                        <div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="retiro" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
+                                <i class="ph ph-hand-coins text-xs"></i> Registrar Retiro
+                            </button>
+                        </div>
+                    `;
+                }
+
+                const tooltipTitle = `Fórmula de este mes (${monthLabel}):\n(Utilidad Bruta: ${formatCOP(monthUB)} - Gastos Recurrentes: ${formatCOP(monthFixedGC)} - Gastos Variables: ${formatCOP(monthVariableGC)}) * 90% * ${soc.porcentaje}% = ${formatCOP(ganadoMonth)}`;
+
+                let progressHtml = '';
+                if (puedeVerDinero) {
+                    const totalCupo = ganadoMonth + reserveShareMonth;
+                    if (totalCupo > 0) {
+                        const pct = Math.min(100, Math.round((totalRetiradoMonth / totalCupo) * 100));
+                        const isExceeded = totalRetiradoMonth > totalCupo;
+                        const barColor = isExceeded ? 'bg-rose-500' : 'bg-indigo-500';
+                        progressHtml = `
+                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
+                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                    <span>Progreso Retiros del Mes</span>
+                                    <span class="${isExceeded ? 'text-rose-500 font-black' : 'text-slate-500'}">${isExceeded ? 'Excedido' : `${pct}%`}</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                                    <div class="${barColor} h-1 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        const hasWithdrawn = totalRetiradoMonth > 0;
+                        progressHtml = `
+                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
+                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                                    <span>Progreso Retiros del Mes</span>
+                                    <span class="${hasWithdrawn ? 'text-rose-500 font-black' : 'text-slate-500'}">${hasWithdrawn ? 'Excedido (Sin Utilidades)' : 'Sin Retiros'}</span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                                    <div class="${hasWithdrawn ? 'bg-rose-500 w-full' : 'bg-slate-300 w-0'} h-1 rounded-full transition-all duration-500"></div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+
+                monthGrid.innerHTML += `
+                    <div class="rounded-xl p-4 flex flex-col justify-between ${cardClass}">
+                        <div>
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-500 uppercase">${soc.nombre.substring(0,2)}</div>
+                                    <div>
+                                        <h5 class="text-xs font-black text-slate-800 uppercase tracking-wider">${UI.sanitize(soc.nombre)}</h5>
+                                        <p class="text-[9px] text-slate-400 font-bold">${UI.sanitize(soc.email)}</p>
+                                    </div>
+                                </div>
+                                <span class="bg-slate-100 text-slate-700 text-[9px] font-black px-1.5 py-0.5 rounded">${soc.porcentaje}% Share</span>
+                            </div>
+                            
+                            <div class="space-y-1.5 mt-3">
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-slate-500 font-medium flex items-center">
+                                        Ganado en el Mes (90%):
+                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${tooltipTitle}" onclick="alert(this.getAttribute('title'))"></i>` : ''}
+                                    </span>
+                                    <span class="text-slate-800 font-bold">${ganadoFormat}</span>
+                                </div>
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-slate-500 font-medium">Fondo Reserva (10%):</span>
+                                    <span class="text-slate-700 font-semibold">${reserveShareFormat}</span>
+                                </div>
+                                <div class="flex justify-between text-[10px] hover:bg-slate-100/50 cursor-pointer p-0.5 -mx-0.5 rounded transition-colors" 
+                                     data-action="filter-partner-withdrawals" data-email="${soc.email}" title="Ver transacciones de este socio abajo">
+                                    <span class="text-slate-500 font-medium flex items-center gap-0.5 font-bold text-indigo-600">Retirado del Mes: <i class="ph ph-magnifying-glass text-[10px] text-indigo-400"></i></span>
+                                    <span class="text-slate-600 font-bold underline decoration-dotted decoration-indigo-400">${retiradoFormat}</span>
+                                </div>
+                                <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-100 items-center">
+                                    <span class="text-slate-700 font-black">Disponible del Mes:</span>
+                                    <span class="${disponibleMonth >= 0 ? 'text-emerald-600' : 'text-rose-500'} font-black">${disponibleFormat}</span>
+                                </div>
+                            </div>
+                            ${progressHtml}
+                        </div>
+                        ${buttonsHtml}
+                    </div>
+                `;
+            });
         }
 
         const histFilter = document.getElementById('pvm-history-filter-partner');
@@ -2084,38 +2441,63 @@ export const PartnersComponent = {
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
 
-        // Historical Realized margins
-        const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
-        const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+        // Selected Month calculations
+        const [ySelected, mSelected] = this.selectedSaldosMonth.split('-').map(Number);
+        const startM = new Date(ySelected, mSelected - 1, 1);
+        const endM = new Date(ySelected, mSelected, 0, 23, 59, 59, 999);
 
-        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
-        const histGC = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
-            .reduce((acc, g) => acc + g.monto, 0);
+        // Monthly Realized margins
+        const monthRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
+        const monthUB = monthRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
-        // Net Profit (devengado histórico total applying 10% retention)
-        let histUN = 0;
-        let histRetenidoFondo = 0;
-        if (histUB > histGC) {
-            const histUN_Operacion = histUB - histGC;
-            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
-            histUN = histUN_Operacion - histRetenidoFondo;
+        // Filter month corporate expenses applying the recurrence rule
+        const monthExpenses = this.corporateExpenses.filter(g => {
+            const date = new Date(g.fecha);
+            const isCreatedBeforeOrInMonth = date <= endM;
+            const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
+            
+            if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
+            
+            if (g.es_recurrente) return true;
+            return date >= startM && date <= endM;
+        });
+
+        // Split corporate expenses of this month
+        const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+        const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+
+        // Net Profit & Reserve of the month
+        let monthUN = 0;
+        let monthRetencionFondo = 0;
+        if (monthUB >= monthFixedGC) {
+            const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
+            monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
+            monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
         }
 
-        const ganadoHistorico = histUN * (partner.porcentaje / 100);
-        const reserveShare = histRetenidoFondo * (partner.porcentaje / 100);
-        const totalRetirado = this.movements
-            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
+        const ganadoMonth = monthUN * (partner.porcentaje / 100);
+        const reserveShareMonth = monthRetencionFondo * (partner.porcentaje / 100);
+        const totalRetiradoMonth = this.movements
+            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase() && m.fecha.substring(0, 7) === this.selectedSaldosMonth)
             .reduce((acc, m) => acc + m.monto, 0);
-        // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
-        const disponible = (ganadoHistorico + reserveShare) - totalRetirado;
+        
+        const disponible = (ganadoMonth + reserveShareMonth) - totalRetiradoMonth;
 
         document.getElementById('pvm-mov-socio-email').value = partner.email;
         document.getElementById('pvm-mov-tipo').value = tipo;
         document.getElementById('pvm-mov-socio-nombre').value = partner.nombre;
         document.getElementById('pvm-mov-tipo-texto').value = tipo === 'corte' ? 'Corte de Caja (Retiro de Caja/Control)' : 'Retiro de Utilidades';
         document.getElementById('pvm-mov-saldo-disponible').value = formatCOP(disponible);
-        document.getElementById('pvm-mov-fecha').value = new Date().toISOString().substring(0, 10);
+
+        const dateInput = document.getElementById('pvm-mov-fecha');
+        const currentYM = new Date().toISOString().substring(0, 7);
+        if (this.selectedSaldosMonth === currentYM) {
+            dateInput.value = new Date().toISOString().substring(0, 10);
+            dateInput.disabled = false;
+        } else {
+            dateInput.value = endM.toISOString().substring(0, 10);
+            dateInput.disabled = true; // force the date to be the end of that selected month
+        }
         
         const montoInput = document.getElementById('pvm-mov-monto');
         if (tipo === 'corte') {
@@ -2147,15 +2529,65 @@ export const PartnersComponent = {
             return UI.showToast("No tienes permiso para registrar movimientos de otros socios.", "error");
         }
 
+        const partner = this.sociosConfig.find(s => s.email.toLowerCase() === email.toLowerCase());
+        if (!partner) return UI.showToast("Socio no encontrado", "error");
+
         const allTrips = this.getAllTrips();
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
 
-        // Historical Realized margins
+        // Selected Month calculations
+        const [ySelected, mSelected] = this.selectedSaldosMonth.split('-').map(Number);
+        const startM = new Date(ySelected, mSelected - 1, 1);
+        const endM = new Date(ySelected, mSelected, 0, 23, 59, 59, 999);
+
+        // Monthly Realized margins
+        const monthRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
+        const monthUB = monthRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+
+        // Filter month corporate expenses applying the recurrence rule
+        const monthExpenses = this.corporateExpenses.filter(g => {
+            const date = new Date(g.fecha);
+            const isCreatedBeforeOrInMonth = date <= endM;
+            const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
+            
+            if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
+            
+            if (g.es_recurrente) return true;
+            return date >= startM && date <= endM;
+        });
+
+        // Split corporate expenses of this month
+        const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+        const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+
+        // Net Profit & Reserve of the month
+        let monthUN = 0;
+        let monthRetencionFondo = 0;
+        if (monthUB >= monthFixedGC) {
+            const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
+            monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
+            monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
+        }
+
+        const ganadoMonth = monthUN * (partner.porcentaje / 100);
+        const reserveShareMonth = monthRetencionFondo * (partner.porcentaje / 100);
+        const totalRetiradoMonth = this.movements
+            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase() && m.fecha.substring(0, 7) === this.selectedSaldosMonth)
+            .reduce((acc, m) => acc + m.monto, 0);
+        
+        const disponible = (ganadoMonth + reserveShareMonth) - totalRetiradoMonth;
+
+        if (monto > disponible + 0.01) {
+            return UI.showToast(`Fondos insuficientes. El socio sólo tiene disponible ${formatCOP(disponible)} en este mes.`, "error");
+        }
+
+        // Global check for float pool safety (uses global variables)
+        // Historical Realized margins (global)
         const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
         const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
-        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
+        // Historical corporate expenses (global)
         const histGC = this.corporateExpenses
             .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
             .reduce((acc, g) => acc + g.monto, 0);
@@ -2171,21 +2603,6 @@ export const PartnersComponent = {
             const histUN_Operacion = histUB - histGC;
             histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
             histUN = histUN_Operacion - histRetenidoFondo;
-        }
-
-        const partner = this.sociosConfig.find(s => s.email.toLowerCase() === email.toLowerCase());
-        if (!partner) return UI.showToast("Socio no encontrado", "error");
-
-        const ganadoHistorico = histUN * (partner.porcentaje / 100);
-        const reserveShare = histRetenidoFondo * (partner.porcentaje / 100);
-        const totalRetirado = this.movements
-            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
-            .reduce((acc, m) => acc + m.monto, 0);
-        // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
-        const disponible = (ganadoHistorico + reserveShare) - totalRetirado;
-
-        if (monto > disponible + 0.01) {
-            return UI.showToast(`Fondos insuficientes. El socio sólo tiene disponible ${formatCOP(disponible)}.`, "error");
         }
 
         // Bloqueo de retiros si comprometen fondos flotantes
@@ -2312,7 +2729,8 @@ export const PartnersComponent = {
 
         const origenFondos = document.getElementById('pvm-gasto-corp-origen')?.value || 'Utilidad de la Agencia';
         const estadoPago = origenFondos === 'Fondo Flotante' ? 'pendiente' : 'pagado';
-        const res = await this.saveCorporateExpense(concepto, categoria, monto, fecha, comprobante, origenFondos, estadoPago);
+        const esRecurrente = document.getElementById('pvm-gasto-corp-es-recurrente')?.checked || false;
+        const res = await this.saveCorporateExpense(concepto, categoria, monto, fecha, comprobante, origenFondos, estadoPago, esRecurrente);
         
         if (submitBtn) {
             submitBtn.innerHTML = originalHtml;
