@@ -1513,6 +1513,11 @@ export const PartnersComponent = {
                         <td class="py-1.5 px-3 whitespace-nowrap text-[10px] text-slate-400 font-bold">${UI.sanitize(g.usuario_email)}</td>
                         <td class="py-1.5 px-3 whitespace-nowrap text-center">${actionBtnHtml}</td>
                     </tr>
+                `;
+            });
+        }
+    },
+
     renderSaldosAndHistory() {
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const rol = window.AuthModule?.userProfile?.rol;
