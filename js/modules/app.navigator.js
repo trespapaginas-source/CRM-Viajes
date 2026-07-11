@@ -47,40 +47,38 @@ export const App = {
                     let sociosConfig = [];
                     let porcentajeRetencion = 10;
                     
+                    // Fetch directly from Supabase since we have a session!
                     try {
-                        const localGC = localStorage.getItem('trv_gastos_corporativos');
-                        if (localGC) gastosCorporativos = JSON.parse(localGC);
-                    } catch (e) {}
+                        const { data } = await window.supabaseClient.from('gastos_corporativos').select('*').is('deleted_at', null);
+                        if (data) {
+                            gastosCorporativos = data;
+                        }
+                    } catch (e) { console.error("Err GC:", e); }
                     try {
-                        const localSM = localStorage.getItem('trv_socios_movimientos');
-                        if (localSM) sociosMovimientos = JSON.parse(localSM);
-                    } catch (e) {}
+                        const { data } = await window.supabaseClient.from('socios_movimientos').select('*').is('deleted_at', null);
+                        if (data) {
+                            sociosMovimientos = data;
+                        }
+                    } catch (e) { console.error("Err SM:", e); }
                     try {
-                        const localFF = localStorage.getItem('trv_fondos_flotantes');
-                        if (localFF) fondosFlotantes = JSON.parse(localFF);
-                    } catch (e) {}
+                        const { data } = await window.supabaseClient.from('fondos_flotantes').select('*').is('deleted_at', null);
+                        if (data) {
+                            fondosFlotantes = data;
+                        }
+                    } catch (e) { console.error("Err FF:", e); }
                     try {
-                        const localSC = localStorage.getItem('trv_socios');
-                        if (localSC) sociosConfig = JSON.parse(localSC);
-                    } catch (e) {}
-                    
-                    const PC = window.PartnersComponent;
-                    if (PC) {
-                        porcentajeRetencion = PC.porcentajeRetencion || 10;
-                        if (gastosCorporativos.length === 0 && PC.corporateExpenses && PC.corporateExpenses.length > 0) {
-                            gastosCorporativos = PC.corporateExpenses;
+                        const { data } = await window.supabaseClient.from('socios_config').select('*').order('created_at', { ascending: true });
+                        if (data && data.length > 0) {
+                            sociosConfig = data.map(s => ({ id: s.id, nombre: s.nombre, email: s.email, porcentaje: Number(s.porcentaje) }));
                         }
-                        if (sociosMovimientos.length === 0 && PC.movements && PC.movements.length > 0) {
-                            sociosMovimientos = PC.movements;
+                    } catch (e) { console.error("Err SC:", e); }
+                    try {
+                        const res = await DataService.getAgenciaConfig();
+                        if (res && res.data && res.data.porcentaje_retencion !== undefined && res.data.porcentaje_retencion !== null) {
+                            porcentajeRetencion = Number(res.data.porcentaje_retencion);
                         }
-                        if (fondosFlotantes.length === 0 && PC.fondosFlotantes && PC.fondosFlotantes.length > 0) {
-                            fondosFlotantes = PC.fondosFlotantes;
-                        }
-                        if (sociosConfig.length === 0 && PC.sociosConfig && PC.sociosConfig.length > 0) {
-                            sociosConfig = PC.sociosConfig;
-                        }
-                    }
-                    
+                    } catch (e) { console.error("Err AR:", e); }
+
                     // Si sociosConfig sigue vacío, usar el default
                     if (sociosConfig.length === 0) {
                         sociosConfig = [
