@@ -1251,6 +1251,11 @@ export const ClientsComponent = {
     },
 
     openDetailModal(id) {
+        // Auto-reconcile operational advances to reflect latest payments
+        if (window.PartnersComponent && typeof window.PartnersComponent.reconciliarEstadosAdelantos === 'function') {
+            window.PartnersComponent.reconciliarEstadosAdelantos();
+        }
+
         const c = DataService.clientes.find(x => x.id === id);
         if (!c) return;
 

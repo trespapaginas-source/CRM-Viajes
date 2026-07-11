@@ -1,11 +1,15 @@
-require('dotenv').config();
+try {
+    require('dotenv').config();
+} catch (error) {
+    console.warn('Warning: Could not load dotenv config. Continuing with system environment variables.');
+}
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',

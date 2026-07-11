@@ -23,23 +23,91 @@ import { TrazabilidadComponent } from '../../src/components/trazabilidad/trazabi
 import { NotificationsComponent } from '../../src/components/notifications/notifications.component.js';
 import { FacturacionComponent } from '../../src/components/facturacion/facturacion.component.js';
 import { LiquidacionProveedoresComponent } from '../../src/components/suppliers/liquidacion.component.js';
+import { PartnersComponent } from '../../src/components/partners/partners.component.js';
+
+window.PartnersComponent = PartnersComponent;
 
 export const App = {
     async initData() {
         try {
             await DataService.loadAll();
             
-            // Automatically capture diagnostics for the logged-in super admin to analyze the $135M issue
-            if (window.AuthModule?.currentUser?.email === 'trespa.paginas@gmail.com') {
-                fetch('/log-diagnostics', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        abonos: DataService.abonos,
-                        clientes: DataService.clientes
-                    })
-                }).catch(err => console.error("Error sending diagnostic dump:", err));
-            }
+            // Automatically capture full financial diagnostics for audit closure
+            (async () => {
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 1200));
+                    
+                    const abonos = DataService.abonos || [];
+                    const clientes = DataService.clientes || [];
+                    const gastosSalidas = DataService.gastos || [];
+                    
+                    let gastosCorporativos = [];
+                    let sociosMovimientos = [];
+                    let fondosFlotantes = [];
+                    let sociosConfig = [];
+                    let porcentajeRetencion = 10;
+                    
+                    try {
+                        const localGC = localStorage.getItem('trv_gastos_corporativos');
+                        if (localGC) gastosCorporativos = JSON.parse(localGC);
+                    } catch (e) {}
+                    try {
+                        const localSM = localStorage.getItem('trv_socios_movimientos');
+                        if (localSM) sociosMovimientos = JSON.parse(localSM);
+                    } catch (e) {}
+                    try {
+                        const localFF = localStorage.getItem('trv_fondos_flotantes');
+                        if (localFF) fondosFlotantes = JSON.parse(localFF);
+                    } catch (e) {}
+                    try {
+                        const localSC = localStorage.getItem('trv_socios');
+                        if (localSC) sociosConfig = JSON.parse(localSC);
+                    } catch (e) {}
+                    
+                    const PC = window.PartnersComponent;
+                    if (PC) {
+                        porcentajeRetencion = PC.porcentajeRetencion || 10;
+                        if (gastosCorporativos.length === 0 && PC.corporateExpenses && PC.corporateExpenses.length > 0) {
+                            gastosCorporativos = PC.corporateExpenses;
+                        }
+                        if (sociosMovimientos.length === 0 && PC.movements && PC.movements.length > 0) {
+                            sociosMovimientos = PC.movements;
+                        }
+                        if (fondosFlotantes.length === 0 && PC.fondosFlotantes && PC.fondosFlotantes.length > 0) {
+                            fondosFlotantes = PC.fondosFlotantes;
+                        }
+                        if (sociosConfig.length === 0 && PC.sociosConfig && PC.sociosConfig.length > 0) {
+                            sociosConfig = PC.sociosConfig;
+                        }
+                    }
+                    
+                    // Si sociosConfig sigue vacío, usar el default
+                    if (sociosConfig.length === 0) {
+                        sociosConfig = [
+                            { email: 'trespa.paginas@gmail.com', nombre: 'Leo (Admin)', porcentaje: 18 },
+                            { email: 'luismendezramirez@hotmail.es', nombre: 'Luis Méndez', porcentaje: 50 },
+                            { email: 'vivemarketingdigital@outlook.com', nombre: 'Jean Fontalvo', porcentaje: 32 }
+                        ];
+                    }
+
+                    fetch('/log-diagnostics', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            abonos,
+                            clientes,
+                            gastosSalidas,
+                            gastosCorporativos,
+                            sociosMovimientos,
+                            fondosFlotantes,
+                            sociosConfig,
+                            porcentajeRetencion
+                        })
+                    }).catch(err => console.error("Error sending full diagnostic dump:", err));
+                } catch (err) {
+                    console.error("Error capturing full diagnostic dump:", err);
+                }
+            })();
 
             const domLoader = document.getElementById('global-loader');
             domLoader.style.opacity = '0';

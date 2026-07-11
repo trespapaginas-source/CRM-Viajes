@@ -2912,13 +2912,30 @@ export const PartnersComponent = {
 
         DataService.adelantos_operativos.forEach(adv => {
             if (adv.deleted_at) return;
-            // Solo auto-conciliar si está ejecutado o ya recuperado (para auto-corregir si cambian abonos)
-            if (adv.estado !== 'ejecutado' && adv.estado !== 'recuperado') return;
+            // Solo auto-conciliar si está aprobado, ejecutado o ya recuperado (para auto-corregir si cambian abonos)
+            if (adv.estado !== 'aprobado' && adv.estado !== 'ejecutado' && adv.estado !== 'recuperado') return;
 
             let totalAbonos = 0;
             if (adv.cliente_id) {
                 // Relación individual (si es compartido con el grupo, consolidar abonos de todo el grupo)
                 const client = DataService.clientes.find(x => x.id === adv.cliente_id);
+
+                // Auto-corrección: Si el cliente es titular de un grupo, el adelanto no está marcado como distribuido,
+                // pero el monto del adelanto supera su precio de venta individual, significa que es un adelanto
+                // grupal. Lo auto-corregimos a distribuir_grupo = true en local y base de datos.
+                if (client && !client.parent_id && !adv.distribuir_grupo) {
+                    const companions = DataService.clientes.filter(x => x.parent_id === client.id && !x.deleted_at);
+                    if (companions.length > 0 && Number(adv.monto_adelantado) > (Number(client.precio_total) || 0)) {
+                        adv.distribuir_grupo = true;
+                        supabaseClient.from('adelantos_operativos')
+                            .update({ distribuir_grupo: true })
+                            .eq('id', adv.id)
+                            .then(({ error }) => {
+                                if (error) console.error("Error al auto-corregir distribuir_grupo en Supabase:", error);
+                            });
+                    }
+                }
+
                 let clientAbonos = [];
                 if (adv.distribuir_grupo && client && !client.parent_id) {
                     const companions = DataService.clientes.filter(x => x.parent_id === client.id && !x.deleted_at);
@@ -2945,7 +2962,9 @@ export const PartnersComponent = {
             if (newRecuperado >= montoAdelantado && montoAdelantado > 0) {
                 newEstado = 'recuperado';
             } else {
-                newEstado = 'ejecutado';
+                if (adv.estado === 'recuperado') {
+                    newEstado = adv.comprobante ? 'ejecutado' : 'aprobado';
+                }
             }
 
             if (Number(adv.monto_recuperado) !== newRecuperado || adv.estado !== newEstado) {
@@ -3265,6 +3284,24 @@ export const PartnersComponent = {
         if (dropdown) {
             dropdown.classList.add('hidden');
         }
+
+        // Show/hide group distribution checkbox if the selected client is a titular with companions
+        const c = DataService.clientes.find(x => x.id === id);
+        const checkboxContainer = document.getElementById('pvm-adelanto-distribuir-grupo-container');
+        const checkboxInput = document.getElementById('pvm-adelanto-distribuir-grupo');
+        if (c && !c.parent_id && checkboxContainer && checkboxInput) {
+            const companions = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at);
+            if (companions.length > 0) {
+                checkboxContainer.classList.remove('hidden');
+                checkboxInput.checked = true; // Default to checked for group members
+            } else {
+                checkboxContainer.classList.add('hidden');
+                checkboxInput.checked = false;
+            }
+        } else if (checkboxContainer && checkboxInput) {
+            checkboxContainer.classList.add('hidden');
+            checkboxInput.checked = false;
+        }
     },
 
     renderAdelantosList() {
@@ -3481,6 +3518,9 @@ export const PartnersComponent = {
             }
         }
 
+        const distribuirGrupoEl = document.getElementById('pvm-adelanto-distribuir-grupo');
+        const distribuirGrupo = distribuirGrupoEl ? distribuirGrupoEl.checked : false;
+
         const payload = {
             cliente_id: tipoRelacion === 'individual' ? clienteId : null,
             plan_id: tipoRelacion === 'grupal' ? planId : null,
@@ -3498,7 +3538,7 @@ export const PartnersComponent = {
             solicitado_por: userEmail,
             aprobado_por: targetEstado !== 'solicitado' ? userEmail : null,
             fecha_ejecucion: targetEstado === 'ejecutado' ? fecha : null,
-            distribuir_grupo: this.currentAdelantoDistribute || false
+            distribuir_grupo: tipoRelacion === 'individual' ? distribuirGrupo : false
         };
 
         try {
@@ -3522,6 +3562,10 @@ export const PartnersComponent = {
             this.populatePassengerDropdown('');
             this.clearAdelantoPreview();
             this.currentAdelantoDistribute = false;
+            const checkboxContainer = document.getElementById('pvm-adelanto-distribuir-grupo-container');
+            const checkboxInput = document.getElementById('pvm-adelanto-distribuir-grupo');
+            if (checkboxContainer) checkboxContainer.classList.add('hidden');
+            if (checkboxInput) checkboxInput.checked = false;
             
             // Recalcular finanzas y UI
             this.calculateDistribution();

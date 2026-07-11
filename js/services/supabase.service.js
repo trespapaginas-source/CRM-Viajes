@@ -253,6 +253,11 @@ export const DataService = {
         if (hasChanges) {
              console.log("Reservas reclasificadas automáticamente según reglas maestras.");
         }
+
+        // Auto-reconcile operational advances to keep them synchronized with the latest abonos
+        if (window.PartnersComponent && typeof window.PartnersComponent.reconciliarEstadosAdelantos === 'function') {
+            window.PartnersComponent.reconciliarEstadosAdelantos();
+        }
     },
 
     // ERR-019 FIX: Ciudades con timeout, deduplicación (upsert) y fallback robusto
