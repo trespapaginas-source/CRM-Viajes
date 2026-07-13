@@ -279,8 +279,11 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(PORT, () => {
-    const url = `http://localhost:${PORT}`;
+let isRetrying = false;
+
+server.on('listening', () => {
+    const actualPort = server.address().port;
+    const url = `http://localhost:${actualPort}`;
     console.log(`=======================================================`);
     console.log(` VIVE TRAVEL CRM - SERVIDOR LOCAL`);
     console.log(`=======================================================`);
@@ -292,3 +295,16 @@ server.listen(PORT, () => {
     const openCmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
     exec(`${openCmd} ${url}`);
 });
+
+server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE' && !isRetrying) {
+        isRetrying = true;
+        console.warn(`[WARN] El puerto ${PORT} está ocupado. Buscando un puerto libre...`);
+        server.listen(0);
+    } else {
+        console.error('Error en el servidor:', error);
+        process.exit(1);
+    }
+});
+
+server.listen(PORT);

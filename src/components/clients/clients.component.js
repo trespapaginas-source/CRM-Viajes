@@ -89,6 +89,11 @@ export const ClientsComponent = {
             planSelect.addEventListener('change', () => this.onPlanSelect());
         }
 
+        const selectFechas = document.getElementById('cf-fecha-viaje');
+        if (selectFechas) {
+            selectFechas.addEventListener('change', () => this.onDateSelectChange());
+        }
+
         const paxInput = document.getElementById('cf-pax');
         if (paxInput) {
             paxInput.addEventListener('input', () => this.onPaxChange());
@@ -593,26 +598,71 @@ export const ClientsComponent = {
 
             const fId = document.getElementById('cf-id').value;
             const c = fId ? DataService.clientes.find(cli => cli.id === fId) : null;
-            
-            const provs = (bloqueo && c && c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
-                ? c.proveedores_vinculados
-                : (plan.proveedores_vinculados || []);
-
-            trs.innerHTML = '';
-            if (provs && provs.length > 0) {
-                provs.forEach(pr => {
-                    trs.innerHTML += `
-                    <tr>
-                        <td class="p-3 font-bold text-xs uppercase border-b border-slate-100">${pr.nombre}</td>
-                        <td class="p-3 font-medium text-sm border-b border-slate-100">${pr.incluye}</td>
-                        <td class="p-3 text-right font-black border-b border-slate-100">${formatCOP(pr.costo)}</td>
-                    </tr>`;
-                });
-            } else {
-                trs.innerHTML = '<tr><td colspan="3" class="p-6 text-center text-orange-400 font-semibold">Este plan no tiene proveedores cargados.</td></tr>';
-            }
-            this.calculateTotals();
+            this.renderProvidersForSelectedDate(id, bloqueo, c);
         }
+    },
+
+    onDateSelectChange() {
+        const planId = document.getElementById('cf-plan-id').value;
+        if (!planId) return;
+
+        const fId = document.getElementById('cf-id').value;
+        const c = fId ? DataService.clientes.find(cli => cli.id === fId) : null;
+        
+        const isEditing = !!c;
+        this.renderProvidersForSelectedDate(planId, isEditing, c);
+    },
+
+    renderProvidersForSelectedDate(planId, isEditing = false, clientObj = null) {
+        const trs = document.getElementById('cf-proveedores-list');
+        if (!trs) return;
+
+        const plan = DataService.planes.find(p => p.id === planId);
+        if (!plan) {
+            trs.innerHTML = '<tr><td colspan="3" class="p-6 text-center text-slate-400 italic">Esperando selección del plan...</td></tr>';
+            return;
+        }
+
+        const fechaSelect = document.getElementById('cf-fecha-viaje')?.value;
+        let provs = [];
+
+        // Si se está editando y la fecha elegida es la misma que ya tenía guardada la reserva,
+        // usamos los proveedores congelados/personalizados de la reserva.
+        if (isEditing && clientObj && clientObj.fecha_viaje === fechaSelect && clientObj.proveedores_vinculados && clientObj.proveedores_vinculados.length > 0) {
+            provs = clientObj.proveedores_vinculados;
+        } else {
+            // De lo contrario (o si es reserva nueva), buscamos los proveedores de la fecha en el catálogo
+            let dateConfig = null;
+            if (fechaSelect && plan.fechas) {
+                dateConfig = plan.fechas.find(f => {
+                    const formattedDate = f.start === f.end
+                        ? formatShortDate(f.start)
+                        : `${formatShortDate(f.start)} al ${formatShortDate(f.end)}`;
+                    return formattedDate === fechaSelect;
+                });
+            }
+
+            if (dateConfig && dateConfig.proveedores_vinculados && dateConfig.proveedores_vinculados.length > 0) {
+                provs = dateConfig.proveedores_vinculados;
+            } else {
+                provs = plan.proveedores_vinculados || [];
+            }
+        }
+
+        trs.innerHTML = '';
+        if (provs && provs.length > 0) {
+            provs.forEach(pr => {
+                trs.innerHTML += `
+                <tr>
+                    <td class="p-3 font-bold text-xs uppercase border-b border-slate-100">${pr.nombre}</td>
+                    <td class="p-3 font-medium text-sm border-b border-slate-100">${pr.incluye}</td>
+                    <td class="p-3 text-right font-black border-b border-slate-100">${formatCOP(pr.costo)}</td>
+                </tr>`;
+            });
+        } else {
+            trs.innerHTML = '<tr><td colspan="3" class="p-6 text-center text-orange-400 font-semibold">Este plan no tiene proveedores cargados.</td></tr>';
+        }
+        this.calculateTotals();
     },
 
     calculateTotals() {

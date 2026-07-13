@@ -428,36 +428,7 @@ export const RentabilidadComponent = {
             }
         });
 
-        if (hasMismatch) {
-            console.log("Detectado desajuste de tarifas con el catálogo. Sincronizando automáticamente...");
-            supabaseClient
-                .from('clientes')
-                .update({
-                    costo_base: targetCostoBase,
-                    proveedores_vinculados: targetProvs
-                })
-                .eq('plan_id', planId)
-                .eq('fecha_viaje', fecha)
-                .is('deleted_at', null)
-                .then(({ error }) => {
-                    if (!error) {
-                        // Actualizar localmente la memoria caché de DataService
-                        DataService.clientes.forEach(c => {
-                            const st = c.estado ? c.estado.toLowerCase() : '';
-                            const isInt = c.tipo_reserva === 'Internacional';
-                            const matchTab = (this.currentTab === 'internacionales' && isInt) || (this.currentTab !== 'internacionales' && !isInt);
-                            if (c.plan_id === planId && c.fecha_viaje === fecha && !['desistió', 'cancelado o devolución', 'cancelados'].includes(st) && matchTab) {
-                                c.costo_base = targetCostoBase;
-                                c.proveedores_vinculados = JSON.parse(JSON.stringify(targetProvs));
-                            }
-                        });
-                        // Reabrir modal para refrescar visualmente
-                        this.openFinancialModal(planId, fecha);
-                    } else {
-                        console.error("Error en auto-sincronización:", error);
-                    }
-                });
-        }
+        // Auto-sincronización silenciosa desactivada por seguridad para evitar alterar reportes históricos de forma involuntaria.
 
         let paxTotal = 0; let paxServicio = 0; let ingresoBruto = 0; let ingresoRetenido = 0;
         const ul = document.getElementById('rdm-passengers-list');
@@ -536,8 +507,25 @@ export const RentabilidadComponent = {
         }
 
         const syncBtn = document.getElementById('btn-sync-rentabilidad-tarifas');
+        const subtitleEl = document.getElementById('rdm-subtitle');
+        if (subtitleEl) {
+            let subtitleText = `Salida del ${UI.sanitize(formatDoubleDate(fecha))}`;
+            if (hasMismatch) {
+                if (isPastTrip) {
+                    subtitleText += ` <span class="bg-rose-50 text-rose-700 border border-rose-200 text-[8px] font-black uppercase px-2 py-0.5 rounded ml-2 inline-flex items-center gap-1" title="Las tarifas de esta salida diferencian del catálogo actual, pero han sido congeladas para proteger el historial financiero."><i class="ph ph-lock text-xs"></i> Tarifas Históricas Protegidas</span>`;
+                } else {
+                    subtitleText += ` <span class="bg-amber-50 text-amber-700 border border-amber-200 text-[8px] font-black uppercase px-2 py-0.5 rounded ml-2 inline-flex items-center gap-1" title="Hay diferencias entre las tarifas cargadas en las reservas y la matriz de costos actual del catálogo."><i class="ph ph-warning-circle text-xs"></i> Desajuste de Tarifas</span>`;
+                }
+            }
+            subtitleEl.innerHTML = subtitleText;
+        }
+
         if (syncBtn) {
-            syncBtn.classList.remove('hidden');
+            if (hasMismatch && !isPastTrip) {
+                syncBtn.classList.remove('hidden');
+            } else {
+                syncBtn.classList.add('hidden');
+            }
         }
 
         this.renderGastos(plan, paxServicio, ingresoBruto);
