@@ -4255,17 +4255,24 @@
                                             <option value="Publicidad">Publicidad (Ads)</option>
                                             <option value="Comisión">Comisión Ventas</option>
                                             <option value="Agencia">Gasto Agencia</option>
+                                            <option value="Matriz Base">Abono a Proveedor (Matriz Base)</option>
                                         </select>
                                     </div>
                                     <div class="md:col-span-4">
                                         <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Detalle (Título)</label>
                                         <input type="text" id="ng-concepto" required placeholder="Ej: Meta Ads..." class="w-full border border-slate-200/60 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50/50 transition-all">
                                     </div>
-                                    <div class="md:col-span-2">
+                                    <div class="md:col-span-2" id="ng-tipo-valor-container">
                                         <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tipo</label>
                                         <select id="ng-tipo-valor"  required class="w-full border border-slate-200/60 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50/50 cursor-pointer transition-all">
                                             <option value="fijo">Valor Fijo</option>
                                             <option value="porcentaje">% Venta</option>
+                                        </select>
+                                    </div>
+                                    <div class="md:col-span-2 hidden" id="ng-prov-select-container">
+                                        <label class="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Proveedor</label>
+                                        <select id="ng-proveedor-pago" class="w-full border border-slate-200/60 rounded-lg px-3 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-slate-900 bg-slate-50/50 cursor-pointer transition-all">
+                                            <option value="">-- Elegir --</option>
                                         </select>
                                     </div>
                                     <div class="md:col-span-3 relative">

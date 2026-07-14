@@ -52,6 +52,8 @@ export const RentabilidadComponent = {
                 this.openFinancialModal(targetAction.dataset.planId, targetAction.dataset.fechaViaje);
             } else if (action === 'delete-gasto') {
                 this.deleteGasto(targetAction.dataset.gastoId);
+            } else if (action === 'delete-pago') {
+                this.deletePago(targetAction.dataset.pagoId);
             } else if (action === 'open-lightbox') {
                 this.openLightbox(targetAction.dataset.url);
             } else if (action === 'close-lightbox' || e.target.id === 'comprobante-lightbox-bg') {
@@ -87,6 +89,11 @@ export const RentabilidadComponent = {
 
         const selectTipoValor = document.getElementById('ng-tipo-valor');
         if (selectTipoValor) selectTipoValor.addEventListener('change', () => this.toggleGastoInput());
+
+        const selectCategoria = document.getElementById('ng-categoria');
+        if (selectCategoria) {
+            selectCategoria.addEventListener('change', () => this.toggleCategoriaInput());
+        }
 
         const fileInput = document.getElementById('ng-soporte-file');
         if (fileInput) fileInput.addEventListener('change', (e) => this.previewSoporte(e.target));
@@ -528,6 +535,39 @@ export const RentabilidadComponent = {
             }
         }
 
+        // Configure Matriz Base payment options based on whether the trip is future
+        const catSelect = document.getElementById('ng-categoria');
+        if (catSelect) {
+            const optMatriz = [...catSelect.options].find(o => o.value === 'Matriz Base');
+            if (optMatriz) optMatriz.remove();
+            if (!isPastTrip) {
+                const newOpt = document.createElement('option');
+                newOpt.value = 'Matriz Base';
+                newOpt.innerText = 'Abono a Proveedor (Matriz Base)';
+                catSelect.appendChild(newOpt);
+            }
+        }
+
+        // Populate Matriz Base provider options
+        const selectProv = document.getElementById('ng-proveedor-pago');
+        if (selectProv) {
+            selectProv.innerHTML = '<option value="">-- Elegir --</option>';
+            targetProvs.forEach(pr => {
+                selectProv.innerHTML += `<option value="${UI.sanitize(pr.nombre)}">${UI.sanitize(pr.nombre)}</option>`;
+            });
+            selectProv.onchange = () => {
+                const inputConcepto = document.getElementById('ng-concepto');
+                if (inputConcepto && selectProv.value) {
+                    inputConcepto.value = `Abono a ${selectProv.value}`;
+                }
+            };
+        }
+
+        // Reset form and UI states
+        document.getElementById('form-nuevo-gasto')?.reset();
+        this.clearSoporte();
+        this.toggleCategoriaInput();
+
         this.renderGastos(plan, paxServicio, ingresoBruto);
         UI.openModal('rentabilidad-detail-modal', 'rdm-bg', 'rdm-content');
     },
@@ -539,6 +579,42 @@ export const RentabilidadComponent = {
         const inp = document.getElementById('ng-valor');
         if (tipo === 'porcentaje') { label.innerText = 'Porcentaje (%)'; sym.innerText = '%'; inp.placeholder = 'Ej: 10'; }
         else { label.innerText = 'Monto ($)'; sym.innerText = '$'; inp.placeholder = 'Ej: 300000'; }
+    },
+
+    toggleCategoriaInput() {
+        const cat = document.getElementById('ng-categoria').value;
+        const tipoContainer = document.getElementById('ng-tipo-valor-container');
+        const provContainer = document.getElementById('ng-prov-select-container');
+        const inputConcepto = document.getElementById('ng-concepto');
+        const fileInput = document.getElementById('ng-soporte-file');
+        
+        if (cat === 'Matriz Base') {
+            if (tipoContainer) tipoContainer.classList.add('hidden');
+            if (provContainer) provContainer.classList.remove('hidden');
+            
+            const selectProv = document.getElementById('ng-proveedor-pago');
+            if (selectProv && inputConcepto) {
+                inputConcepto.placeholder = "Ej: Abono a Cibeles...";
+                if (selectProv.value) {
+                    inputConcepto.value = `Abono a ${selectProv.value}`;
+                }
+            }
+            
+            const photoLabel = document.querySelector('label[for="ng-soporte-file"] span');
+            if (photoLabel) photoLabel.innerText = "Foto (Opcional)...";
+            if (fileInput) fileInput.required = false;
+        } else {
+            if (tipoContainer) tipoContainer.classList.remove('hidden');
+            if (provContainer) provContainer.classList.add('hidden');
+            
+            if (inputConcepto) {
+                inputConcepto.placeholder = "Ej: Meta Ads...";
+            }
+            
+            const photoLabel = document.querySelector('label[for="ng-soporte-file"] span');
+            if (photoLabel) photoLabel.innerText = "Seleccionar Foto...";
+            if (fileInput) fileInput.required = true;
+        }
     },
 
     previewSoporte(input) {
@@ -591,59 +667,86 @@ export const RentabilidadComponent = {
         btn.disabled = true;
 
         try {
+            const cat = document.getElementById('ng-categoria').value;
             const fileInput = document.getElementById('ng-soporte-file');
             const file = fileInput.files[0];
 
-            if (!file) {
+            if (!file && cat !== 'Matriz Base') {
                 UI.showToast("Es obligatorio adjuntar una fotografía del comprobante de pago para poder registrar este gasto y mantener un control correcto de la rentabilidad.", "error");
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
                 return;
             }
 
-            btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Subiendo foto...';
             let soporteUrl = '';
-            try {
-                soporteUrl = await this.uploadSoporte(file);
-            } catch (uploadErr) {
-                console.error("Error subiendo comprobante:", uploadErr);
-                UI.showToast("Error al subir la foto. Verifica que el bucket 'comprobantes' exista en Supabase Storage y sea público.", "error");
-                btn.innerHTML = originalHtml;
-                btn.disabled = false;
-                return;
+            if (file) {
+                btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Subiendo foto...';
+                try {
+                    soporteUrl = await this.uploadSoporte(file);
+                } catch (uploadErr) {
+                    console.error("Error subiendo comprobante:", uploadErr);
+                    UI.showToast("Error al subir la foto. Verifica que el bucket 'comprobantes' exista en Supabase Storage y sea público.", "error");
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                    return;
+                }
             }
 
             btn.innerHTML = '<i class="ph ph-spinner animate-spin mr-2"></i> Guardando...';
-            const payload = {
-                plan_id: this.currentPlanId,
-                fecha_viaje: this.currentFecha,
-                categoria: document.getElementById('ng-categoria').value,
-                concepto: document.getElementById('ng-concepto').value,
-                tipo_valor: document.getElementById('ng-tipo-valor').value,
-                valor: UI.parseCurrency(document.getElementById('ng-valor').value),
-                soporte_url: soporteUrl,
-                justificacion: document.getElementById('ng-justificacion').value.trim(),
-                usuario_email: window.AuthModule?.currentUser?.email || 'Staff'
-            };
 
-            const { error } = await supabaseClient.from('gastos_salidas').insert([payload]);
-
-            if (error) {
-                if (error.code === '42703') {
-                    UI.showToast("Crea las columnas 'soporte_url' y 'justificacion' (ambas 'text') en la tabla 'gastos_salidas' en Supabase", "error");
-                    throw new Error("COLUMNAS_FALTANTES");
+            if (cat === 'Matriz Base') {
+                const provName = document.getElementById('ng-proveedor-pago').value;
+                if (!provName) {
+                    UI.showToast("Debes seleccionar el proveedor al que le hiciste el abono.", "error");
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                    return;
                 }
-                throw error;
+                const payload = {
+                    plan_id: this.currentPlanId,
+                    fecha_viaje: this.currentFecha,
+                    nombre_proveedor: provName,
+                    monto: UI.parseCurrency(document.getElementById('ng-valor').value),
+                    soporte_url: soporteUrl || null,
+                    justificacion: document.getElementById('ng-justificacion').value.trim(),
+                    usuario_email: window.AuthModule?.currentUser?.email || 'Staff'
+                };
+                const { error } = await supabaseClient.from('proveedores_pagos_salidas').insert([payload]);
+                if (error) throw error;
+            } else {
+                const payload = {
+                    plan_id: this.currentPlanId,
+                    fecha_viaje: this.currentFecha,
+                    categoria: cat,
+                    concepto: document.getElementById('ng-concepto').value,
+                    tipo_valor: document.getElementById('ng-tipo-valor').value,
+                    valor: UI.parseCurrency(document.getElementById('ng-valor').value),
+                    soporte_url: soporteUrl,
+                    justificacion: document.getElementById('ng-justificacion').value.trim(),
+                    usuario_email: window.AuthModule?.currentUser?.email || 'Staff'
+                };
+
+                const { error } = await supabaseClient.from('gastos_salidas').insert([payload]);
+
+                if (error) {
+                    if (error.code === '42703') {
+                        UI.showToast("Crea las columnas 'soporte_url' y 'justificacion' (ambas 'text') en la tabla 'gastos_salidas' en Supabase", "error");
+                        throw new Error("COLUMNAS_FALTANTES");
+                    }
+                    throw error;
+                }
             }
+
             document.getElementById('form-nuevo-gasto').reset();
             this.clearSoporte();
             this.toggleGastoInput();
+            this.toggleCategoriaInput();
             
             // Refrescar DB
             await DataService.loadAll();
-            UI.showToast("Costo registrado correctamente.", "success");
+            UI.showToast("Movimiento registrado correctamente.", "success");
         } catch (err) {
-            UI.showToast("Error al guardar el gasto.", "error");
+            UI.showToast("Error al guardar el movimiento.", "error");
         } finally {
             btn.innerHTML = originalHtml;
             btn.disabled = false;
@@ -662,6 +765,20 @@ export const RentabilidadComponent = {
 
         const name = gasto ? `Costo Operativo: ${gasto.concepto} (${formatCOP(gasto.costo)})` : 'Costo Operativo';
         window.promptGlobalDelete(id, 'gasto_salida', name);
+    },
+
+    async deletePago(id) {
+        const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador' || window.AuthModule?.userProfile?.rol === 'super_administrador';
+        const pago = DataService.proveedores_pagos_salidas.find(p => p.id === id);
+        if (pago) {
+            const hoursSinceCreated = (new Date() - new Date(pago.created_at)) / (1000 * 60 * 60);
+            if (!IS_ADMIN && hoursSinceCreated > 48) {
+                return UI.showToast("Acción denegada: Pago congelado por antigüedad contable.", "error");
+            }
+        }
+
+        const name = pago ? `Abono a Proveedor: ${pago.nombre_proveedor} (${formatCOP(pago.monto)})` : 'Abono a Proveedor';
+        window.promptGlobalDelete(id, 'proveedor_pago_salida', name);
     },
 
     async renderGastos(plan, paxServicio, ingresoBruto) {
@@ -752,6 +869,18 @@ export const RentabilidadComponent = {
         });
 
         // Renderizar cada proveedor desglosado en la tabla de costos auditados
+        const todayModal = new Date();
+        todayModal.setHours(0,0,0,0);
+        let dateViajeModal = parseSpanishDate(this.currentFecha);
+        const parts = this.currentFecha.split(/\s+al\s+/i);
+        if (parts.length === 2) {
+            const parsedEnd = parseSpanishDate(parts[1].trim());
+            if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+                dateViajeModal = parsedEnd;
+            }
+        }
+        const isPastTrip = dateViajeModal && !isNaN(dateViajeModal.getTime()) && dateViajeModal < todayModal;
+
         const provsList = Object.values(aggregatedProvs);
         if (provsList.length === 0) {
             list.innerHTML += `
@@ -766,15 +895,79 @@ export const RentabilidadComponent = {
                 </tr>`;
         } else {
             provsList.forEach(ap => {
+                let badgeHtml = '';
+                let paymentsHtml = '';
+                
+                if (!isPastTrip) {
+                    const payments = (DataService.proveedores_pagos_salidas || []).filter(p => 
+                        p.plan_id === this.currentPlanId && 
+                        p.fecha_viaje === this.currentFecha && 
+                        p.nombre_proveedor.toLowerCase() === ap.nombre.toLowerCase()
+                    );
+                    const totalAbonadoProv = payments.reduce((sum, p) => sum + parseFloat(p.monto || 0), 0);
+                    
+                    let badgeClass = 'bg-red-50 text-red-700 border-red-200';
+                    let statusText = 'Sin Pago';
+                    if (totalAbonadoProv >= ap.costoTotal && ap.costoTotal > 0) {
+                        badgeClass = 'bg-green-50 text-green-700 border-green-200';
+                        statusText = 'Pagado';
+                    } else if (totalAbonadoProv > 0) {
+                        badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+                        statusText = 'Pago Parcial';
+                    }
+                    
+                    badgeHtml = `<span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${badgeClass} ml-2 inline-block">
+                        ${statusText} (${formatCOP(totalAbonadoProv)} de ${formatCOP(ap.costoTotal)})
+                    </span>`;
+                    
+                    if (payments.length > 0) {
+                        paymentsHtml = `<div class="mt-2 space-y-1.5 pl-3 border-l-2 border-slate-200">`;
+                        payments.forEach(p => {
+                            const sopUrl = p.soporte_url 
+                                ? `<img src="${p.soporte_url}" alt="Comprobante" data-action="open-lightbox" data-url="${p.soporte_url}" class="w-10 h-7 object-cover rounded cursor-pointer border border-amber-200 shadow-sm hover:scale-105 transition-all">`
+                                : `<span class="text-slate-300 text-[8px] italic flex items-center shrink-0"><i class="ph ph-warning-circle mr-0.5"></i> Sin Foto</span>`;
+
+                            const IS_ADMIN = window.AuthModule?.userProfile?.rol === 'administrador' || window.AuthModule?.userProfile?.rol === 'super_administrador';
+                            const hoursSinceCreated = (new Date() - new Date(p.created_at)) / (1000 * 60 * 60);
+                            const isFrozen = !IS_ADMIN && hoursSinceCreated > 48;
+                            
+                            let deleteBtn = '';
+                            if (isFrozen) {
+                                deleteBtn = '<i class="ph ph-lock text-slate-300 text-xs" title="Bloqueado por antigüedad (48h)"></i>';
+                            } else {
+                                deleteBtn = `<button data-action="delete-pago" data-pago-id="${p.id}" class="text-red-400 hover:text-red-600 p-0.5"><i class="ph ph-trash text-xs pointer-events-none"></i></button>`;
+                            }
+
+                            paymentsHtml += `
+                                <div class="flex items-center justify-between text-[9px] bg-slate-100/50 p-1.5 rounded border border-slate-200/20">
+                                    <div class="flex items-center gap-2 truncate">
+                                        <span class="font-black text-slate-600">${formatCOP(p.monto)}</span>
+                                        <span class="text-slate-400">por ${p.usuario_email || 'Staff'}</span>
+                                        ${p.justificacion ? `<span class="text-slate-500 italic truncate max-w-[120px]" title="${p.justificacion}">"${p.justificacion}"</span>` : ''}
+                                    </div>
+                                    <div class="flex items-center gap-1.5 shrink-0 ml-2">
+                                        ${sopUrl}
+                                        ${deleteBtn}
+                                    </div>
+                                </div>`;
+                        });
+                        paymentsHtml += `</div>`;
+                    }
+                }
+
                 list.innerHTML += `
                     <tr class="bg-slate-50 border-b border-slate-100">
-                        <td class="py-3 px-4"><span class="bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2 py-0.5 rounded">Matriz Base</span></td>
-                        <td class="py-3 px-4">
-                            <p class="text-xs font-bold text-slate-700">${UI.sanitize(ap.nombre)}</p>
+                        <td class="py-3 px-4 align-top"><span class="bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2 py-0.5 rounded">Matriz Base</span></td>
+                        <td class="py-3 px-4 align-top">
+                            <div class="flex items-center flex-wrap gap-1">
+                                <p class="text-xs font-bold text-slate-700">${UI.sanitize(ap.nombre)}</p>
+                                ${badgeHtml}
+                            </div>
                             <span class="text-[9px] text-slate-500 block mt-0.5">${UI.sanitize(ap.incluye)} — ${formatCOP(ap.costoUnitario)} x ${ap.paxCount} Pax</span>
+                            ${paymentsHtml}
                         </td>
-                        <td class="py-3 px-4 text-right font-black text-slate-800">${formatCOP(ap.costoTotal)}</td>
-                        <td class="py-3 px-4 text-center"><i class="ph ph-lock-key text-slate-300"></i></td>
+                        <td class="py-3 px-4 text-right font-black text-slate-800 align-top">${formatCOP(ap.costoTotal)}</td>
+                        <td class="py-3 px-4 text-center align-top"><i class="ph ${isPastTrip ? 'ph-lock-key' : 'ph-check-circle'} text-slate-300"></i></td>
                     </tr>`;
             });
         }

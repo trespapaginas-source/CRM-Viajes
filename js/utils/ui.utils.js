@@ -248,6 +248,7 @@ export function promptGlobalDelete(id, type, name, extra = '') {
     if (type === 'proveedor') message = "Se eliminará este proveedor y todo su catálogo de servicios de la base de datos.";
     if (type === 'abono') message = "Se eliminará este abono registrado. El saldo del cliente se recalculará automáticamente.";
     if (type === 'gasto_salida') message = "Se eliminará este gasto operativo. Los reportes de rentabilidad y costos se verán afectados.";
+    if (type === 'proveedor_pago_salida') message = "Se eliminará este abono a proveedor de Matriz Base. Los balances de caja y conciliación se verán afectados.";
     if (type === 'gasto_corporativo') message = "Se eliminará este gasto de la corporación / sociedad.";
     if (type === 'socio_movimiento') message = "Se eliminará este movimiento o retiro de socio.";
 
@@ -300,6 +301,9 @@ export async function executeGlobalDelete() {
         } else if (type === 'gasto_salida') {
             await window.DataService.deleteGastoSalida(id, motivo);
             UI.showToast("Gasto operativo eliminado correctamente.", "success");
+        } else if (type === 'proveedor_pago_salida') {
+            await window.DataService.deleteProveedorPagoSalida(id, motivo);
+            UI.showToast("Pago de proveedor eliminado correctamente.", "success");
         } else if (type === 'gasto_corporativo') {
             await window.DataService.deleteGastoCorporativo(id, motivo);
             UI.showToast("Gasto corporativo de socio eliminado correctamente.", "success");

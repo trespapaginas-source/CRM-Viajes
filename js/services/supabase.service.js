@@ -29,6 +29,7 @@ export const DataService = {
     documentos_guardados: [],
     alertas_gestionadas: [],
     proveedores_liquidaciones: [],
+    proveedores_pagos_salidas: [],
     db: {
         categories: ["Operador Turístico", "Alojamiento / Hotelería", "Transporte Especial", "Aseguradora Integral", "Restaurante y Eventos", "Guianza Local"],
         destinos: ["Barranquilla", "Cartagena", "Quindío", "Santa Marta", "La Guajira", "San Andrés"]
@@ -148,6 +149,20 @@ export const DataService = {
             console.warn("Table 'proveedores_liquidaciones' is missing or inaccessible. Fallback applied.", err);
         }
 
+        this.proveedores_pagos_salidas = [];
+        try {
+            const { data, error } = await supabaseClient
+                .from('proveedores_pagos_salidas')
+                .select('*')
+                .is('deleted_at', null)
+                .order('created_at', { ascending: false });
+            if (!error && data) {
+                this.proveedores_pagos_salidas = data;
+            }
+        } catch (err) {
+            console.warn("Table 'proveedores_pagos_salidas' is missing or inaccessible. Fallback applied.", err);
+        }
+
         Store.setState({
             planes: this.planes,
             clientes: this.clientes,
@@ -163,6 +178,7 @@ export const DataService = {
             documentos_guardados: this.documentos_guardados,
             alertas_gestionadas: this.alertas_gestionadas,
             proveedores_liquidaciones: this.proveedores_liquidaciones,
+            proveedores_pagos_salidas: this.proveedores_pagos_salidas,
             limitWarnings: limitWarnings,
             historyTableMissing: historyTableMissing
         });
@@ -1124,6 +1140,18 @@ export const DataService = {
             const monto = gasto ? gasto.costo : 0;
             await this.registrarHistorial(null, 'Gasto Operativo Eliminado (Soft Delete)', `Concepto: ${concepto} | Monto: ${monto}`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { gasto_salida_id: id, motivo_eliminacion: motivo });
             const { error } = await supabaseClient.from('gastos_salidas').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
+            if (error) throw error;
+            await this.loadAll();
+        } catch (e) { throw e; }
+    },
+    async deleteProveedorPagoSalida(id, motivo) {
+        try {
+            const user = window.AuthModule?.currentUser?.email || 'Desconocido';
+            const pago = this.proveedores_pagos_salidas.find(p => p.id === id);
+            const proveedor = pago ? pago.nombre_proveedor : id;
+            const monto = pago ? pago.monto : 0;
+            await this.registrarHistorial(null, 'Pago a Proveedor Eliminado (Soft Delete)', `Proveedor: ${proveedor} | Monto: ${monto}`, `Movido a la Papelera. Motivo: ${motivo}`, 'ELIMINACION', { proveedor_pago_salida_id: id, motivo_eliminacion: motivo });
+            const { error } = await supabaseClient.from('proveedores_pagos_salidas').update({ deleted_at: new Date().toISOString(), deleted_by: user, motivo_eliminacion: motivo }).eq('id', id);
             if (error) throw error;
             await this.loadAll();
         } catch (e) { throw e; }

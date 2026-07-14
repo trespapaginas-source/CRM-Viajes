@@ -3106,7 +3106,21 @@ export const PartnersComponent = {
             .filter(f => f.estado === 'disponible')
             .reduce((sum, f) => sum + (Number(f.monto) || 0), 0) - pendingFloatExpenses;
 
-        const cajaTeorica = balanceFondo + totalSociosDisponible + totalFloatPool;
+        // Calcular egresos de caja por pagos realizados a proveedores para viajes futuros
+        const totalPagosFuturos = (DataService.proveedores_pagos_salidas || [])
+            .filter(p => {
+                if (p.deleted_at) return false;
+                let d = null;
+                if (p.fecha_viaje) {
+                    const parts = p.fecha_viaje.split(/\s+al\s+/i);
+                    const parseStr = parts.length === 2 ? parts[1].trim() : p.fecha_viaje;
+                    d = parseSpanishDate(parseStr);
+                }
+                return d && d > hoy;
+            })
+            .reduce((sum, p) => sum + parseFloat(p.monto || 0), 0);
+
+        const cajaTeorica = balanceFondo + totalSociosDisponible + totalFloatPool - totalPagosFuturos;
         const liquidezLibre = cajaTeorica - totalTransito - totalVouchers;
 
         // Render KPI Texts
@@ -3542,8 +3556,23 @@ export const PartnersComponent = {
         };
 
         try {
-            const { data, error } = await supabaseClient.from('adelantos_operativos').insert([payload]).select();
-            if (error) throw error;
+            let data = null;
+            let insertRes = await supabaseClient.from('adelantos_operativos').insert([payload]).select();
+            if (insertRes.error) {
+                // Fallback robusto si la columna distribuir_grupo no existe aún en la base de datos del usuario
+                if (insertRes.error.code === 'PGRST204' || (insertRes.error.message && insertRes.error.message.includes('distribuir_grupo'))) {
+                    console.warn("La columna 'distribuir_grupo' no existe en la tabla 'adelantos_operativos'. Reintentando inserción omitiendo esta propiedad...");
+                    const fallbackPayload = { ...payload };
+                    delete fallbackPayload.distribuir_grupo;
+                    const retryRes = await supabaseClient.from('adelantos_operativos').insert([fallbackPayload]).select();
+                    if (retryRes.error) throw retryRes.error;
+                    data = retryRes.data;
+                } else {
+                    throw insertRes.error;
+                }
+            } else {
+                data = insertRes.data;
+            }
 
             UI.showToast(isAdmin ? "Adelanto operativo registrado con éxito." : "Solicitud de adelanto enviada correctamente.", "success");
             
