@@ -1690,7 +1690,7 @@ export const PartnersComponent = {
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                     .reduce((acc, m) => acc + m.monto, 0);
                 
-                const disponible = (ganadoHistorico + reserveShare) - totalRetirado;
+                const disponible = ganadoHistorico - totalRetirado;
 
                 const ganadoFormat = puedeVerDinero ? formatCOP(ganadoHistorico) : '***';
                 const reserveShareFormat = puedeVerDinero ? formatCOP(reserveShare) : '***';
@@ -1835,7 +1835,7 @@ export const PartnersComponent = {
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase() && m.fecha.substring(0, 7) === this.selectedSaldosMonth)
                     .reduce((acc, m) => acc + m.monto, 0);
                 
-                const disponibleMonth = (ganadoMonth + reserveShareMonth) - totalRetiradoMonth;
+                const disponibleMonth = ganadoMonth - totalRetiradoMonth;
 
                 const ganadoFormat = puedeVerDinero ? formatCOP(ganadoMonth) : '***';
                 const reserveShareFormat = puedeVerDinero ? formatCOP(reserveShareMonth) : '***';
@@ -1872,7 +1872,7 @@ export const PartnersComponent = {
 
                 let progressHtml = '';
                 if (puedeVerDinero) {
-                    const totalCupo = ganadoMonth + reserveShareMonth;
+                    const totalCupo = ganadoMonth;
                     if (totalCupo > 0) {
                         const pct = Math.min(100, Math.round((totalRetiradoMonth / totalCupo) * 100));
                         const isExceeded = totalRetiradoMonth > totalCupo;
