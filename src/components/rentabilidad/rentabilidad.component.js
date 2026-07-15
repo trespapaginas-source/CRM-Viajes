@@ -286,9 +286,9 @@ export const RentabilidadComponent = {
                 let dateViaje = parseSpanishDate(data.fecha_viaje);
                 const parts = data.fecha_viaje.split(/\s+al\s+/i);
                 if (parts.length === 2) {
-                    const parsedEnd = parseSpanishDate(parts[1].trim());
-                    if (parsedEnd && !isNaN(parsedEnd.getTime())) {
-                        dateViaje = parsedEnd;
+                    const parsedStart = parseSpanishDate(parts[0].trim());
+                    if (parsedStart && !isNaN(parsedStart.getTime())) {
+                        dateViaje = parsedStart;
                     }
                 }
                 if (dateViaje && !isNaN(dateViaje.getTime()) && dateViaje < today) {
@@ -446,9 +446,9 @@ export const RentabilidadComponent = {
         let dateViajeModal = parseSpanishDate(fecha);
         const parts = fecha.split(/\s+al\s+/i);
         if (parts.length === 2) {
-            const parsedEnd = parseSpanishDate(parts[1].trim());
-            if (parsedEnd && !isNaN(parsedEnd.getTime())) {
-                dateViajeModal = parsedEnd;
+            const parsedStart = parseSpanishDate(parts[0].trim());
+            if (parsedStart && !isNaN(parsedStart.getTime())) {
+                dateViajeModal = parsedStart;
             }
         }
         const isPastTrip = dateViajeModal && !isNaN(dateViajeModal.getTime()) && dateViajeModal < todayModal;
@@ -874,9 +874,9 @@ export const RentabilidadComponent = {
         let dateViajeModal = parseSpanishDate(this.currentFecha);
         const parts = this.currentFecha.split(/\s+al\s+/i);
         if (parts.length === 2) {
-            const parsedEnd = parseSpanishDate(parts[1].trim());
-            if (parsedEnd && !isNaN(parsedEnd.getTime())) {
-                dateViajeModal = parsedEnd;
+            const parsedStart = parseSpanishDate(parts[0].trim());
+            if (parsedStart && !isNaN(parsedStart.getTime())) {
+                dateViajeModal = parsedStart;
             }
         }
         const isPastTrip = dateViajeModal && !isNaN(dateViajeModal.getTime()) && dateViajeModal < todayModal;

@@ -684,7 +684,7 @@ export const PartnersComponent = {
                 let parseStr = c.fecha_viaje;
                 if (p && p.fechas) {
                     const objF = p.fechas.find(f => formatShortDate(f.start) === c.fecha_viaje || `${formatShortDate(f.start)} al ${formatShortDate(f.end)}` === c.fecha_viaje);
-                    if (objF && objF.end) parseStr = formatShortDate(objF.end);
+                    if (objF && objF.start) parseStr = formatShortDate(objF.start);
                 }
                 let d = parseSpanishDate(parseStr);
                 if (!d || isNaN(d.getTime())) d = new Date();
