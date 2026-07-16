@@ -351,6 +351,13 @@ export const PartnersComponent = {
             });
         }
 
+        const monthFondosFilter = document.getElementById('pvm-fondos-filtro-mes');
+        if (monthFondosFilter) {
+            monthFondosFilter.addEventListener('change', () => {
+                this.renderFondosFlotantesList();
+            });
+        }
+
         const adelantoFileInput = document.getElementById('pvm-adelanto-comprobante');
         if (adelantoFileInput) {
             adelantoFileInput.addEventListener('change', (e) => {
@@ -4011,6 +4018,35 @@ export const PartnersComponent = {
             dateReg.value = new Date().toISOString().substring(0, 10);
         }
 
+        // Populate month filter dropdown if empty or has only "Todos"
+        const monthFilter = document.getElementById('pvm-fondos-filtro-mes');
+        if (monthFilter && monthFilter.options.length <= 1) {
+            monthFilter.innerHTML = '<option value="todos">Todos los meses</option>';
+            
+            const startDate = new Date('2026-04-01T00:00:00');
+            const endDate = new Date();
+            let curr = new Date(startDate);
+            const months = [];
+            while (curr <= endDate) {
+                const y = curr.getFullYear();
+                const m = String(curr.getMonth() + 1).padStart(2, '0');
+                months.push({
+                    ym: `${y}-${m}`,
+                    label: curr.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+                });
+                curr.setMonth(curr.getMonth() + 1);
+            }
+            
+            months.reverse().forEach(m => {
+                const capitalizedLabel = m.label.charAt(0).toUpperCase() + m.label.slice(1);
+                monthFilter.innerHTML += `<option value="${m.ym}">${capitalizedLabel}</option>`;
+            });
+            
+            // Default to current month
+            const currentYM = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+            monthFilter.value = currentYM;
+        }
+
         // Compute KPIs
         const activeFondos = (this.fondosFlotantes || []).filter(f => !f.deleted_at);
         const totalActivos = activeFondos.reduce((sum, f) => sum + (Number(f.monto) || 0), 0);
@@ -4039,11 +4075,13 @@ export const PartnersComponent = {
 
     renderFondosFlotantesList() {
         const statusFilter = document.getElementById('pvm-fondos-filtro-estado')?.value || 'todos';
+        const monthFilter = document.getElementById('pvm-fondos-filtro-mes')?.value || 'todos';
         const activeFondos = (this.fondosFlotantes || []).filter(f => !f.deleted_at);
 
         const filtered = activeFondos.filter(f => {
-            if (statusFilter === 'todos') return true;
-            return f.estado === statusFilter;
+            const matchesStatus = statusFilter === 'todos' || f.estado === statusFilter;
+            const matchesMonth = monthFilter === 'todos' || (f.fecha_registro && f.fecha_registro.substring(0, 7) === monthFilter);
+            return matchesStatus && matchesMonth;
         });
 
         const countEl = document.getElementById('pvm-fondos-count');
@@ -4083,13 +4121,17 @@ export const PartnersComponent = {
                     actionBtns = `<span class="text-slate-300 text-[10px]">-</span>`;
                 }
 
+                // Format dates to DD/MM/YYYY for perfect spacing and alignment
+                const dateRegFormatted = f.fecha_registro ? f.fecha_registro.split('-').reverse().join('/') : '-';
+                const dateLimFormatted = f.fecha_limite ? f.fecha_limite.split('-').reverse().join('/') : '-';
+
                 tb.innerHTML += `
                     <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="py-2 px-3 whitespace-nowrap text-[11px] font-medium text-slate-500">${formatShortDate(f.fecha_registro)}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-[11px] font-bold text-slate-600">${dateRegFormatted}</td>
                         <td class="py-2 px-3 text-[11px] font-black text-slate-800">${UI.sanitize(f.cliente_nombre)}</td>
                         <td class="py-2 px-3 text-[11px] text-slate-600 max-w-[200px] truncate" title="${UI.sanitize(f.plan_nombre)}">${UI.sanitize(f.plan_nombre)}</td>
                         <td class="py-2 px-3 whitespace-nowrap text-right text-[11px] font-black text-slate-800">${isAdmin ? formatCOP(f.monto) : '***'}</td>
-                        <td class="py-2 px-3 whitespace-nowrap text-[11px] font-bold text-rose-500">${formatShortDate(f.fecha_limite)}</td>
+                        <td class="py-2 px-3 whitespace-nowrap text-[11px] font-bold text-rose-500">${dateLimFormatted}</td>
                         <td class="py-2 px-3 whitespace-nowrap text-center">${statusBadge}</td>
                         <td class="py-2 px-3 whitespace-nowrap text-center">${actionBtns}</td>
                     </tr>
