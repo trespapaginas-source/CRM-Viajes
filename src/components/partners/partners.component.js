@@ -190,17 +190,7 @@ export const PartnersComponent = {
                 if (totalDisp <= 0) {
                     UI.showToast("No tienes saldo disponible para retirar.", "error");
                 } else {
-                    const monto = prompt(`¿Cuánto deseas retirar del saldo global acumulado (Disponible: ${formatCOP(totalDisp)})?`, String(Math.floor(totalDisp)));
-                    if (monto !== null) {
-                        const parsedMonto = UI.parseCurrency(monto);
-                        if (isNaN(parsedMonto) || parsedMonto <= 0) {
-                            UI.showToast("El monto ingresado no es válido.", "error");
-                        } else if (parsedMonto > totalDisp) {
-                            UI.showToast(`No puedes retirar más del saldo disponible (${formatCOP(totalDisp)}).`, "error");
-                        } else {
-                            this.handleGlobalWithdrawal(email, parsedMonto);
-                        }
-                    }
+                    this.openMovimientoModal(email, 'retiro_global');
                 }
             } else if (action === 'filter-partner-withdrawals') {
                 this.filterPartnerWithdrawals(target.dataset.email);
@@ -1062,12 +1052,26 @@ export const PartnersComponent = {
                 .is('deleted_at', null)
                 .order('fecha', { ascending: false });
             if (error) throw error;
-            this.movements = data || [];
+
+            // Auto-clean any legacy FIFO auto-split movements if found
+            const cleanData = (data || []).filter(m => !m.concepto || !m.concepto.includes('FIFO'));
+            const fifoMovs = (data || []).filter(m => m.concepto && m.concepto.includes('FIFO'));
+            if (fifoMovs.length > 0) {
+                const fifoIds = fifoMovs.map(m => m.id);
+                supabaseClient.from('socios_movimientos')
+                    .update({ deleted_at: new Date().toISOString(), deleted_by: 'sistema_limpieza_fifo' })
+                    .in('id', fifoIds)
+                    .then(() => console.log('Auto-cleaned legacy FIFO movements:', fifoIds))
+                    .catch(err => console.error('Error cleaning FIFO movements:', err));
+            }
+
+            this.movements = cleanData;
             this.fallbackActive = false;
         } catch (e) {
             console.warn('Supabase fallback for movements:', e);
             const local = localStorage.getItem('trv_socios_movimientos');
-            this.movements = local ? JSON.parse(local) : [];
+            const parsed = local ? JSON.parse(local) : [];
+            this.movements = parsed.filter(m => !m.concepto || !m.concepto.includes('FIFO'));
             this.fallbackActive = true;
         }
     },
@@ -1177,7 +1181,7 @@ export const PartnersComponent = {
             const balanceF = histUB > histGC 
                 ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
                 : -(histGC - histUB);
-            const cajaTeoricaPre = balanceF + totalSociosDisp;
+            const cajaTeoricaPre = balanceF + totalSociosDisp + totalFloatPool;
 
             if ((cajaTeoricaPre - totalWithdrawal) < totalFloatPool) {
                 return UI.showToast(`Operación bloqueada: Mantener el fondo de clientes en custodia requiere un respaldo de ${formatCOP(totalFloatPool)} en caja. Caja estimada restante: ${formatCOP(cajaTeoricaPre - totalWithdrawal)}.`, "error");
@@ -2478,46 +2482,57 @@ export const PartnersComponent = {
         const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
         const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
 
-        // Net Profit & Reserve of the month
-        let monthUN = 0;
-        let monthRetencionFondo = 0;
-        if (monthUB >= monthFixedGC) {
-            const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
-            monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
-            monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
+        // Global Realized calculations
+        const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
+        const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+        const histGC = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
+            .reduce((acc, g) => acc + g.monto, 0);
+        const histGC_Reserva = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Fondo de Reserva')
+            .reduce((acc, g) => acc + g.monto, 0);
+
+        let histUN = 0;
+        let histRetenidoFondo = 0;
+        if (histUB > histGC) {
+            const histUN_Operacion = histUB - histGC;
+            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
+            histUN = histUN_Operacion - histRetenidoFondo;
         }
 
-        const ganadoMonth = monthUN * (partner.porcentaje / 100);
-        const reserveShareMonth = monthRetencionFondo * (partner.porcentaje / 100);
-        const totalRetiradoMonth = this.movements
-            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase() && m.fecha.substring(0, 7) === this.selectedSaldosMonth)
+        const ganadoGlobal = histUN * (partner.porcentaje / 100);
+        const totalRetiradoGlobal = this.movements
+            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
             .reduce((acc, m) => acc + m.monto, 0);
-        
-        const disponible = (ganadoMonth + reserveShareMonth) - totalRetiradoMonth;
+
+        const disponibleGlobal = ganadoGlobal - totalRetiradoGlobal;
 
         document.getElementById('pvm-mov-socio-email').value = partner.email;
         document.getElementById('pvm-mov-tipo').value = tipo;
         document.getElementById('pvm-mov-socio-nombre').value = partner.nombre;
-        document.getElementById('pvm-mov-tipo-texto').value = tipo === 'corte' ? 'Corte de Caja (Retiro de Caja/Control)' : 'Retiro de Utilidades';
-        document.getElementById('pvm-mov-saldo-disponible').value = formatCOP(disponible);
-
-        const dateInput = document.getElementById('pvm-mov-fecha');
-        const currentYM = new Date().toISOString().substring(0, 7);
-        if (this.selectedSaldosMonth === currentYM) {
-            dateInput.value = new Date().toISOString().substring(0, 10);
-            dateInput.disabled = false;
+        
+        if (tipo === 'corte') {
+            document.getElementById('pvm-mov-tipo-texto').value = 'Corte de Caja (Retiro de Caja/Control)';
+        } else if (tipo === 'retiro_global') {
+            document.getElementById('pvm-mov-tipo-texto').value = 'Retiro Total Express / Saldo Global';
         } else {
-            dateInput.value = endM.toISOString().substring(0, 10);
-            dateInput.disabled = true; // force the date to be the end of that selected month
+            document.getElementById('pvm-mov-tipo-texto').value = 'Retiro de Utilidades';
         }
+
+        document.getElementById('pvm-mov-saldo-disponible').value = formatCOP(disponibleGlobal);
+
+        // Date input MUST ALWAYS be enabled and editable!
+        const dateInput = document.getElementById('pvm-mov-fecha');
+        dateInput.value = new Date().toISOString().substring(0, 10);
+        dateInput.disabled = false;
         
         const montoInput = document.getElementById('pvm-mov-monto');
-        if (tipo === 'corte') {
-            UI.setCurrencyValue('pvm-mov-monto', Math.floor(disponible));
+        if (tipo === 'corte' || tipo === 'retiro_global') {
+            UI.setCurrencyValue('pvm-mov-monto', Math.max(0, Math.floor(disponibleGlobal)));
         } else {
             montoInput.value = '';
         }
-        document.getElementById('pvm-mov-concepto').value = '';
+        document.getElementById('pvm-mov-concepto').value = tipo === 'retiro_global' ? 'Retiro de Utilidades (Global)' : (tipo === 'corte' ? 'Corte de caja' : '');
 
         UI.openModal('pvm-movimiento-modal', 'pvm-mov-bg', 'pvm-mov-content');
     },
@@ -2526,8 +2541,9 @@ export const PartnersComponent = {
         const email = document.getElementById('pvm-mov-socio-email').value;
         const tipo = document.getElementById('pvm-mov-tipo').value;
         const monto = UI.parseCurrency(document.getElementById('pvm-mov-monto').value) || 0;
-        const fecha = document.getElementById('pvm-mov-fecha').value;
-        const concepto = document.getElementById('pvm-mov-concepto').value;
+        const fecha = document.getElementById('pvm-mov-fecha').value || new Date().toISOString().substring(0, 10);
+        const conceptoInput = document.getElementById('pvm-mov-concepto').value.trim();
+        const concepto = conceptoInput || (tipo === 'corte' ? 'Corte de caja' : 'Retiro de Utilidades');
 
         if (monto <= 0) {
             return UI.showToast("El monto debe ser mayor a cero.", "error");
@@ -2548,53 +2564,6 @@ export const PartnersComponent = {
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
 
-        // Selected Month calculations
-        const [ySelected, mSelected] = this.selectedSaldosMonth.split('-').map(Number);
-        const startM = new Date(ySelected, mSelected - 1, 1);
-        const endM = new Date(ySelected, mSelected, 0, 23, 59, 59, 999);
-
-        // Monthly Realized margins
-        const monthRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-        const monthUB = monthRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-        // Filter month corporate expenses applying the recurrence rule
-        const monthExpenses = this.corporateExpenses.filter(g => {
-            const date = new Date(g.fecha);
-            const isCreatedBeforeOrInMonth = date <= endM;
-            const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
-            
-            if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
-            
-            if (g.es_recurrente) return true;
-            return date >= startM && date <= endM;
-        });
-
-        // Split corporate expenses of this month
-        const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-        const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-        // Net Profit & Reserve of the month
-        let monthUN = 0;
-        let monthRetencionFondo = 0;
-        if (monthUB >= monthFixedGC) {
-            const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
-            monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
-            monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
-        }
-
-        const ganadoMonth = monthUN * (partner.porcentaje / 100);
-        const reserveShareMonth = monthRetencionFondo * (partner.porcentaje / 100);
-        const totalRetiradoMonth = this.movements
-            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase() && m.fecha.substring(0, 7) === this.selectedSaldosMonth)
-            .reduce((acc, m) => acc + m.monto, 0);
-        
-        const disponible = (ganadoMonth + reserveShareMonth) - totalRetiradoMonth;
-
-        if (monto > disponible + 0.01) {
-            return UI.showToast(`Fondos insuficientes. El socio sólo tiene disponible ${formatCOP(disponible)} en este mes.`, "error");
-        }
-
-        // Global check for float pool safety (uses global variables)
         // Historical Realized margins (global)
         const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
         const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
@@ -2615,6 +2584,17 @@ export const PartnersComponent = {
             const histUN_Operacion = histUB - histGC;
             histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
             histUN = histUN_Operacion - histRetenidoFondo;
+        }
+
+        const ganadoGlobal = histUN * (partner.porcentaje / 100);
+        const totalRetiradoGlobal = this.movements
+            .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
+            .reduce((acc, m) => acc + m.monto, 0);
+        
+        const disponibleGlobal = ganadoGlobal - totalRetiradoGlobal;
+
+        if (monto > disponibleGlobal + 0.01) {
+            return UI.showToast(`Fondos insuficientes. El socio sólo tiene disponible ${formatCOP(disponibleGlobal)} en su saldo acumulado.`, "error");
         }
 
         // Bloqueo de retiros si comprometen fondos flotantes
@@ -2651,13 +2631,14 @@ export const PartnersComponent = {
         const balanceF = histUB > histGC 
             ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
             : -(histGC - histUB);
-        const cajaTeoricaPre = balanceF + totalSociosDisp;
+        const cajaTeoricaPre = balanceF + totalSociosDisp + totalFloatPool;
 
-        if (tipo === 'retiro' && (cajaTeoricaPre - monto) < totalFloatPool) {
+        if ((tipo === 'retiro' || tipo === 'retiro_global') && (cajaTeoricaPre - monto) < totalFloatPool) {
             return UI.showToast(`Operación bloqueada: Mantener el fondo de clientes en custodia requiere un respaldo de ${formatCOP(totalFloatPool)} en caja. Caja estimada restante: ${formatCOP(cajaTeoricaPre - monto)}.`, "error");
         }
 
-        const res = await this.saveMovement(email, tipo, monto, fecha, concepto);
+        const tipoMovimiento = tipo === 'corte' ? 'corte' : 'retiro';
+        const res = await this.saveMovement(email, tipoMovimiento, monto, fecha, concepto);
         if (res.success) {
             UI.showToast(`Movimiento registrado con éxito.`, "success");
             UI.closeModal('pvm-movimiento-modal', 'pvm-mov-bg', 'pvm-mov-content');
