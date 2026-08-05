@@ -1980,16 +1980,8 @@ export const PartnersComponent = {
         const histFilter = document.getElementById('pvm-history-filter-partner');
         const selectedEmail = histFilter ? histFilter.value : 'todos';
 
-        // Filter movements by global date range too
-        const strStart = document.getElementById('pvm-date-start')?.value;
-        const strEnd = document.getElementById('pvm-date-end')?.value;
-        const dateStart = strStart ? new Date(`${strStart}T00:00:00`) : new Date('2020-01-01T00:00:00');
-        const dateEnd = strEnd ? new Date(`${strEnd}T23:59:59`) : new Date('2099-12-31T23:59:59');
-
-        let filtered = this.movements.filter(m => {
-            const d = new Date(`${m.fecha}T00:00:00`);
-            return d >= dateStart && d <= dateEnd;
-        });
+        // Historial de movimientos siempre muestra todos los movimientos globales (o los del socio seleccionado)
+        let filtered = [...this.movements];
 
         if (selectedEmail !== 'todos') {
             filtered = filtered.filter(m => m.socio_email.toLowerCase() === selectedEmail.toLowerCase());
