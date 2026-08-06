@@ -1179,18 +1179,58 @@ export const PartnersComponent = {
                 .filter(g => g.origen_fondos === 'Fondo de Reserva')
                 .reduce((acc, g) => acc + g.monto, 0);
 
-            let histUN = 0;
-            let histRetenidoFondo = 0;
-            if (histUB > histGC) {
-                const histUN_Operacion = histUB - histGC;
-                histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
-                histUN = histUN_Operacion - histRetenidoFondo;
+            // Calculate historical realized net profit and reserve share per socio month by month
+            const globalPartnerGanado = {};
+            const globalPartnerReserve = {};
+            this.sociosConfig.forEach(s => {
+                globalPartnerGanado[s.email.toLowerCase()] = 0;
+                globalPartnerReserve[s.email.toLowerCase()] = 0;
+            });
+
+            const startHistDate = new Date('2026-04-01T00:00:00');
+            let currM = new Date(startHistDate);
+            while (currM <= hoy) {
+                const y = currM.getFullYear();
+                const m = String(currM.getMonth() + 1).padStart(2, '0');
+                const ym = `${y}-${m}`;
+                const [ySel, mSel] = ym.split('-').map(Number);
+                const startM = new Date(ySel, mSel - 1, 1);
+                const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
+
+                const mRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
+                const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+
+                const mExpenses = this.corporateExpenses.filter(g => {
+                    if (g.deleted_at) return false;
+                    if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
+                    const date = new Date(g.fecha);
+                    return date >= startM && date <= endM;
+                });
+
+                const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+                const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+
+                let mUN = 0;
+                let mRetencionFondo = 0;
+                if (mUB >= mFixedGC) {
+                    const mUN_Operacion = mUB - mFixedGC - mVariableGC;
+                    mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
+                    mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
+                }
+
+                this.sociosConfig.forEach(soc => {
+                    const pct = this.getPartnerPorcentaje(soc.email, ym);
+                    globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
+                    globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
+                });
+
+                currM.setMonth(currM.getMonth() + 1);
             }
 
             let totalSociosDisp = 0;
             this.sociosConfig.forEach(soc => {
-                const ganado = histUN * (soc.porcentaje / 100);
-                const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+                const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
+                const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
                 const retirado = this.movements
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                     .reduce((acc, m) => acc + m.monto, 0);
@@ -1199,8 +1239,8 @@ export const PartnersComponent = {
 
             let totalReservaUtilizada = 0;
             this.sociosConfig.forEach(soc => {
-                const ganado = histUN * (soc.porcentaje / 100);
-                const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+                const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
+                const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
                 const retirado = this.movements
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                     .reduce((acc, m) => acc + m.monto, 0);
@@ -2739,8 +2779,8 @@ export const PartnersComponent = {
             
         let totalSociosDisp = 0;
         this.sociosConfig.forEach(soc => {
-            const ganado = histUN * (soc.porcentaje / 100);
-            const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+            const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
+            const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
             const retirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
@@ -2749,8 +2789,8 @@ export const PartnersComponent = {
 
         let totalReservaUtilizada = 0;
         this.sociosConfig.forEach(soc => {
-            const ganado = histUN * (soc.porcentaje / 100);
-            const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+            const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
+            const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
             const retirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
@@ -3181,18 +3221,61 @@ export const PartnersComponent = {
             .filter(g => g.origen_fondos === 'Fondo de Reserva')
             .reduce((acc, g) => acc + g.monto, 0);
         
-        let histUN = 0;
-        let histRetenidoFondo = 0;
-        if (histUB > histGC) {
-            const histUN_Operacion = histUB - histGC;
-            histRetenidoFondo = histUN_Operacion * (this.porcentajeRetencion / 100);
-            histUN = histUN_Operacion - histRetenidoFondo;
+        // Calculate historical realized net profit and reserve share per socio month by month
+        const globalPartnerGanado = {};
+        const globalPartnerReserve = {};
+        let histRetenidoFondoGlobal = 0;
+        this.sociosConfig.forEach(s => {
+            globalPartnerGanado[s.email.toLowerCase()] = 0;
+            globalPartnerReserve[s.email.toLowerCase()] = 0;
+        });
+
+        const startHistDate = new Date('2026-04-01T00:00:00');
+        let currM = new Date(startHistDate);
+        while (currM <= hoy) {
+            const y = currM.getFullYear();
+            const m = String(currM.getMonth() + 1).padStart(2, '0');
+            const ym = `${y}-${m}`;
+            const [ySel, mSel] = ym.split('-').map(Number);
+            const startM = new Date(ySel, mSel - 1, 1);
+            const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
+
+            const mRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
+            const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+
+            const mExpenses = this.corporateExpenses.filter(g => {
+                if (g.deleted_at) return false;
+                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
+                const date = new Date(g.fecha);
+                return date >= startM && date <= endM;
+            });
+
+            const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+            const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+
+            let mUN = 0;
+            let mRetencionFondo = 0;
+            if (mUB >= mFixedGC) {
+                const mUN_Operacion = mUB - mFixedGC - mVariableGC;
+                mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
+                mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
+            }
+
+            histRetenidoFondoGlobal += mRetencionFondo;
+
+            this.sociosConfig.forEach(soc => {
+                const pct = this.getPartnerPorcentaje(soc.email, ym);
+                globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
+                globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
+            });
+
+            currM.setMonth(currM.getMonth() + 1);
         }
 
         let totalSociosDisponible = 0;
         this.sociosConfig.forEach(soc => {
-            const ganadoHistorico = histUN * (soc.porcentaje / 100);
-            const reserveShare = histRetenidoFondo * (soc.porcentaje / 100);
+            const ganadoHistorico = globalPartnerGanado[soc.email.toLowerCase()] || 0;
+            const reserveShare = globalPartnerReserve[soc.email.toLowerCase()] || 0;
             const totalRetirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
@@ -3202,8 +3285,8 @@ export const PartnersComponent = {
 
         let totalReservaUtilizada = 0;
         this.sociosConfig.forEach(soc => {
-            const ganado = histUN * (soc.porcentaje / 100);
-            const reserve = histRetenidoFondo * (soc.porcentaje / 100);
+            const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
+            const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
             const retirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
