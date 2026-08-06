@@ -2722,7 +2722,14 @@ export const PartnersComponent = {
 
         // Net Profit (devengado histórico total applying 10% retention)
         // Calculate historical realized net profit per socio month by month using time-based percentages
-        let ganadoGlobal = 0;
+        const globalPartnerGanado = {};
+        const globalPartnerReserve = {};
+        let histRetenidoFondoGlobal = 0;
+        this.sociosConfig.forEach(s => {
+            globalPartnerGanado[s.email.toLowerCase()] = 0;
+            globalPartnerReserve[s.email.toLowerCase()] = 0;
+        });
+
         const startHistDate = new Date('2026-04-01T00:00:00');
         let currM = new Date(startHistDate);
         while (currM <= hoy) {
@@ -2747,18 +2754,25 @@ export const PartnersComponent = {
             const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
 
             let mUN = 0;
+            let mRetencionFondo = 0;
             if (mUB >= mFixedGC) {
                 const mUN_Operacion = mUB - mFixedGC - mVariableGC;
-                const mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
+                mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
                 mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
             }
 
-            const pct = this.getPartnerPorcentaje(partner.email, ym);
-            ganadoGlobal += mUN * (pct / 100);
+            histRetenidoFondoGlobal += mRetencionFondo;
+
+            this.sociosConfig.forEach(soc => {
+                const pct = this.getPartnerPorcentaje(soc.email, ym);
+                globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
+                globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
+            });
 
             currM.setMonth(currM.getMonth() + 1);
         }
 
+        const ganadoGlobal = globalPartnerGanado[partner.email.toLowerCase()] || 0;
         const totalRetiradoGlobal = this.movements
             .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
             .reduce((acc, m) => acc + m.monto, 0);
@@ -2801,7 +2815,7 @@ export const PartnersComponent = {
         });
 
         const balanceF = histUB > histGC 
-            ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
+            ? Math.max(0, histRetenidoFondoGlobal - histGC_Reserva - totalReservaUtilizada) 
             : -(histGC - histUB);
         const cajaTeoricaPre = balanceF + totalSociosDisp + totalFloatPool;
 
