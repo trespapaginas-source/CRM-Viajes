@@ -78,7 +78,8 @@ export const DashboardComponent = {
 
         const ingresosSalidaMap = {};
         DataService.clientes.forEach(c => {
-            if (c.estado !== 'cancelado o devolución') {
+            const stC = c.estado ? c.estado.toLowerCase() : '';
+            if (!['cancelado o devolución', 'desistió', 'cancelados', 'devolución', 'reprogramado'].includes(stC)) {
                 const key = `${c.plan_id}_${c.fecha_viaje}`;
                 ingresosSalidaMap[key] = (ingresosSalidaMap[key] || 0) + parseFloat(c.precio_total || 0);
             }
@@ -108,28 +109,41 @@ export const DashboardComponent = {
             const clientDate = new Date(cli.created_at);
             const stLower = cli.estado ? cli.estado.toLowerCase() : '';
             const isCancelled = ['cancelado o devolución', 'desistió', 'cancelados'].includes(stLower);
+            const isDevolucion = stLower === 'devolución';
+            const isReprogramado = stLower === 'reprogramado';
 
             // Conteo global
             if (clientDate >= startDate) {
                 totalClientesGeneral++;
-                if (isCancelled) totalCancelados++;
+                if (isCancelled || isDevolucion) totalCancelados++;
             }
 
             const isNotCancelled = !isCancelled;
             const isActiveSale = (isNotCancelled && clientDate >= startDate);
 
             if (isActiveSale) {
-                const precio = parseFloat(cli.precio_total || 0);
                 const abonosCli = abonosMap[cli.id] || 0;
+
+                // Devolución: solo cuenta lo que quedó de abonos tras el reembolso (igual que en Rentabilidad).
+                // Reprogramado: no aporta ingreso a esta reserva original.
+                let precio;
+                if (isDevolucion) {
+                    precio = Math.max(0, abonosCli - parseFloat(cli.monto_devuelto || 0));
+                } else if (isReprogramado) {
+                    precio = 0;
+                } else {
+                    precio = parseFloat(cli.precio_total || 0);
+                }
 
                 ingresosTotales += precio;
                 totalRecaudado += abonosCli;
                 carteraPendiente += Math.max(precio - abonosCli, 0);
 
-                // Real PAX to avoid double counting group companions
+                // Real PAX to avoid double counting group companions (excluye devolución/reprogramado, igual que Rentabilidad)
                 const companionsCount = DataService.clientes.filter(x => x.parent_id === cli.id && !x.deleted_at).length;
                 const realPaxCli = companionsCount > 0 ? 1 : parseInt(cli.pax || 1);
-                totalPasajeros += realPaxCli;
+                const paxServicioCli = (isDevolucion || isReprogramado) ? 0 : realPaxCli;
+                totalPasajeros += paxServicioCli;
 
                 const plan = DataService.planes.find(p => p.id === cli.plan_id);
                 if (plan) {
@@ -141,7 +155,7 @@ export const DashboardComponent = {
                             : (plan.proveedores_vinculados || []);
                         cCost = provs.reduce((sum, p) => sum + parseFloat(p.costo || 0), 0);
                     }
-                    const planCost = cCost * realPaxCli;
+                    const planCost = cCost * paxServicioCli;
                     costosBase += planCost;
 
                     // Group by plan.id AND cli.fecha_viaje to represent specific departures
@@ -163,10 +177,10 @@ export const DashboardComponent = {
                     planStats[statKey].totalVendido += precio;
                     planStats[statKey].totalRecaudado += abonosCli;
                     planStats[statKey].costos += planCost;
-                    planStats[statKey].pax += realPaxCli;
+                    planStats[statKey].pax += paxServicioCli;
 
-                    if (abonosCli >= precio - 1) planStats[statKey].pagados += realPaxCli;
-                    else planStats[statKey].deben += realPaxCli;
+                    if (abonosCli >= precio - 1) planStats[statKey].pagados += paxServicioCli;
+                    else planStats[statKey].deben += paxServicioCli;
                 }
             }
         });

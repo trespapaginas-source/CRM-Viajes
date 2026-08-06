@@ -114,6 +114,147 @@ export const PartnersComponent = {
         return partner ? partner.porcentaje : 0;
     },
 
+    // Utilidad bruta realizada, gastos y utilidad neta de UN mes específico.
+    // Fuente única de verdad: usada por todos los cálculos históricos/mensuales de socios
+    // para evitar que la regla de gastos recurrentes o el parseo de fechas queden
+    // implementados de forma distinta en cada lugar que los necesita.
+    getMonthlyFinancials(ym, allTrips, hoy) {
+        const [y, m] = ym.split('-').map(Number);
+        const startM = new Date(y, m - 1, 1);
+        const endM = new Date(y, m, 0, 23, 59, 59, 999);
+
+        // Un viaje solo se considera REALIZADO (devengado) cuando ya CONCLUYÓ (dateObjEnd), no cuando apenas
+        // empieza. Se agrupa en el mes por su fecha de INICIO (dateObj), pero solo cuenta como utilidad
+        // realizada si su fecha de FIN ya pasó.
+        const mAllTripsInMonth = allTrips.filter(t => t.dateObj >= startM && t.dateObj <= endM);
+        const mRealizedTrips = mAllTripsInMonth.filter(t => (t.dateObjEnd || t.dateObj) <= hoy);
+        const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
+        const mIngresos = mRealizedTrips.reduce((acc, t) => acc + t.ingresoBruto, 0);
+        const mCostosOperativos = mRealizedTrips.reduce((acc, t) => acc + t.costoTotal, 0);
+
+        const mExpenses = this.corporateExpenses.filter(g => {
+            // Un gasto eliminado no debe contar en NINGÚN mes (ni pasado ni futuro) — no solo desde su eliminación en adelante.
+            if (g.deleted_at) return false;
+            if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
+            const date = parseSpanishDate(g.fecha);
+            if (!date) return false;
+            // Un gasto (recurrente o no) SOLO cuenta en su mes exacto de registro — nunca se proyecta
+            // automáticamente a meses futuros. Si un gasto realmente se repite cada mes, debe registrarse
+            // como una fila nueva cada vez (es_recurrente solo distingue "fijo" de "variable" para ese mes).
+            return date >= startM && date <= endM;
+        });
+
+        const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+        const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+
+        let mUN = 0;
+        let mRetencionFondo = 0;
+        if (mUB >= mFixedGC) {
+            const mUN_Operacion = mUB - mFixedGC - mVariableGC;
+            mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
+            mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
+        }
+
+        // "Proyectada": si TODOS los viajes de este mes llegan a ocurrir (incluye los aún no realizados).
+        // Para meses ya cerrados, mUBProyectada === mUB (todos sus viajes ya concluyeron).
+        const mUBProyectada = mAllTripsInMonth.reduce((acc, t) => acc + t.margen, 0);
+        let mUNProyectada = 0;
+        let mRetencionFondoProyectada = 0;
+        if (mUBProyectada >= mFixedGC) {
+            const mUN_OperacionProyectada = mUBProyectada - mFixedGC - mVariableGC;
+            mRetencionFondoProyectada = Math.max(0, mUN_OperacionProyectada * (this.porcentajeRetencion / 100));
+            mUNProyectada = Math.max(0, mUN_OperacionProyectada - mRetencionFondoProyectada);
+        }
+
+        return {
+            mUB, mFixedGC, mVariableGC, mUN, mRetencionFondo, mIngresos, mCostosOperativos,
+            mUBProyectada, mUNProyectada, mRetencionFondoProyectada
+        };
+    },
+
+    // Utilidad neta distribuible de UN socio dentro de un rango de fechas arbitrario (picker "Panel de Reparto").
+    // El rango se parte en el corte de agosto 2026 (único cambio de porcentaje vigente) para que un rango
+    // que cruce esa fecha no se calcule con un único porcentaje plano equivocado para uno de los dos lados.
+    getPartnerShareForRange(email, dateStart, dateEnd, allTrips, hoy) {
+        const boundary = new Date('2026-08-01T00:00:00');
+        const segments = [];
+        if (dateStart < boundary) {
+            segments.push([dateStart, new Date(Math.min(dateEnd.getTime(), boundary.getTime() - 1000))]);
+        }
+        if (dateEnd >= boundary) {
+            segments.push([new Date(Math.max(dateStart.getTime(), boundary.getTime())), dateEnd]);
+        }
+
+        let total = 0;
+        segments.forEach(([segStart, segEnd]) => {
+            if (segEnd < segStart) return;
+
+            const segRealized = allTrips.filter(t => t.dateObj >= segStart && t.dateObj <= segEnd && (t.dateObjEnd || t.dateObj) <= hoy);
+            const segUB = segRealized.reduce((acc, t) => acc + t.margen, 0);
+
+            const segExpenses = this.corporateExpenses.filter(g => {
+                const d = parseSpanishDate(g.fecha);
+                if (!d || d < segStart || d > segEnd) return false;
+                return g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos;
+            });
+            const segGC = segExpenses.reduce((acc, g) => acc + g.monto, 0);
+
+            if (segUB <= segGC) return;
+            const segUN_Operacion = segUB - segGC;
+            const segRetencion = Math.max(0, segUN_Operacion * (this.porcentajeRetencion / 100));
+            const segUN = segUN_Operacion - segRetencion;
+
+            const ym = `${segStart.getFullYear()}-${String(segStart.getMonth() + 1).padStart(2, '0')}`;
+            const pct = this.getPartnerPorcentaje(email, ym);
+            total += segUN * (pct / 100);
+        });
+
+        return total;
+    },
+
+    // Acumula, mes a mes desde abril 2026 hasta hoy, la utilidad ganada y la reserva
+    // de cada socio aplicando el porcentaje vigente en cada mes (getPartnerPorcentaje).
+    getHistoricalPartnerTotals(hoy, allTrips) {
+        const globalPartnerGanado = {};
+        const globalPartnerReserve = {};
+        this.sociosConfig.forEach(s => {
+            globalPartnerGanado[s.email.toLowerCase()] = 0;
+            globalPartnerReserve[s.email.toLowerCase()] = 0;
+        });
+
+        let histUB = 0;
+        let histRetenidoFondoGlobal = 0;
+
+        const startHistDate = new Date('2026-04-01T00:00:00');
+        let currM = new Date(startHistDate);
+        while (currM <= hoy) {
+            const y = currM.getFullYear();
+            const m = String(currM.getMonth() + 1).padStart(2, '0');
+            const ym = `${y}-${m}`;
+
+            const { mUB, mUN, mRetencionFondo } = this.getMonthlyFinancials(ym, allTrips, hoy);
+            histUB += mUB;
+            histRetenidoFondoGlobal += mRetencionFondo;
+
+            this.sociosConfig.forEach(soc => {
+                const pct = this.getPartnerPorcentaje(soc.email, ym);
+                globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
+                globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
+            });
+
+            currM.setMonth(currM.getMonth() + 1);
+        }
+
+        const histGC = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
+            .reduce((acc, g) => acc + g.monto, 0);
+        const histGC_Reserva = this.corporateExpenses
+            .filter(g => g.origen_fondos === 'Fondo de Reserva')
+            .reduce((acc, g) => acc + g.monto, 0);
+
+        return { globalPartnerGanado, globalPartnerReserve, histRetenidoFondoGlobal, histUB, histGC, histGC_Reserva };
+    },
+
     isSuperAdmin() {
         return window.AuthModule?.userProfile?.rol === 'super_administrador';
     },
@@ -717,7 +858,23 @@ export const PartnersComponent = {
                 }
                 let d = parseSpanishDate(parseStr);
                 if (!d || isNaN(d.getTime())) d = new Date();
-                salidasUnicas.set(k, { planId: c.plan_id, planName: p ? p.nombre : 'Plan Genérico', fechaFormat: c.fecha_viaje, dateObj: d });
+
+                // Fecha de FIN del viaje: hasta que no pase, el margen no se considera devengado/realizado.
+                // Se agrupa igual por la fecha de INICIO (dateObj), pero "realizado" se evalúa contra el FIN.
+                let dEnd = d;
+                const rangeParts = (c.fecha_viaje || '').split(/\s+al\s+/i);
+                if (rangeParts.length === 2) {
+                    const parsedEnd = parseSpanishDate(rangeParts[1].trim());
+                    if (parsedEnd && !isNaN(parsedEnd.getTime())) dEnd = parsedEnd;
+                } else if (p && p.fechas) {
+                    const objF = p.fechas.find(f => formatShortDate(f.start) === c.fecha_viaje || `${formatShortDate(f.start)} al ${formatShortDate(f.end)}` === c.fecha_viaje);
+                    if (objF && objF.end) {
+                        const parsedEnd = parseSpanishDate(formatShortDate(objF.end));
+                        if (parsedEnd && !isNaN(parsedEnd.getTime())) dEnd = parsedEnd;
+                    }
+                }
+
+                salidasUnicas.set(k, { planId: c.plan_id, planName: p ? p.nombre : 'Plan Genérico', fechaFormat: c.fecha_viaje, dateObj: d, dateObjEnd: dEnd });
             }
         });
 
@@ -799,10 +956,10 @@ export const PartnersComponent = {
         this.reconciliarEstadosAdelantos();
 
         // Filtered Realized trips
-        const filteredRealizedTrips = allTrips.filter(t => t.dateObj >= dateStart && t.dateObj <= dateEnd && t.dateObj <= hoy);
+        const filteredRealizedTrips = allTrips.filter(t => t.dateObj >= dateStart && t.dateObj <= dateEnd && (t.dateObjEnd || t.dateObj) <= hoy);
 
         // Filtered Future trips
-        const filteredFutureTrips = allTrips.filter(t => t.dateObj >= dateStart && t.dateObj <= dateEnd && t.dateObj > hoy);
+        const filteredFutureTrips = allTrips.filter(t => t.dateObj >= dateStart && t.dateObj <= dateEnd && (t.dateObjEnd || t.dateObj) > hoy);
 
         // Filtered Corporate Expenses (only ones paid by Agency Utility, or repaid Float debts, excluding reserve-funded/pending float ones)
         const filteredCorpExpenses = this.corporateExpenses.filter(g => {
@@ -862,16 +1019,16 @@ export const PartnersComponent = {
         const totalAdelantadoActivoRango = activeAdelantosRango.reduce((sum, a) => sum + (Number(a.monto_adelantado) - Number(a.monto_recuperado)), 0);
 
         // Let's pass these to render distribution
-        this.renderDistributionUI(filteredAllTrips, filteredIngresos, filteredCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo, isDeficit, deficitAmount, totalRecaudadoRango, totalAdelantadoActivoRango);
+        this.renderDistributionUI(filteredAllTrips, filteredIngresos, filteredCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo, isDeficit, deficitAmount, totalRecaudadoRango, totalAdelantadoActivoRango, dateStart, dateEnd, allTrips, hoy);
     },
 
-    renderDistributionUI(viajes, gIngresos, gCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo = 0, isDeficit = false, deficitAmount = 0, totalRecaudadoRango = 0, totalAdelantadoActivoRango = 0) {
+    renderDistributionUI(viajes, gIngresos, gCostos, filteredUN, filteredUB, filteredGC, filteredUP, retencionFondo = 0, isDeficit = false, deficitAmount = 0, totalRecaudadoRango = 0, totalAdelantadoActivoRango = 0, dateStart, dateEnd, allTrips, hoy) {
         const rol = window.AuthModule?.userProfile?.rol;
         const isAdmin = rol === 'administrador' || rol === 'socio_mayoritario' || rol === 'super_administrador';
         const currentUserEmail = (window.AuthModule?.currentUser?.email || '').toLowerCase();
         const me = this.sociosConfig.find(s => s.email.toLowerCase() === currentUserEmail);
-        const miPorcentaje = me ? me.porcentaje : 0;
-        const miPago = filteredUN * (miPorcentaje / 100);
+        const miPago = me ? this.getPartnerShareForRange(me.email, dateStart, dateEnd, allTrips, hoy) : 0;
+        const miPorcentaje = me ? this.getPartnerPorcentaje(me.email, `${dateEnd.getFullYear()}-${String(dateEnd.getMonth() + 1).padStart(2, '0')}`) : 0;
 
         const utilTotal = document.getElementById('pvm-utilidad-total');
         if (utilTotal) {
@@ -972,7 +1129,8 @@ export const PartnersComponent = {
             sCards.innerHTML = '';
             this.sociosConfig.forEach(soc => {
                 const esMio = soc.email.toLowerCase() === currentUserEmail;
-                const pagoSocio = filteredUN * (soc.porcentaje / 100);
+                const pagoSocio = this.getPartnerShareForRange(soc.email, dateStart, dateEnd, allTrips, hoy);
+                const pctBadge = this.getPartnerPorcentaje(soc.email, `${dateEnd.getFullYear()}-${String(dateEnd.getMonth() + 1).padStart(2, '0')}`);
                 const puedeVerDinero = isAdmin || esMio;
                 const dineroFormat = puedeVerDinero ? formatCOP(pagoSocio) : '***';
                 const extraClasses = esMio ? 'ring-2 ring-indigo-500 bg-indigo-50/50' : 'bg-slate-50 hover:bg-slate-100';
@@ -980,7 +1138,7 @@ export const PartnersComponent = {
                     <div class="border border-slate-200 rounded-xl px-3 py-2 flex items-center transition-colors shadow-sm ${extraClasses}">
                         <div class="w-8 h-8 rounded-full bg-slate-200 border border-white flex items-center justify-center text-xs font-black text-slate-500 mr-2 shrink-0">${soc.nombre.substring(0, 2).toUpperCase()}</div>
                         <div>
-                            <div class="flex items-center gap-1.5 mb-0.5"><p class="text-[10px] font-black text-slate-800 uppercase tracking-widest">${UI.sanitize(soc.nombre)}</p><span class="text-[8px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded font-black tracking-widest">${soc.porcentaje}%</span></div>
+                            <div class="flex items-center gap-1.5 mb-0.5"><p class="text-[10px] font-black text-slate-800 uppercase tracking-widest">${UI.sanitize(soc.nombre)}</p><span class="text-[8px] bg-slate-200 text-slate-600 px-1 py-0.5 rounded font-black tracking-widest">${pctBadge}%</span></div>
                             <p class="text-xs font-black text-slate-600">${dineroFormat}</p>
                         </div>
                     </div>`;
@@ -1004,7 +1162,7 @@ export const PartnersComponent = {
 
             viajes.forEach(v => {
                 const colorMargen = v.margen >= 0 ? 'text-emerald-600' : 'text-red-500';
-                const isPast = v.dateObj && v.dateObj <= hoy;
+                const isPast = v.dateObj && (v.dateObjEnd || v.dateObj) <= hoy;
                 const badgeHtml = isPast ? `<span class="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-[8px] font-black bg-emerald-50 text-emerald-600 uppercase tracking-widest border border-emerald-100"><i class="ph-fill ph-check-circle mr-1 text-[10px]"></i>Realizado</span>` : '';
                 const rowClass = isPast ? 'bg-slate-50/40 hover:bg-slate-100/50' : 'hover:bg-slate-50';
 
@@ -1170,88 +1328,24 @@ export const PartnersComponent = {
             const allTrips = this.getAllTrips();
             const hoy = new Date();
             hoy.setHours(23, 59, 59, 999);
-            const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
-            const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-            const histGC = this.corporateExpenses
-                .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
-                .reduce((acc, g) => acc + g.monto, 0);
-            const histGC_Reserva = this.corporateExpenses
-                .filter(g => g.origen_fondos === 'Fondo de Reserva')
-                .reduce((acc, g) => acc + g.monto, 0);
 
-            // Calculate historical realized net profit and reserve share per socio month by month
-            const globalPartnerGanado = {};
-            const globalPartnerReserve = {};
-            this.sociosConfig.forEach(s => {
-                globalPartnerGanado[s.email.toLowerCase()] = 0;
-                globalPartnerReserve[s.email.toLowerCase()] = 0;
-            });
+            const { globalPartnerGanado, globalPartnerReserve, histRetenidoFondoGlobal, histUB, histGC, histGC_Reserva } =
+                this.getHistoricalPartnerTotals(hoy, allTrips);
 
-            const startHistDate = new Date('2026-04-01T00:00:00');
-            let currM = new Date(startHistDate);
-            while (currM <= hoy) {
-                const y = currM.getFullYear();
-                const m = String(currM.getMonth() + 1).padStart(2, '0');
-                const ym = `${y}-${m}`;
-                const [ySel, mSel] = ym.split('-').map(Number);
-                const startM = new Date(ySel, mSel - 1, 1);
-                const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
-
-                const mRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-                const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-                const mExpenses = this.corporateExpenses.filter(g => {
-                    if (g.deleted_at) return false;
-                    if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
-                    const date = new Date(g.fecha);
-                    return date >= startM && date <= endM;
-                });
-
-                const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-                const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-                let mUN = 0;
-                let mRetencionFondo = 0;
-                if (mUB >= mFixedGC) {
-                    const mUN_Operacion = mUB - mFixedGC - mVariableGC;
-                    mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
-                    mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
-                }
-
-                this.sociosConfig.forEach(soc => {
-                    const pct = this.getPartnerPorcentaje(soc.email, ym);
-                    globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
-                    globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
-                });
-
-                currM.setMonth(currM.getMonth() + 1);
-            }
-
+            // El Fondo de Reserva es intocable para cubrir socios: NO se suma a lo disponible de cada
+            // socio, y NO se usa como respaldo cuando alguien retira más de lo que ganó. Solo se reduce
+            // por gastos explícitamente cargados a él (origen_fondos = 'Fondo de Reserva', ej. emergencias).
             let totalSociosDisp = 0;
             this.sociosConfig.forEach(soc => {
                 const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
-                const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
                 const retirado = this.movements
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                     .reduce((acc, m) => acc + m.monto, 0);
-                totalSociosDisp += ((ganado + reserve) - retirado);
+                totalSociosDisp += (ganado - retirado);
             });
 
-            let totalReservaUtilizada = 0;
-            this.sociosConfig.forEach(soc => {
-                const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
-                const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
-                const retirado = this.movements
-                    .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
-                    .reduce((acc, m) => acc + m.monto, 0);
-                
-                const excess = Math.max(0, retirado - ganado);
-                const reserveUsed = Math.min(reserve, excess);
-                totalReservaUtilizada += reserveUsed;
-            });
-
-            const balanceF = histUB > histGC 
-                ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
+            const balanceF = histUB > histGC
+                ? Math.max(0, histRetenidoFondoGlobal - histGC_Reserva)
                 : -(histGC - histUB);
             const cajaTeoricaPre = balanceF + totalSociosDisp + totalFloatPool;
 
@@ -1280,46 +1374,14 @@ export const PartnersComponent = {
             for (const ym of monthsList) {
                 if (remainingWithdrawal <= 0.01) break;
 
-                // Calculate available for partner in month `ym`
-                // 1. Month trips & margins
-                const monthTrips = allTrips.filter(t => {
-                    const y = t.dateObj.getFullYear();
-                    const m = String(t.dateObj.getMonth() + 1).padStart(2, '0');
-                    return t.dateObj <= hoy && `${y}-${m}` === ym;
-                });
-                const monthUB = monthTrips.reduce((acc, t) => acc + t.margen, 0);
+                // Calculate available for partner in month `ym` using the shared, single source of truth
+                const { mUN: monthUN, mRetencionFondo: monthRetencionFondo } = this.getMonthlyFinancials(ym, allTrips, hoy);
+                const [ySel, mSel] = ym.split('-').map(Number);
+                const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
 
-                // 2. Month expenses
-                const parts = ym.split('-');
-                const y = parseInt(parts[0]);
-                const mIdx = parseInt(parts[1]);
-                const startM = new Date(y, mIdx - 1, 1);
-                const endM = new Date(y, mIdx, 0, 23, 59, 59, 999);
-
-                const monthExpenses = this.corporateExpenses.filter(g => {
-                    const date = new Date(g.fecha);
-                    const isCreatedBeforeOrInMonth = date <= endM;
-                    const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
-                    
-                    if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
-                    
-                    if (g.es_recurrente) return true;
-                    return date >= startM && date <= endM;
-                });
-
-                const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-                const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-                let monthUN = 0;
-                let monthRetencionFondo = 0;
-                if (monthUB > monthFixedGC) {
-                    const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
-                    monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
-                    monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
-                }
-
-                const ganadoSocio = monthUN * (partner.porcentaje / 100);
-                const reserveShare = monthRetencionFondo * (partner.porcentaje / 100);
+                const pct = this.getPartnerPorcentaje(partner.email, ym);
+                const ganadoSocio = monthUN * (pct / 100);
+                const reserveShare = monthRetencionFondo * (pct / 100);
                 const totalRetirado = this.movements
                     .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase() && m.fecha.substring(0, 7) === ym)
                     .reduce((acc, m) => acc + m.monto, 0);
@@ -1613,73 +1675,15 @@ export const PartnersComponent = {
         // Render monthly tabs first
         this.renderSaldosMonthTabs();
 
-        // 1. Global / Historical calculations
-        const histRealizedTripsGlobal = allTrips.filter(t => t.dateObj <= hoy);
-        const histUBGlobal = histRealizedTripsGlobal.reduce((acc, t) => acc + t.margen, 0);
-
-        const histGCGlobal = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
-            .reduce((acc, g) => acc + g.monto, 0);
-
-        const histGC_ReservaGlobal = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Fondo de Reserva')
-            .reduce((acc, g) => acc + g.monto, 0);
-
-        let histUNGlobal = 0;
-        let histRetenidoFondoGlobal = 0;
-        if (histUBGlobal > histGCGlobal) {
-            const histUN_OperacionGlobal = histUBGlobal - histGCGlobal;
-            histRetenidoFondoGlobal = histUN_OperacionGlobal * (this.porcentajeRetencion / 100);
-            histUNGlobal = histUN_OperacionGlobal - histRetenidoFondoGlobal;
-        }
-
-        // Calculate historical realized net profit per socio month by month using time-based percentages
-        const globalPartnerGanado = {};
-        const globalPartnerReserve = {};
-        this.sociosConfig.forEach(s => {
-            globalPartnerGanado[s.email.toLowerCase()] = 0;
-            globalPartnerReserve[s.email.toLowerCase()] = 0;
-        });
-
-        const startHistDate = new Date('2026-04-01T00:00:00');
-        let currM = new Date(startHistDate);
-        while (currM <= hoy) {
-            const y = currM.getFullYear();
-            const m = String(currM.getMonth() + 1).padStart(2, '0');
-            const ym = `${y}-${m}`;
-            const [ySel, mSel] = ym.split('-').map(Number);
-            const startM = new Date(ySel, mSel - 1, 1);
-            const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
-
-            const mRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-            const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-            const mExpenses = this.corporateExpenses.filter(g => {
-                if (g.deleted_at) return false;
-                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
-                const date = new Date(g.fecha);
-                return date >= startM && date <= endM;
-            });
-
-            const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-            const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-            let mUN = 0;
-            let mRetencionFondo = 0;
-            if (mUB >= mFixedGC) {
-                const mUN_Operacion = mUB - mFixedGC - mVariableGC;
-                mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
-                mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
-            }
-
-            this.sociosConfig.forEach(soc => {
-                const pct = this.getPartnerPorcentaje(soc.email, ym);
-                globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
-                globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
-            });
-
-            currM.setMonth(currM.getMonth() + 1);
-        }
+        // 1. Global / Historical calculations (mes a mes, con el % vigente en cada mes)
+        const {
+            globalPartnerGanado,
+            globalPartnerReserve,
+            histRetenidoFondoGlobal,
+            histUB: histUBGlobal,
+            histGC: histGCGlobal,
+            histGC_Reserva: histGC_ReservaGlobal
+        } = this.getHistoricalPartnerTotals(hoy, allTrips);
 
         // 2. Selected Month calculations
         const [ySelected, mSelected] = this.selectedSaldosMonth.split('-').map(Number);
@@ -1687,34 +1691,9 @@ export const PartnersComponent = {
         const endM = new Date(ySelected, mSelected, 0, 23, 59, 59, 999);
         const monthLabel = startM.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
-        // Update local month subheader title
-        const monthHeader = document.getElementById('pvm-saldos-month-header');
-        if (monthHeader) {
-            monthHeader.innerHTML = `<i class="ph ph-calendar mr-1.5 text-sm"></i> Rendimiento de ${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} (Tarjetas Mensuales)`;
-        }
-
-        // Monthly Realized margins
-        const monthRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-        const monthUB = monthRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-        // Filter month corporate expenses applying the recurrence rule
-        const monthExpenses = this.corporateExpenses.filter(g => {
-            const date = new Date(g.fecha);
-            const isCreatedBeforeOrInMonth = date <= endM;
-            const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
-            
-            if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
-            
-            if (g.es_recurrente) {
-                return true; // Recurring expenses apply to their month of registration and all future months
-            } else {
-                return date >= startM && date <= endM; // Non-recurring expenses apply only to their month of registration
-            }
-        });
-
-        // Split corporate expenses of this month
-        const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-        const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
+        // Utilidad, gastos y retención del mes seleccionado (misma fuente que el resto del módulo)
+        const { mUB: monthUB, mFixedGC: monthFixedGC, mVariableGC: monthVariableGC, mUN: monthUN, mRetencionFondo: monthRetencionFondo } =
+            this.getMonthlyFinancials(this.selectedSaldosMonth, allTrips, hoy);
         const monthTotalGC = monthFixedGC + monthVariableGC;
 
         // Coverage percentage of Fixed/Recurring Expenses
@@ -1760,15 +1739,6 @@ export const PartnersComponent = {
             } else {
                 coverageContainer.classList.add('hidden');
             }
-        }
-
-        // Net Profit & Reserve of the month
-        let monthUN = 0;
-        let monthRetencionFondo = 0;
-        if (monthUB >= monthFixedGC) {
-            const monthUN_Operacion = monthUB - monthFixedGC - monthVariableGC;
-            monthRetencionFondo = Math.max(0, monthUN_Operacion * (this.porcentajeRetencion / 100));
-            monthUN = Math.max(0, monthUN_Operacion - monthRetencionFondo);
         }
 
         const fallbackBanner = document.getElementById('pvm-saldos-fallback-banner');
@@ -1889,29 +1859,17 @@ export const PartnersComponent = {
                 `;
             });
 
-            // Reserve Fund Card
+            // Reserve Fund Card — el 10% es intocable para cubrir socios que retiraron de más. Solo baja
+            // por gastos explícitamente cargados a él (origen_fondos = 'Fondo de Reserva', ej. emergencias).
             if (isAdmin) {
-                let totalReservaUtilizada = 0;
-                this.sociosConfig.forEach(soc => {
-                    const ganado = histUNGlobal * (soc.porcentaje / 100);
-                    const reserve = histRetenidoFondoGlobal * (soc.porcentaje / 100);
-                    const retirado = this.movements
-                        .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
-                        .reduce((acc, m) => acc + m.monto, 0);
-                    
-                    const excess = Math.max(0, retirado - ganado);
-                    const reserveUsed = Math.min(reserve, excess);
-                    totalReservaUtilizada += reserveUsed;
-                });
-
-                const fondoDisponible = histUBGlobal > histGCGlobal 
-                    ? Math.max(0, histRetenidoFondoGlobal - histGC_ReservaGlobal - totalReservaUtilizada) 
+                const fondoDisponible = histUBGlobal > histGCGlobal
+                    ? Math.max(0, histRetenidoFondoGlobal - histGC_ReservaGlobal)
                     : -(histGCGlobal - histUBGlobal);
-                
+
                 const balanceColorClass = fondoDisponible >= 0 ? 'text-emerald-600' : 'text-rose-500';
-                
+
                 const retencionTooltip = `Retención Acumulada:\n${formatCOP(histRetenidoFondoGlobal)}`;
-                const disponibleTooltip = `Saldo Disponible del Fondo:\n${formatCOP(fondoDisponible)}\n\n(Retención: ${formatCOP(histRetenidoFondoGlobal)} - Gastos Reserva: ${formatCOP(histGC_ReservaGlobal)} - Reserva Socios: ${formatCOP(totalReservaUtilizada)})`;
+                const disponibleTooltip = `Saldo Disponible del Fondo:\n${formatCOP(fondoDisponible)}\n\n(Retención: ${formatCOP(histRetenidoFondoGlobal)} - Gastos Reserva: ${formatCOP(histGC_ReservaGlobal)})\n\nEste fondo NO se usa para cubrir socios que retiraron más de lo que ganaron.`;
 
                 globalGrid.innerHTML += `
                     <div class="rounded-xl p-4 flex flex-col justify-between border border-dashed border-slate-300 bg-slate-50/50">
@@ -1951,134 +1909,6 @@ export const PartnersComponent = {
                     </div>
                 `;
             }
-        }
-
-        // 4. Render Monthly Cards (Tarjetas del Mes)
-        const monthGrid = document.getElementById('pvm-saldos-month-grid');
-        if (monthGrid) {
-            monthGrid.innerHTML = '';
-            this.sociosConfig.forEach(soc => {
-                const esMio = soc.email.toLowerCase() === currentUserEmail;
-                const puedeVerDinero = isAdmin || esMio;
-
-                const pctMonth = this.getPartnerPorcentaje(soc.email, this.selectedSaldosMonth);
-                const ganadoMonth = monthUN * (pctMonth / 100);
-                const reserveShareMonth = monthRetencionFondo * (pctMonth / 100);
-                const totalRetiradoMonth = this.movements
-                    .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase() && m.fecha.substring(0, 7) === this.selectedSaldosMonth)
-                    .reduce((acc, m) => acc + m.monto, 0);
-                
-                const disponibleMonth = ganadoMonth - totalRetiradoMonth;
-
-                const ganadoFormat = puedeVerDinero ? formatCOP(ganadoMonth) : '***';
-                const reserveShareFormat = puedeVerDinero ? formatCOP(reserveShareMonth) : '***';
-                const retiradoFormat = puedeVerDinero ? formatCOP(totalRetiradoMonth) : '***';
-                const disponibleFormat = puedeVerDinero ? formatCOP(disponibleMonth) : '***';
-
-                const cardClass = esMio 
-                    ? 'border-2 border-indigo-500 bg-indigo-50/30 shadow-md' 
-                    : 'border border-slate-200 bg-white';
-
-                let buttonsHtml = '';
-                if (isAdmin) {
-                    buttonsHtml = `
-                        <div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="retiro" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
-                                <i class="ph ph-hand-coins text-xs"></i> Retiro
-                            </button>
-                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="corte" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
-                                <i class="ph ph-scissors text-xs"></i> Corte Caja
-                            </button>
-                        </div>
-                    `;
-                } else if (esMio) {
-                    buttonsHtml = `
-                        <div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                            <button type="button" data-action="pvm-open-movimiento" data-email="${soc.email}" data-tipo="retiro" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 py-1.5 px-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1">
-                                <i class="ph ph-hand-coins text-xs"></i> Registrar Retiro
-                            </button>
-                        </div>
-                    `;
-                }
-
-                const tooltipTitle = `Fórmula de este mes (${monthLabel}):\n(Utilidad Bruta: ${formatCOP(monthUB)} - Gastos Recurrentes: ${formatCOP(monthFixedGC)} - Gastos Variables: ${formatCOP(monthVariableGC)}) * 90% * ${soc.porcentaje}% = ${formatCOP(ganadoMonth)}`;
-
-                let progressHtml = '';
-                if (puedeVerDinero) {
-                    const totalCupo = ganadoMonth;
-                    if (totalCupo > 0) {
-                        const pct = Math.min(100, Math.round((totalRetiradoMonth / totalCupo) * 100));
-                        const isExceeded = totalRetiradoMonth > totalCupo;
-                        const barColor = isExceeded ? 'bg-rose-500' : 'bg-indigo-500';
-                        progressHtml = `
-                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
-                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                                    <span>Progreso Retiros del Mes</span>
-                                    <span class="${isExceeded ? 'text-rose-500 font-black' : 'text-slate-500'}">${isExceeded ? 'Excedido' : `${pct}%`}</span>
-                                </div>
-                                <div class="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
-                                    <div class="${barColor} h-1 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        const hasWithdrawn = totalRetiradoMonth > 0;
-                        progressHtml = `
-                            <div class="mt-2.5 pt-2 border-t border-slate-100/50">
-                                <div class="flex justify-between items-center text-[8px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                                    <span>Progreso Retiros del Mes</span>
-                                    <span class="${hasWithdrawn ? 'text-rose-500 font-black' : 'text-slate-500'}">${hasWithdrawn ? 'Excedido (Sin Utilidades)' : 'Sin Retiros'}</span>
-                                </div>
-                                <div class="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
-                                    <div class="${hasWithdrawn ? 'bg-rose-500 w-full' : 'bg-slate-300 w-0'} h-1 rounded-full transition-all duration-500"></div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                }
-
-                monthGrid.innerHTML += `
-                    <div class="rounded-xl p-4 flex flex-col justify-between ${cardClass}">
-                        <div>
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-black text-slate-500 uppercase">${soc.nombre.substring(0,2)}</div>
-                                    <div>
-                                        <h5 class="text-xs font-black text-slate-800 uppercase tracking-wider">${UI.sanitize(soc.nombre)}</h5>
-                                        <p class="text-[9px] text-slate-400 font-bold">${UI.sanitize(soc.email)}</p>
-                                    </div>
-                                </div>
-                                <span class="bg-slate-100 text-slate-700 text-[9px] font-black px-1.5 py-0.5 rounded">${pctMonth}% Share</span>
-                            </div>
-                            
-                            <div class="space-y-1.5 mt-3">
-                                <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium flex items-center">
-                                        Ganado en el Mes (90%):
-                                        ${puedeVerDinero ? `<i class="ph ph-info text-slate-400 hover:text-slate-600 cursor-pointer ml-1 text-xs" title="${tooltipTitle}" onclick="alert(this.getAttribute('title'))"></i>` : ''}
-                                    </span>
-                                    <span class="text-slate-800 font-bold">${ganadoFormat}</span>
-                                </div>
-                                <div class="flex justify-between text-[10px]">
-                                    <span class="text-slate-500 font-medium">Fondo Reserva (10%):</span>
-                                    <span class="text-slate-700 font-semibold">${reserveShareFormat}</span>
-                                </div>
-                                <div class="flex justify-between text-[10px] hover:bg-slate-100/50 cursor-pointer p-0.5 -mx-0.5 rounded transition-colors" 
-                                     data-action="filter-partner-withdrawals" data-email="${soc.email}" title="Ver transacciones de este socio abajo">
-                                    <span class="text-slate-500 font-medium flex items-center gap-0.5 font-bold text-indigo-600">Retirado del Mes: <i class="ph ph-magnifying-glass text-[10px] text-indigo-400"></i></span>
-                                    <span class="text-slate-600 font-bold underline decoration-dotted decoration-indigo-400">${retiradoFormat}</span>
-                                </div>
-                                <div class="flex justify-between text-xs pt-1.5 border-t border-dashed border-slate-100 items-center">
-                                    <span class="text-slate-700 font-black">Disponible del Mes:</span>
-                                    <span class="${disponibleMonth >= 0 ? 'text-emerald-600' : 'text-rose-500'} font-black">${disponibleFormat}</span>
-                                </div>
-                            </div>
-                            ${progressHtml}
-                        </div>
-                        ${buttonsHtml}
-                    </div>
-                `;
-            });
         }
 
         const histFilter = document.getElementById('pvm-history-filter-partner');
@@ -2229,36 +2059,30 @@ export const PartnersComponent = {
                 return `${y}-${m}` === month;
             });
 
-            const ingresos = monthTrips.reduce((acc, t) => acc + t.ingresoBruto, 0);
-            const costos = monthTrips.reduce((acc, t) => acc + t.costoTotal, 0);
-            const bruta = ingresos - costos;
+            // Misma fuente única de verdad que el resto del módulo (respeta la regla de gastos
+            // recurrentes aplicados a todos los meses futuros y el parseo de fecha sin desfase de huso horario).
+            // "ingresos"/"costos" (uso interno, Rentabilidad %) son SOLO de viajes ya concluidos —
+            // igual que "Utilidad Bruta". "Ingresos Brutos" (columna visible) es distinto: TODOS los
+            // planes vendidos con salida en este mes, ya hayan concluido o no, y sin descontar nada.
+            const {
+                mUB: bruta, mFixedGC, mVariableGC, mUN: neta, mRetencionFondo: retencionFondo,
+                mIngresos: ingresos, mCostosOperativos: costos, mUBProyectada: brutaProyectada, mUNProyectada: netaProyectada
+            } = this.getMonthlyFinancials(month, allTrips, hoy);
+            const gastosCorp = mFixedGC + mVariableGC;
 
-            // Corporate expenses in this month (only ones paid by Agency Utility, or repaid Float debts, excluding reserve-funded/pending float ones)
-            const monthGastos = this.corporateExpenses.filter(g => {
-                if (!g.fecha) return false;
-                const parts = g.fecha.split('-');
-                const isMatchedMonth = `${parts[0]}-${parts[1]}` === month;
-                const isOrdinario = g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos;
-                return isMatchedMonth && isOrdinario;
-            });
-            const gastosCorp = monthGastos.reduce((acc, g) => acc + g.monto, 0);
+            const ingresosBrutosVendidos = monthTrips.reduce((acc, t) => acc + t.ingresoBruto, 0);
 
-            // Adelantos en este mes
+            // Adelantos en este mes: solo el saldo pendiente (adelantado - recuperado). Si ya se pagó
+            // por completo, no debe aportar ningún valor a este mes.
             const monthAdelantosList = (DataService.adelantos_operativos || []).filter(a => {
                 if (a.deleted_at || !a.fecha) return false;
                 const parts = a.fecha.split('-');
                 return `${parts[0]}-${parts[1]}` === month;
             });
-            const monthAdelantos = monthAdelantosList.reduce((acc, a) => acc + (Number(a.monto_adelantado) || 0), 0);
-
-            // Prioridad Financiera (Opción B)
-            let neta = 0;
-            let retencionFondo = 0;
-            if (bruta > gastosCorp) {
-                const operacionNeta = bruta - gastosCorp;
-                retencionFondo = operacionNeta * (this.porcentajeRetencion / 100);
-                neta = operacionNeta - retencionFondo;
-            }
+            const monthAdelantos = monthAdelantosList.reduce((acc, a) => {
+                const pendiente = Number(a.monto_adelantado || 0) - Number(a.monto_recuperado || 0);
+                return acc + Math.max(0, pendiente);
+            }, 0);
 
             // Withdrawals in this month
             const monthMovements = this.movements.filter(m => {
@@ -2277,10 +2101,13 @@ export const PartnersComponent = {
                 paxAsistentes,
                 ingresos,
                 costos,
+                ingresosBrutosVendidos,
                 bruta,
+                brutaProyectada,
                 gastosCorp,
                 retencionFondo,
                 neta,
+                netaProyectada,
                 retiros,
                 adelantos: monthAdelantos
             };
@@ -2296,15 +2123,18 @@ export const PartnersComponent = {
         if (thead) {
             let partnerCols = '';
             this.sociosConfig.forEach(soc => {
-                partnerCols += `<th class="py-2.5 px-4 text-right">${UI.sanitize(soc.nombre)} (${soc.porcentaje}%)</th>`;
+                partnerCols += `<th class="py-2.5 px-4 text-right">${UI.sanitize(soc.nombre)}</th>`;
             });
             thead.innerHTML = `
                 <tr>
                     <th class="py-2.5 px-4">Mes / Año</th>
+                    <th class="py-2.5 px-4 text-right">Ingresos Brutos</th>
                     <th class="py-2.5 px-4 text-right">Utilidad Bruta</th>
+                    <th class="py-2.5 px-4 text-right">Utilidad Proyectada</th>
                     <th class="py-2.5 px-4 text-right">Gastos Fijos</th>
                     <th class="py-2.5 px-4 text-right">Retención Fondo</th>
                     <th class="py-2.5 px-4 text-right">Neta Distribuible</th>
+                    <th class="py-2.5 px-4 text-right">Neta Distribuible Proyectada</th>
                     ${partnerCols}
                     <th class="py-2.5 px-4 text-right">Adelantos/Préstamos</th>
                     <th class="py-2.5 px-4 text-right">Retiros</th>
@@ -2317,7 +2147,7 @@ export const PartnersComponent = {
         if (mList) {
             mList.innerHTML = '';
             if (monthlyData.length === 0) {
-                const colspan = 7 + this.sociosConfig.length;
+                const colspan = 10 + this.sociosConfig.length;
                 mList.innerHTML = `<tr><td colspan="${colspan}" class="py-4 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">Sin datos disponibles</td></tr>`;
             } else {
                 monthlyData.forEach(row => {
@@ -2329,8 +2159,9 @@ export const PartnersComponent = {
                     this.sociosConfig.forEach(soc => {
                         const esMio = soc.email.toLowerCase() === currentUserEmail;
                         const puedeVer = isAdmin || esMio;
-                        const valorSocio = row.neta * (soc.porcentaje / 100);
-                        partnerCells += `<td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-semibold ${row.neta >= 0 ? 'text-slate-800' : 'text-rose-500/80'}">${puedeVer ? formatCOP(valorSocio) : '***'}</td>`;
+                        const pctRow = this.getPartnerPorcentaje(soc.email, row.month);
+                        const valorSocio = row.neta * (pctRow / 100);
+                        partnerCells += `<td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-semibold ${row.neta >= 0 ? 'text-slate-800' : 'text-rose-500/80'}">${puedeVer ? formatCOP(valorSocio) : '***'}<span class="block text-[8px] text-slate-400 font-bold">${pctRow}%</span></td>`;
                     });
 
                     let retirosVal = 0;
@@ -2363,10 +2194,13 @@ export const PartnersComponent = {
                     mList.innerHTML += `
                         <tr class="pvm-monthly-row hover:bg-slate-100/70 transition-colors cursor-pointer" data-month="${row.month}">
                             <td class="py-2.5 px-4 whitespace-nowrap text-xs font-black text-slate-800 flex items-center gap-1.5"><i class="ph ph-caret-right text-[10px] text-slate-400"></i> ${formatMonthYear(row.month)} ${statusBadge}</td>
+                            <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-slate-500">${isAdmin ? formatCOP(row.ingresosBrutosVendidos) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-slate-600">${isAdmin ? formatCOP(row.bruta) : '***'}</td>
+                            <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-indigo-500">${isAdmin ? formatCOP(row.brutaProyectada) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-rose-500/80">${isAdmin ? formatCOP(row.gastosCorp) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-amber-500">${isAdmin ? formatCOP(row.retencionFondo) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-black ${netaColor}">${isAdmin ? formatCOP(row.neta) : '***'}</td>
+                            <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-indigo-500">${isAdmin ? formatCOP(row.netaProyectada) : '***'}</td>
                             ${partnerCells}
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-amber-600">${isAdmin ? formatCOP(row.adelantos) : '***'}</td>
                             <td class="py-2.5 px-4 text-right whitespace-nowrap text-xs font-medium text-slate-600">${retirosDisplay}</td>
@@ -2503,7 +2337,7 @@ export const PartnersComponent = {
                         }
                         return false;
                     });
-                    const totalAdelantos = planAdvances.reduce((sum, a) => sum + (Number(a.monto_adelantado) || 0), 0);
+                    const totalAdelantos = planAdvances.reduce((sum, a) => sum + Math.max(0, Number(a.monto_adelantado || 0) - Number(a.monto_recuperado || 0)), 0);
 
                     const adelantosDisplay = totalAdelantos > 0 ? formatCOP(totalAdelantos) : '$0';
                     const recaudadoDisplay = formatCOP(totalRecaudado);
@@ -2571,78 +2405,9 @@ export const PartnersComponent = {
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
 
-        // Selected Month calculations
-        const [ySelected, mSelected] = this.selectedSaldosMonth.split('-').map(Number);
-        const startM = new Date(ySelected, mSelected - 1, 1);
-        const endM = new Date(ySelected, mSelected, 0, 23, 59, 59, 999);
-
-        // Monthly Realized margins
-        const monthRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-        const monthUB = monthRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-        // Filter month corporate expenses applying the recurrence rule
-        const monthExpenses = this.corporateExpenses.filter(g => {
-            const date = new Date(g.fecha);
-            const isCreatedBeforeOrInMonth = date <= endM;
-            const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
-            
-            if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
-            
-            if (g.es_recurrente) return true;
-            return date >= startM && date <= endM;
-        });
-
-        // Split corporate expenses of this month
-        const monthFixedGC = monthExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-        const monthVariableGC = monthExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-        // Global Realized calculations
-        const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
-        const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-        const histGC = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
-            .reduce((acc, g) => acc + g.monto, 0);
-        const histGC_Reserva = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Fondo de Reserva')
-            .reduce((acc, g) => acc + g.monto, 0);
-
-        // Calculate historical realized net profit per socio month by month using time-based percentages
-        let ganadoGlobal = 0;
-        const startHistDate = new Date('2026-04-01T00:00:00');
-        let currM = new Date(startHistDate);
-        while (currM <= hoy) {
-            const y = currM.getFullYear();
-            const m = String(currM.getMonth() + 1).padStart(2, '0');
-            const ym = `${y}-${m}`;
-            const [ySel, mSel] = ym.split('-').map(Number);
-            const startM = new Date(ySel, mSel - 1, 1);
-            const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
-
-            const mRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-            const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-            const mExpenses = this.corporateExpenses.filter(g => {
-                if (g.deleted_at) return false;
-                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
-                const date = new Date(g.fecha);
-                return date >= startM && date <= endM;
-            });
-
-            const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-            const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-            let mUN = 0;
-            if (mUB >= mFixedGC) {
-                const mUN_Operacion = mUB - mFixedGC - mVariableGC;
-                const mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
-                mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
-            }
-
-            const pct = this.getPartnerPorcentaje(partner.email, ym);
-            ganadoGlobal += mUN * (pct / 100);
-
-            currM.setMonth(currM.getMonth() + 1);
-        }
+        // Ganado histórico del socio, mes a mes con el % vigente en cada mes (misma fuente que el resto del módulo)
+        const { globalPartnerGanado } = this.getHistoricalPartnerTotals(hoy, allTrips);
+        const ganadoGlobal = globalPartnerGanado[partner.email.toLowerCase()] || 0;
 
         const totalRetiradoGlobal = this.movements
             .filter(m => m.socio_email.toLowerCase() === partner.email.toLowerCase())
@@ -2707,70 +2472,9 @@ export const PartnersComponent = {
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
 
-        // Historical Realized margins (global)
-        const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
-        const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-        // Historical corporate expenses (global)
-        const histGC = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
-            .reduce((acc, g) => acc + g.monto, 0);
-
-        const histGC_Reserva = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Fondo de Reserva')
-            .reduce((acc, g) => acc + g.monto, 0);
-
-        // Net Profit (devengado histórico total applying 10% retention)
-        // Calculate historical realized net profit per socio month by month using time-based percentages
-        const globalPartnerGanado = {};
-        const globalPartnerReserve = {};
-        let histRetenidoFondoGlobal = 0;
-        this.sociosConfig.forEach(s => {
-            globalPartnerGanado[s.email.toLowerCase()] = 0;
-            globalPartnerReserve[s.email.toLowerCase()] = 0;
-        });
-
-        const startHistDate = new Date('2026-04-01T00:00:00');
-        let currM = new Date(startHistDate);
-        while (currM <= hoy) {
-            const y = currM.getFullYear();
-            const m = String(currM.getMonth() + 1).padStart(2, '0');
-            const ym = `${y}-${m}`;
-            const [ySel, mSel] = ym.split('-').map(Number);
-            const startM = new Date(ySel, mSel - 1, 1);
-            const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
-
-            const mRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-            const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-            const mExpenses = this.corporateExpenses.filter(g => {
-                if (g.deleted_at) return false;
-                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
-                const date = new Date(g.fecha);
-                return date >= startM && date <= endM;
-            });
-
-            const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-            const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-            let mUN = 0;
-            let mRetencionFondo = 0;
-            if (mUB >= mFixedGC) {
-                const mUN_Operacion = mUB - mFixedGC - mVariableGC;
-                mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
-                mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
-            }
-
-            histRetenidoFondoGlobal += mRetencionFondo;
-
-            this.sociosConfig.forEach(soc => {
-                const pct = this.getPartnerPorcentaje(soc.email, ym);
-                globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
-                globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
-            });
-
-            currM.setMonth(currM.getMonth() + 1);
-        }
+        // Net Profit (devengado histórico total applying 10% retention), mes a mes con el % vigente en cada mes
+        const { globalPartnerGanado, globalPartnerReserve, histRetenidoFondoGlobal, histUB, histGC, histGC_Reserva } =
+            this.getHistoricalPartnerTotals(hoy, allTrips);
 
         const ganadoGlobal = globalPartnerGanado[partner.email.toLowerCase()] || 0;
         const totalRetiradoGlobal = this.movements
@@ -2791,31 +2495,19 @@ export const PartnersComponent = {
             .filter(f => f.estado === 'disponible')
             .reduce((sum, f) => sum + (Number(f.monto) || 0), 0) - pendingFloatExpenses;
             
+        // El Fondo de Reserva es intocable para cubrir socios: no se suma a lo disponible de cada socio,
+        // ni se usa como respaldo cuando alguien retira más de lo que ganó.
         let totalSociosDisp = 0;
         this.sociosConfig.forEach(soc => {
             const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
-            const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
             const retirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
-            totalSociosDisp += ((ganado + reserve) - retirado);
+            totalSociosDisp += (ganado - retirado);
         });
 
-        let totalReservaUtilizada = 0;
-        this.sociosConfig.forEach(soc => {
-            const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
-            const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
-            const retirado = this.movements
-                .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
-                .reduce((acc, m) => acc + m.monto, 0);
-            
-            const excess = Math.max(0, retirado - ganado);
-            const reserveUsed = Math.min(reserve, excess);
-            totalReservaUtilizada += reserveUsed;
-        });
-
-        const balanceF = histUB > histGC 
-            ? Math.max(0, histRetenidoFondoGlobal - histGC_Reserva - totalReservaUtilizada) 
+        const balanceF = histUB > histGC
+            ? Math.max(0, histRetenidoFondoGlobal - histGC_Reserva)
             : -(histGC - histUB);
         const cajaTeoricaPre = balanceF + totalSociosDisp + totalFloatPool;
 
@@ -3224,94 +2916,24 @@ export const PartnersComponent = {
         const hoy = new Date();
         hoy.setHours(23, 59, 59, 999);
         const allTrips = this.getAllTrips();
-        const histRealizedTrips = allTrips.filter(t => t.dateObj <= hoy);
-        const histUB = histRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-        // Historical corporate expenses (excluding reserve-funded ones and pending float-funded ones)
-        const histGC = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Utilidad de la Agencia' || (g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado') || !g.origen_fondos)
-            .reduce((acc, g) => acc + g.monto, 0);
 
-        const histGC_Reserva = this.corporateExpenses
-            .filter(g => g.origen_fondos === 'Fondo de Reserva')
-            .reduce((acc, g) => acc + g.monto, 0);
-        
-        // Calculate historical realized net profit and reserve share per socio month by month
-        const globalPartnerGanado = {};
-        const globalPartnerReserve = {};
-        let histRetenidoFondoGlobal = 0;
-        this.sociosConfig.forEach(s => {
-            globalPartnerGanado[s.email.toLowerCase()] = 0;
-            globalPartnerReserve[s.email.toLowerCase()] = 0;
-        });
+        // Utilidad, gastos y ganado histórico por socio, mes a mes con el % vigente en cada mes
+        const { globalPartnerGanado, globalPartnerReserve, histRetenidoFondoGlobal, histUB, histGC, histGC_Reserva } =
+            this.getHistoricalPartnerTotals(hoy, allTrips);
 
-        const startHistDate = new Date('2026-04-01T00:00:00');
-        let currM = new Date(startHistDate);
-        while (currM <= hoy) {
-            const y = currM.getFullYear();
-            const m = String(currM.getMonth() + 1).padStart(2, '0');
-            const ym = `${y}-${m}`;
-            const [ySel, mSel] = ym.split('-').map(Number);
-            const startM = new Date(ySel, mSel - 1, 1);
-            const endM = new Date(ySel, mSel, 0, 23, 59, 59, 999);
-
-            const mRealizedTrips = allTrips.filter(t => t.dateObj <= hoy && t.dateObj >= startM && t.dateObj <= endM);
-            const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
-
-            const mExpenses = this.corporateExpenses.filter(g => {
-                if (g.deleted_at) return false;
-                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
-                const date = new Date(g.fecha);
-                return date >= startM && date <= endM;
-            });
-
-            const mFixedGC = mExpenses.filter(g => g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-            const mVariableGC = mExpenses.filter(g => !g.es_recurrente).reduce((sum, g) => sum + g.monto, 0);
-
-            let mUN = 0;
-            let mRetencionFondo = 0;
-            if (mUB >= mFixedGC) {
-                const mUN_Operacion = mUB - mFixedGC - mVariableGC;
-                mRetencionFondo = Math.max(0, mUN_Operacion * (this.porcentajeRetencion / 100));
-                mUN = Math.max(0, mUN_Operacion - mRetencionFondo);
-            }
-
-            histRetenidoFondoGlobal += mRetencionFondo;
-
-            this.sociosConfig.forEach(soc => {
-                const pct = this.getPartnerPorcentaje(soc.email, ym);
-                globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
-                globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
-            });
-
-            currM.setMonth(currM.getMonth() + 1);
-        }
-
+        // El Fondo de Reserva es intocable para cubrir socios: no se suma a lo disponible de cada socio,
+        // ni se usa como respaldo cuando alguien retira más de lo que ganó.
         let totalSociosDisponible = 0;
         this.sociosConfig.forEach(soc => {
             const ganadoHistorico = globalPartnerGanado[soc.email.toLowerCase()] || 0;
-            const reserveShare = globalPartnerReserve[soc.email.toLowerCase()] || 0;
             const totalRetirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
                 .reduce((acc, m) => acc + m.monto, 0);
-            // Disponible includes the 90% earned + the 10% reserve fund share to buffer deficits
-            totalSociosDisponible += ((ganadoHistorico + reserveShare) - totalRetirado);
+            totalSociosDisponible += (ganadoHistorico - totalRetirado);
         });
 
-        let totalReservaUtilizada = 0;
-        this.sociosConfig.forEach(soc => {
-            const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
-            const reserve = globalPartnerReserve[soc.email.toLowerCase()] || 0;
-            const retirado = this.movements
-                .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
-                .reduce((acc, m) => acc + m.monto, 0);
-            
-            const excess = Math.max(0, retirado - ganado);
-            const reserveUsed = Math.min(reserve, excess);
-            totalReservaUtilizada += reserveUsed;
-        });
-
-        const balanceFondo = histUB > histGC 
-            ? Math.max(0, histRetenidoFondo - histGC_Reserva - totalReservaUtilizada) 
+        const balanceFondo = histUB > histGC
+            ? Math.max(0, histRetenidoFondoGlobal - histGC_Reserva)
             : -(histGC - histUB);
 
         const pendingFloatExpenses = (this.corporateExpenses || [])
