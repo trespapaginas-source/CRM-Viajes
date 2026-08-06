@@ -1022,8 +1022,9 @@ export const RentabilidadComponent = {
             } else {
                 let htmlSplit = '';
                 PartnersComponent.sociosConfig.forEach(soc => {
-                    const share = margenNeto * (soc.porcentaje / 100);
-                    htmlSplit += `<div class="flex justify-between items-center text-[10px] font-bold mb-0.5"><span class="text-slate-500 truncate mr-2" title="${soc.nombre}">${soc.nombre} <span class="text-[8px] text-slate-300">(${soc.porcentaje}%)</span></span><span class="text-emerald-500 tabular-nums shrink-0">${formatCOP(share)}</span></div>`;
+                    const pct = PartnersComponent.getPartnerPorcentaje(soc.email, this.currentFecha);
+                    const share = margenNeto * (pct / 100);
+                    htmlSplit += `<div class="flex justify-between items-center text-[10px] font-bold mb-0.5"><span class="text-slate-500 truncate mr-2" title="${soc.nombre}">${soc.nombre} <span class="text-[8px] text-slate-300">(${pct}%)</span></span><span class="text-emerald-500 tabular-nums shrink-0">${formatCOP(share)}</span></div>`;
                 });
                 splitContainer.innerHTML = htmlSplit;
             }
