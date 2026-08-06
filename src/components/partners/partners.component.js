@@ -1615,11 +1615,9 @@ export const PartnersComponent = {
             const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
             const mExpenses = this.corporateExpenses.filter(g => {
+                if (g.deleted_at) return false;
+                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
                 const date = new Date(g.fecha);
-                const isCreatedBeforeOrInMonth = date <= endM;
-                const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
-                if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
-                if (g.es_recurrente) return true;
                 return date >= startM && date <= endM;
             });
 
@@ -2584,11 +2582,9 @@ export const PartnersComponent = {
             const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
             const mExpenses = this.corporateExpenses.filter(g => {
+                if (g.deleted_at) return false;
+                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
                 const date = new Date(g.fecha);
-                const isCreatedBeforeOrInMonth = date <= endM;
-                const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
-                if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
-                if (g.es_recurrente) return true;
                 return date >= startM && date <= endM;
             });
 
@@ -2701,11 +2697,9 @@ export const PartnersComponent = {
             const mUB = mRealizedTrips.reduce((acc, t) => acc + t.margen, 0);
 
             const mExpenses = this.corporateExpenses.filter(g => {
+                if (g.deleted_at) return false;
+                if (g.origen_fondos && g.origen_fondos !== 'Utilidad de la Agencia' && !(g.origen_fondos === 'Fondo Flotante' && g.estado_pago === 'pagado')) return false;
                 const date = new Date(g.fecha);
-                const isCreatedBeforeOrInMonth = date <= endM;
-                const isNotDeletedOrDeletedAfterMonth = !g.deleted_at || new Date(g.deleted_at) > endM;
-                if (!isCreatedBeforeOrInMonth || !isNotDeletedOrDeletedAfterMonth) return false;
-                if (g.es_recurrente) return true;
                 return date >= startM && date <= endM;
             });
 
