@@ -1,7 +1,7 @@
 import { DataService, supabaseClient } from '../../../js/services/supabase.service.js';
 import { Store } from '../../core/store.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, formatShortDate, formatDoubleDate, parseSpanishDate } from '../../../js/utils/format.utils.js';
+import { formatCOP, formatShortDate, formatDoubleDate, parseSpanishDate, enCajaCuentaComoRealizado } from '../../../js/utils/format.utils.js';
 
 export const PartnersComponent = {
     sociosConfig: [],
@@ -21,6 +21,10 @@ export const PartnersComponent = {
     getClientRealPax(c) {
         const companionsCount = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at).length;
         return companionsCount > 0 ? 1 : parseInt(c.pax || 1);
+    },
+
+    getClientAbonosConfirmados(c) {
+        return DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
     },
 
     async loadAgencyConfig() {
@@ -80,6 +84,20 @@ export const PartnersComponent = {
         // 3. Fallback Final: Cargar configuración por defecto
         this.sociosConfig = [...defaultSocios];
         this._configLoaded = true;
+    },
+
+    // socios_config tiene 2 filas por socio real (vigencia migrada el 08-12, nunca usada
+    // realmente por getPartnerPorcentaje que hardcodea el % vigente por fecha). Cualquier
+    // total "por socio" debe iterar esta lista deduplicada por email, no sociosConfig crudo
+    // — de lo contrario cada socio se procesa dos veces y los montos quedan duplicados.
+    getSociosUnicos() {
+        const seen = new Set();
+        return this.sociosConfig.filter(s => {
+            const e = (s.email || '').toLowerCase();
+            if (!e || seen.has(e)) return false;
+            seen.add(e);
+            return true;
+        });
     },
 
     getPartnerPorcentaje(email, dateOrYM) {
@@ -217,7 +235,7 @@ export const PartnersComponent = {
     getHistoricalPartnerTotals(hoy, allTrips) {
         const globalPartnerGanado = {};
         const globalPartnerReserve = {};
-        this.sociosConfig.forEach(s => {
+        this.getSociosUnicos().forEach(s => {
             globalPartnerGanado[s.email.toLowerCase()] = 0;
             globalPartnerReserve[s.email.toLowerCase()] = 0;
         });
@@ -236,7 +254,7 @@ export const PartnersComponent = {
             histUB += mUB;
             histRetenidoFondoGlobal += mRetencionFondo;
 
-            this.sociosConfig.forEach(soc => {
+            this.getSociosUnicos().forEach(soc => {
                 const pct = this.getPartnerPorcentaje(soc.email, ym);
                 globalPartnerGanado[soc.email.toLowerCase()] += mUN * (pct / 100);
                 globalPartnerReserve[soc.email.toLowerCase()] += mRetencionFondo * (pct / 100);
@@ -893,19 +911,19 @@ export const PartnersComponent = {
                 const paxNum = this.getClientRealPax(c);
                 paxTotal += paxNum;
                 const st = c.estado ? c.estado.toLowerCase() : '';
-                
-                if (['devolución', 'en caja', 'reprogramado'].includes(st)) {
+                const totalAbo = this.getClientAbonosConfirmados(c);
+                const enCajaRealizado = st === 'en caja' && enCajaCuentaComoRealizado(c.precio_total, totalAbo, c.estado_manual);
+
+                if (['devolución', 'reprogramado'].includes(st) || (st === 'en caja' && !enCajaRealizado)) {
                     paxRetenidos += paxNum;
                 } else {
                     paxAsistentes += paxNum;
                 }
 
                 if (st === 'devolución') {
-                    const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                     const devuelto = parseFloat(c.monto_devuelto || 0);
                     ingresoBruto += Math.max(0, totalAbo - devuelto);
-                } else if (st === 'en caja') {
-                    const totalAbo = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+                } else if (st === 'en caja' && !enCajaRealizado) {
                     ingresoBruto += totalAbo;
                 } else if (st === 'reprogramado') {
                     // No aporta ingresos a esta salida
@@ -913,7 +931,8 @@ export const PartnersComponent = {
                     ingresoBruto += parseFloat(c.precio_total || 0);
                 }
 
-                if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
+                const cuentaCosto = st !== 'devolución' && st !== 'reprogramado' && (st !== 'en caja' || enCajaRealizado);
+                if (cuentaCosto) {
                     let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan?.costo_base || 0);
                     if (cCost === 0) {
                         const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
@@ -1127,7 +1146,7 @@ export const PartnersComponent = {
         const sCards = document.getElementById('pvm-socios-cards');
         if (sCards) {
             sCards.innerHTML = '';
-            this.sociosConfig.forEach(soc => {
+            this.getSociosUnicos().forEach(soc => {
                 const esMio = soc.email.toLowerCase() === currentUserEmail;
                 const pagoSocio = this.getPartnerShareForRange(soc.email, dateStart, dateEnd, allTrips, hoy);
                 const pctBadge = this.getPartnerPorcentaje(soc.email, `${dateEnd.getFullYear()}-${String(dateEnd.getMonth() + 1).padStart(2, '0')}`);
@@ -1336,7 +1355,7 @@ export const PartnersComponent = {
             // socio, y NO se usa como respaldo cuando alguien retira más de lo que ganó. Solo se reduce
             // por gastos explícitamente cargados a él (origen_fondos = 'Fondo de Reserva', ej. emergencias).
             let totalSociosDisp = 0;
-            this.sociosConfig.forEach(soc => {
+            this.getSociosUnicos().forEach(soc => {
                 const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
                 const retirado = this.movements
                     .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
@@ -1781,7 +1800,7 @@ export const PartnersComponent = {
         const globalGrid = document.getElementById('pvm-saldos-global-grid');
         if (globalGrid) {
             globalGrid.innerHTML = '';
-            this.sociosConfig.forEach(soc => {
+            this.getSociosUnicos().forEach(soc => {
                 const esMio = soc.email.toLowerCase() === currentUserEmail;
                 const puedeVerDinero = isAdmin || esMio;
 
@@ -1915,7 +1934,7 @@ export const PartnersComponent = {
         if (histFilter) {
             const currentSelected = histFilter.value;
             histFilter.innerHTML = '<option value="todos">Todos los Socios</option>';
-            this.sociosConfig.forEach(soc => {
+            this.getSociosUnicos().forEach(soc => {
                 histFilter.innerHTML += `<option value="${soc.email}">${UI.sanitize(soc.nombre)}</option>`;
             });
             histFilter.value = currentSelected;
@@ -2122,7 +2141,7 @@ export const PartnersComponent = {
         const thead = document.getElementById('pvm-monthly-thead');
         if (thead) {
             let partnerCols = '';
-            this.sociosConfig.forEach(soc => {
+            this.getSociosUnicos().forEach(soc => {
                 partnerCols += `<th class="py-2.5 px-4 text-right">${UI.sanitize(soc.nombre)}</th>`;
             });
             thead.innerHTML = `
@@ -2147,7 +2166,7 @@ export const PartnersComponent = {
         if (mList) {
             mList.innerHTML = '';
             if (monthlyData.length === 0) {
-                const colspan = 10 + this.sociosConfig.length;
+                const colspan = 10 + this.getSociosUnicos().length;
                 mList.innerHTML = `<tr><td colspan="${colspan}" class="py-4 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">Sin datos disponibles</td></tr>`;
             } else {
                 monthlyData.forEach(row => {
@@ -2156,7 +2175,7 @@ export const PartnersComponent = {
                     const netaColor = row.neta >= 0 ? 'text-emerald-600' : 'text-rose-500';
 
                     let partnerCells = '';
-                    this.sociosConfig.forEach(soc => {
+                    this.getSociosUnicos().forEach(soc => {
                         const esMio = soc.email.toLowerCase() === currentUserEmail;
                         const puedeVer = isAdmin || esMio;
                         const pctRow = this.getPartnerPorcentaje(soc.email, row.month);
@@ -2498,7 +2517,7 @@ export const PartnersComponent = {
         // El Fondo de Reserva es intocable para cubrir socios: no se suma a lo disponible de cada socio,
         // ni se usa como respaldo cuando alguien retira más de lo que ganó.
         let totalSociosDisp = 0;
-        this.sociosConfig.forEach(soc => {
+        this.getSociosUnicos().forEach(soc => {
             const ganado = globalPartnerGanado[soc.email.toLowerCase()] || 0;
             const retirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())
@@ -2924,7 +2943,7 @@ export const PartnersComponent = {
         // El Fondo de Reserva es intocable para cubrir socios: no se suma a lo disponible de cada socio,
         // ni se usa como respaldo cuando alguien retira más de lo que ganó.
         let totalSociosDisponible = 0;
-        this.sociosConfig.forEach(soc => {
+        this.getSociosUnicos().forEach(soc => {
             const ganadoHistorico = globalPartnerGanado[soc.email.toLowerCase()] || 0;
             const totalRetirado = this.movements
                 .filter(m => m.socio_email.toLowerCase() === soc.email.toLowerCase())

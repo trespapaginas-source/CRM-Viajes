@@ -49,6 +49,29 @@ export function parseSpanishDate(dateStr) {
     return new Date(dateStr);
 }
 
+// Un cliente "En Caja" (el plan ya finalizó, el pago quedó incompleto y nunca se
+// cargó el saldo restante) se trata como si SÍ hubiese viajado — cuenta ingreso
+// pleno (precio_total) y costo completo del proveedor — cuando alcanzó a abonar
+// al menos el 20% del valor del plan antes de esa fecha: a ese nivel de abono se
+// asume que hubo un cupo real reservado con el proveedor. Por debajo del 20% se
+// mantiene el trato histórico de "en caja": no se le carga costo (no viajó) y el
+// abono recibido queda como ganancia de la agencia, sin devolución ni cobro del
+// resto. Regla de negocio confirmada por el usuario el 2026-08-19 (ajustada de
+// 30% a 20% ese mismo día tras validar el caso real de Daniel Álvarez, 27.6%).
+//
+// El % abonado es solo un proxy — falla cuando el cliente sí abonó bastante pero
+// igual no viajó (ej. Kevin Altamar y Sahia Peña, 35.7% abonado, confirmado por
+// el usuario el 2026-08-21 que no asistieron). Para esos casos puntuales, marcar
+// estado_manual=true en el cliente hace que esta función respete el estado "en
+// caja" tal cual está, sin importar el % abonado — el operador ya verificó a mano
+// que no hubo servicio real.
+export function enCajaCuentaComoRealizado(precioTotal, montoAbonado, estadoManual) {
+    if (estadoManual === true) return false;
+    const total = Number(precioTotal) || 0;
+    if (total <= 0) return false;
+    return (Number(montoAbonado) || 0) / total >= 0.2;
+}
+
 export function calcularFinanzas(totalAbonadoValido = 0, tarifaTotal = 0) {
     totalAbonadoValido = Number(Math.floor(totalAbonadoValido || 0));
     tarifaTotal = Number(Math.floor(tarifaTotal || 0));

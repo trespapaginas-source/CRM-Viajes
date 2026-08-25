@@ -2,7 +2,7 @@ import { DataService, supabaseClient } from '../../../js/services/supabase.servi
 import { Store } from '../../core/store.js';
 import { PartnersComponent } from '../partners/partners.component.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, formatShortDate, parseSpanishDate, formatDoubleDate } from '../../../js/utils/format.utils.js';
+import { formatCOP, formatShortDate, parseSpanishDate, formatDoubleDate, enCajaCuentaComoRealizado } from '../../../js/utils/format.utils.js';
 import { ClientsComponent } from '../clients/clients.component.js';
 
 export const RentabilidadComponent = {
@@ -15,6 +15,20 @@ export const RentabilidadComponent = {
     getClientRealPax(c) {
         const companionsCount = DataService.clientes.filter(x => x.parent_id === c.id && !x.deleted_at).length;
         return companionsCount > 0 ? 1 : parseInt(c.pax || 1);
+    },
+
+    getClientAbonosConfirmados(c) {
+        return DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+    },
+
+    // Se agrupa por la fecha de INICIO de la salida (igual que la Bóveda de Socios), tomando el primer
+    // tramo de "fecha_viaje" cuando es un rango ("... al ...").
+    getSalidaYearMonth(fechaViaje) {
+        if (!fechaViaje) return null;
+        const inicioStr = fechaViaje.split(/\s+al\s+/i)[0].trim();
+        const d = parseSpanishDate(inicioStr);
+        if (!d || isNaN(d.getTime())) return null;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     },
 
     init() {
@@ -83,6 +97,9 @@ export const RentabilidadComponent = {
 
         const fDestino = document.getElementById('filter-rentabilidad-destino');
         if (fDestino) fDestino.addEventListener('change', () => this.filterGrid());
+
+        const fMes = document.getElementById('filter-rentabilidad-mes');
+        if (fMes) fMes.addEventListener('change', () => this.filterGrid());
 
         const fSearch = document.getElementById('filter-rentabilidad-search');
         if (fSearch) fSearch.addEventListener('input', () => this.filterGrid());
@@ -177,6 +194,24 @@ export const RentabilidadComponent = {
             fD.innerHTML = '<option value="">Todos los Destinos</option>';
             DataService.db.destinos.forEach(d => fD.innerHTML += `<option value="${d}">${d}</option>`);
         }
+        const fM = document.getElementById('filter-rentabilidad-mes');
+        if (fM) {
+            const selected = fM.value;
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const yearsMonths = new Set();
+            DataService.clientes.forEach(c => {
+                const ym = this.getSalidaYearMonth(c.fecha_viaje);
+                if (ym) yearsMonths.add(ym);
+            });
+            const sorted = [...yearsMonths].sort();
+            fM.innerHTML = '<option value="">Todos los Meses</option>';
+            sorted.forEach(ym => {
+                const [y, m] = ym.split('-');
+                const label = `${meses[parseInt(m) - 1]} ${y}`;
+                fM.innerHTML += `<option value="${ym}">${label}</option>`;
+            });
+            if (selected && sorted.includes(selected)) fM.value = selected;
+        }
     },
 
     filterGrid() { this.renderGrid(); },
@@ -229,6 +264,9 @@ export const RentabilidadComponent = {
             const filterDestino = document.getElementById('filter-rentabilidad-destino')?.value.toLowerCase() || "";
             if (filterDestino && !(plan.destino || "").toLowerCase().includes(filterDestino)) return;
 
+            const filterMes = document.getElementById('filter-rentabilidad-mes')?.value || "";
+            if (filterMes && this.getSalidaYearMonth(cli.fecha_viaje) !== filterMes) return;
+
             const filterSearch = document.getElementById('filter-rentabilidad-search')?.value.toLowerCase() || "";
             if (filterSearch) {
                 const searchInPlan = plan.nombre.toLowerCase().includes(filterSearch);
@@ -244,17 +282,18 @@ export const RentabilidadComponent = {
             const grupo = salidasMap.get(key);
             grupo.pax_total += this.getClientRealPax(cli);
 
+            const totalAboCli = this.getClientAbonosConfirmados(cli);
+            const enCajaRealizado = st === 'en caja' && enCajaCuentaComoRealizado(cli.precio_total, totalAboCli, cli.estado_manual);
+
             if (st === 'devolución') {
-                const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
                 const devuelto = parseFloat(cli.monto_devuelto || 0);
-                grupo.ingreso_bruto += Math.max(0, totalAbo - devuelto);
+                grupo.ingreso_bruto += Math.max(0, totalAboCli - devuelto);
                 // Excluir de pasajeros en servicio
             } else if (st === 'reprogramado') {
                 // No aporta ingresos a esta salida y tampoco cuenta como pax_servicio
-            } else if (st === 'en caja') {
-                const totalAbo = DataService.abonos.filter(a => a.cliente_id === cli.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
-                grupo.ingreso_bruto += totalAbo;
-                grupo.ingreso_retenido += totalAbo;
+            } else if (st === 'en caja' && !enCajaRealizado) {
+                grupo.ingreso_bruto += totalAboCli;
+                grupo.ingreso_retenido += totalAboCli;
             } else {
                 grupo.ingreso_bruto += parseFloat(cli.precio_total || 0);
                 grupo.pax_servicio += this.getClientRealPax(cli);
@@ -311,7 +350,9 @@ export const RentabilidadComponent = {
             let costoOperativoBase = 0;
             data.clientes.forEach(c => {
                 const st = c.estado ? c.estado.toLowerCase() : '';
-                if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
+                const cuentaCosto = st !== 'devolución' && st !== 'reprogramado'
+                    && (st !== 'en caja' || enCajaCuentaComoRealizado(c.precio_total, this.getClientAbonosConfirmados(c), c.estado_manual));
+                if (cuentaCosto) {
                     let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
                     if (cCost === 0) {
                         const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
@@ -458,7 +499,8 @@ export const RentabilidadComponent = {
             paxTotal += p;
 
             const st = c.estado ? c.estado.toLowerCase() : '';
-            const abonado = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded').reduce((s, a) => s + (Number(a.monto) || 0), 0);
+            const abonado = this.getClientAbonosConfirmados(c);
+            const enCajaRealizado = st === 'en caja' && enCajaCuentaComoRealizado(c.precio_total, abonado, c.estado_manual);
 
             if (st === 'devolución') {
                 const devuelto = parseFloat(c.monto_devuelto || 0);
@@ -466,7 +508,7 @@ export const RentabilidadComponent = {
                 // Excluir de pasajeros en servicio
             } else if (st === 'reprogramado') {
                 // No aporta ingresos a esta salida y tampoco cuenta como pasajeros en servicio
-            } else if (st === 'en caja') {
+            } else if (st === 'en caja' && !enCajaRealizado) {
                 ingresoBruto += abonado;
                 ingresoRetenido += abonado;
             } else {
@@ -474,7 +516,7 @@ export const RentabilidadComponent = {
                 paxServicio += p;
             }
 
-            const isEnCajaPast = st === 'en caja' && isPastTrip;
+            const isEnCajaPast = st === 'en caja' && !enCajaRealizado && isPastTrip;
             const saldo = Math.max(c.precio_total - abonado, 0);
 
             let statusHtml;
@@ -800,7 +842,9 @@ export const RentabilidadComponent = {
 
         clientesSalida.forEach(c => {
             const st = c.estado ? c.estado.toLowerCase() : '';
-            if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
+            const cuentaCosto = st !== 'devolución' && st !== 'reprogramado'
+                && (st !== 'en caja' || enCajaCuentaComoRealizado(c.precio_total, this.getClientAbonosConfirmados(c), c.estado_manual));
+            if (cuentaCosto) {
                 let cCost = (c.costo_base !== undefined && c.costo_base !== null) ? parseFloat(c.costo_base) : parseFloat(plan.costo_base || 0);
                 if (cCost === 0) {
                     const provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
@@ -818,7 +862,9 @@ export const RentabilidadComponent = {
 
         clientesSalida.forEach(c => {
             const st = c.estado ? c.estado.toLowerCase() : '';
-            if (st !== 'en caja' && st !== 'devolución' && st !== 'reprogramado') {
+            const cuentaCosto = st !== 'devolución' && st !== 'reprogramado'
+                && (st !== 'en caja' || enCajaCuentaComoRealizado(c.precio_total, this.getClientAbonosConfirmados(c), c.estado_manual));
+            if (cuentaCosto) {
                 const paxNum = this.getClientRealPax(c);
                 let provs = (c.proveedores_vinculados && c.proveedores_vinculados.length > 0)
                     ? c.proveedores_vinculados
@@ -1021,7 +1067,7 @@ export const RentabilidadComponent = {
                 splitContainer.innerHTML = `<div class="text-[9px] font-bold text-slate-400">Sin ganancia a distribuir</div>`;
             } else {
                 let htmlSplit = '';
-                PartnersComponent.sociosConfig.forEach(soc => {
+                PartnersComponent.getSociosUnicos().forEach(soc => {
                     const pct = PartnersComponent.getPartnerPorcentaje(soc.email, this.currentFecha);
                     const share = margenNeto * (pct / 100);
                     htmlSplit += `<div class="flex justify-between items-center text-[10px] font-bold mb-0.5"><span class="text-slate-500 truncate mr-2" title="${soc.nombre}">${soc.nombre} <span class="text-[8px] text-slate-300">(${pct}%)</span></span><span class="text-emerald-500 tabular-nums shrink-0">${formatCOP(share)}</span></div>`;
@@ -1161,9 +1207,8 @@ export const RentabilidadComponent = {
         const rows = [];
 
         clientesSalida.forEach(c => {
-            const abonos = DataService.abonos.filter(a => a.cliente_id === c.id && a.estado_pago !== 'pending' && a.estado_pago !== 'refunded');
-            const totalAbonado = abonos.reduce((s, a) => s + (Number(a.monto) || 0), 0);
-            
+            const totalAbonado = this.getClientAbonosConfirmados(c);
+
             let precio = parseFloat(c.precio_total || 0);
             const st = c.estado ? c.estado.toLowerCase() : '';
             if (st === 'devolución') {
@@ -1171,7 +1216,7 @@ export const RentabilidadComponent = {
                 precio = Math.max(0, totalAbonado - devuelto);
             } else if (st === 'reprogramado') {
                 precio = 0;
-            } else if (st === 'en caja') {
+            } else if (st === 'en caja' && !enCajaCuentaComoRealizado(c.precio_total, totalAbonado, c.estado_manual)) {
                 precio = totalAbonado;
             }
 

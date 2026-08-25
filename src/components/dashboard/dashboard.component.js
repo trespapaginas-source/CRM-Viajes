@@ -1,7 +1,7 @@
 import { DataService } from '../../../js/services/supabase.service.js';
 import { Store } from '../../core/store.js';
 import { UI } from '../../../js/utils/ui.utils.js';
-import { formatCOP, parseSpanishDate, formatDoubleDate } from '../../../js/utils/format.utils.js';
+import { formatCOP, parseSpanishDate, formatDoubleDate, enCajaCuentaComoRealizado } from '../../../js/utils/format.utils.js';
 
 export const DashboardComponent = {
     currentRange: 'mes',
@@ -111,6 +111,7 @@ export const DashboardComponent = {
             const isCancelled = ['cancelado o devolución', 'desistió', 'cancelados'].includes(stLower);
             const isDevolucion = stLower === 'devolución';
             const isReprogramado = stLower === 'reprogramado';
+            const isEnCaja = stLower === 'en caja';
 
             // Conteo global
             if (clientDate >= startDate) {
@@ -123,6 +124,11 @@ export const DashboardComponent = {
 
             if (isActiveSale) {
                 const abonosCli = abonosMap[cli.id] || 0;
+                // En Caja: plan ya finalizado con pago incompleto sin cargar el saldo. Se
+                // trata como si sí hubiese viajado (cuenta ingreso y costo completos) solo
+                // si alcanzó a abonar al menos 30% del plan; si no, se asume que no viajó
+                // (igual que en Rentabilidad/Bóveda — ver enCajaCuentaComoRealizado).
+                const enCajaRealizado = isEnCaja && enCajaCuentaComoRealizado(cli.precio_total, abonosCli, cli.estado_manual);
 
                 // Devolución: solo cuenta lo que quedó de abonos tras el reembolso (igual que en Rentabilidad).
                 // Reprogramado: no aporta ingreso a esta reserva original.
@@ -131,6 +137,8 @@ export const DashboardComponent = {
                     precio = Math.max(0, abonosCli - parseFloat(cli.monto_devuelto || 0));
                 } else if (isReprogramado) {
                     precio = 0;
+                } else if (isEnCaja && !enCajaRealizado) {
+                    precio = abonosCli;
                 } else {
                     precio = parseFloat(cli.precio_total || 0);
                 }
@@ -139,10 +147,10 @@ export const DashboardComponent = {
                 totalRecaudado += abonosCli;
                 carteraPendiente += Math.max(precio - abonosCli, 0);
 
-                // Real PAX to avoid double counting group companions (excluye devolución/reprogramado, igual que Rentabilidad)
+                // Real PAX to avoid double counting group companions (excluye devolución/reprogramado/en-caja-no-realizado, igual que Rentabilidad)
                 const companionsCount = DataService.clientes.filter(x => x.parent_id === cli.id && !x.deleted_at).length;
                 const realPaxCli = companionsCount > 0 ? 1 : parseInt(cli.pax || 1);
-                const paxServicioCli = (isDevolucion || isReprogramado) ? 0 : realPaxCli;
+                const paxServicioCli = (isDevolucion || isReprogramado || (isEnCaja && !enCajaRealizado)) ? 0 : realPaxCli;
                 totalPasajeros += paxServicioCli;
 
                 const plan = DataService.planes.find(p => p.id === cli.plan_id);
